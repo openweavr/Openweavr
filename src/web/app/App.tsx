@@ -16,9 +16,9 @@ export function App() {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onNavigate={setCurrentPage} />;
       case 'workflows':
-        return <Workflows />;
+        return <Workflows onNavigate={setCurrentPage} />;
       case 'runs':
         return <Runs />;
       case 'builder':

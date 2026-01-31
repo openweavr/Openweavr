@@ -9,7 +9,11 @@ interface Workflow {
   status: 'active' | 'inactive';
 }
 
-export function Workflows() {
+interface WorkflowsProps {
+  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings') => void;
+}
+
+export function Workflows({ onNavigate }: WorkflowsProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +52,7 @@ export function Workflows() {
           <h1 className="page-title">Workflows</h1>
           <p className="page-subtitle">Manage your automation workflows</p>
         </div>
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" onClick={() => onNavigate('builder')}>
           <span>+</span> New Workflow
         </button>
       </div>
@@ -63,7 +67,7 @@ export function Workflows() {
           <div className="empty-icon">🧵</div>
           <div className="empty-title">No workflows yet</div>
           <p>Create your first workflow to get started</p>
-          <button className="btn btn-primary" style={{ marginTop: '20px' }}>
+          <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={() => onNavigate('builder')}>
             <span>+</span> Create Workflow
           </button>
         </div>

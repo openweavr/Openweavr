@@ -16,7 +16,11 @@ interface RecentRun {
   duration?: number;
 }
 
-export function Dashboard() {
+interface DashboardProps {
+  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings') => void;
+}
+
+export function Dashboard({ onNavigate }: DashboardProps) {
   const { connected, messages } = useWebSocket();
   const [stats, setStats] = useState<Stats>({
     totalWorkflows: 0,
@@ -148,7 +152,7 @@ export function Dashboard() {
           <h2 className="card-title">Quick Actions</h2>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={() => onNavigate('builder')}>
             <span>+</span> New Workflow
           </button>
           <button className="btn btn-secondary">
