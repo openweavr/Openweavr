@@ -1,0 +1,65 @@
+name: Plugin Request
+description: Request a new integration/plugin
+title: "[Plugin]: "
+labels: ["plugin", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want Weavr to integrate with a new service? Let us know!
+
+  - type: input
+    id: service
+    attributes:
+      label: Service Name
+      description: What service should we integrate with?
+      placeholder: e.g., Linear, Notion, Discord
+    validations:
+      required: true
+
+  - type: input
+    id: service-url
+    attributes:
+      label: Service URL
+      description: Link to the service
+      placeholder: https://...
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: What would you automate with this plugin?
+      placeholder: |
+        I want to:
+        - Trigger workflows when...
+        - Create/update... in the service
+        - Send notifications to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: api-docs
+    attributes:
+      label: API Documentation
+      description: Link to API docs if available
+      placeholder: https://docs.service.com/api
+
+  - type: checkboxes
+    id: actions
+    attributes:
+      label: Desired Actions
+      description: What actions should this plugin support?
+      options:
+        - label: Triggers (events from the service)
+        - label: Create/Write operations
+        - label: Read/Query operations
+        - label: Update operations
+        - label: Delete operations
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to help build this plugin
+          required: false

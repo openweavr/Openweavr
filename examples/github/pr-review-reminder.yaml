@@ -1,0 +1,35 @@
+name: pr-review-reminder
+description: Daily reminder for open PRs needing review
+
+triggers:
+  - type: cron.schedule
+    config:
+      expression: "0 9 * * 1-5"  # 9am weekdays
+      timezone: America/New_York
+
+steps:
+  - id: fetch-prs
+    action: github.list_prs
+    config:
+      repo: your-org/your-repo
+      state: open
+
+  - id: filter-needs-review
+    action: transform
+    depends_on:
+      - fetch-prs
+    config:
+      template: |
+        📋 *Open PRs Needing Review*
+
+        {% for pr in steps.fetch-prs %}
+        • <{{ pr.html_url }}|{{ pr.title }}> by {{ pr.user.login }}
+        {% endfor %}
+
+  - id: post-reminder
+    action: slack.post
+    depends_on:
+      - filter-needs-review
+    config:
+      channel: "#engineering"
+      text: "{{ steps.filter-needs-review }}"

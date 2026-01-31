@@ -1,0 +1,29 @@
+name: bug-to-slack
+description: Notify Slack when GitHub issues are labeled 'bug'
+
+triggers:
+  - type: github.issue.labeled
+    config:
+      repo: your-org/your-repo
+      label: bug
+
+steps:
+  - id: format-message
+    action: transform
+    config:
+      template: |
+        🐛 *New Bug Report*
+
+        *Title:* {{ trigger.issue.title }}
+        *Author:* {{ trigger.issue.user.login }}
+        *Labels:* {{ trigger.issue.labels | map: 'name' | join: ', ' }}
+
+        {{ trigger.issue.html_url }}
+
+  - id: notify-slack
+    action: slack.post
+    depends_on:
+      - format-message
+    config:
+      channel: "#bugs"
+      text: "{{ steps.format-message }}"

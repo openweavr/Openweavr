@@ -1,0 +1,39 @@
+name: auto-label-issues
+description: Automatically label issues based on title keywords
+
+triggers:
+  - type: github.issue.opened
+    config:
+      repo: your-org/your-repo
+
+steps:
+  - id: check-bug
+    action: condition
+    config:
+      if: "{{ trigger.issue.title | downcase | contains: 'bug' }}"
+
+  - id: label-bug
+    action: github.add_labels
+    depends_on:
+      - check-bug
+    config:
+      repo: "{{ trigger.repository.full_name }}"
+      issue_number: "{{ trigger.issue.number }}"
+      labels:
+        - bug
+        - triage
+
+  - id: check-feature
+    action: condition
+    config:
+      if: "{{ trigger.issue.title | downcase | contains: 'feature' }}"
+
+  - id: label-feature
+    action: github.add_labels
+    depends_on:
+      - check-feature
+    config:
+      repo: "{{ trigger.repository.full_name }}"
+      issue_number: "{{ trigger.issue.number }}"
+      labels:
+        - enhancement

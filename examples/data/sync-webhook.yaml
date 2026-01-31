@@ -1,0 +1,49 @@
+name: sync-webhook
+description: Sync data to external service when webhook received
+
+triggers:
+  - type: http.webhook
+    config:
+      path: /sync
+
+env:
+  TARGET_API: https://api.target-service.com/data
+
+steps:
+  - id: validate-payload
+    action: condition
+    config:
+      if: "{{ trigger.data != null }}"
+
+  - id: transform-data
+    action: transform
+    depends_on:
+      - validate-payload
+    config:
+      template: |
+        {
+          "id": "{{ trigger.data.id }}",
+          "name": "{{ trigger.data.name }}",
+          "updated_at": "{{ now | date: '%Y-%m-%dT%H:%M:%SZ' }}",
+          "source": "weavr"
+        }
+
+  - id: send-to-target
+    action: http.post
+    depends_on:
+      - transform-data
+    config:
+      url: "{{ env.TARGET_API }}"
+      body: "{{ steps.transform-data | parse_json }}"
+      headers:
+        Authorization: "Bearer {{ env.TARGET_API_KEY }}"
+    retry:
+      attempts: 3
+      delay: 2000
+
+  - id: log-result
+    action: log
+    depends_on:
+      - send-to-target
+    config:
+      message: "Synced {{ trigger.data.id }} - Status: {{ steps.send-to-target.status }}"

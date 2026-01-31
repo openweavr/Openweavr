@@ -1,0 +1,36 @@
+name: deploy-notify
+description: Notify team when deployment webhook is received
+
+triggers:
+  - type: http.webhook
+    config:
+      path: /deploy
+
+steps:
+  - id: format-message
+    action: transform
+    config:
+      template: |
+        🚀 *Deployment Complete*
+
+        *Environment:* {{ trigger.environment }}
+        *Version:* {{ trigger.version }}
+        *Deployed by:* {{ trigger.user }}
+        *Time:* {{ trigger.timestamp }}
+
+  - id: notify-slack
+    action: slack.post
+    depends_on:
+      - format-message
+    config:
+      channel: "#deployments"
+      text: "{{ steps.format-message }}"
+
+  - id: add-reaction
+    action: slack.react
+    depends_on:
+      - notify-slack
+    config:
+      channel: "#deployments"
+      timestamp: "{{ steps.notify-slack.ts }}"
+      name: rocket

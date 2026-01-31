@@ -2,13 +2,16 @@ import { useWebSocket } from '../hooks/useWebSocket';
 
 interface SidebarProps {
   currentPage: string;
-  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'settings') => void;
+  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings') => void;
 }
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'workflows', label: 'Workflows', icon: '🔄' },
+  { id: 'builder', label: 'Builder', icon: '🔧' },
   { id: 'runs', label: 'Run History', icon: '📜' },
+  { id: 'logs', label: 'Live Logs', icon: '📋' },
+  { id: 'plugins', label: 'Plugins', icon: '🔌' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ] as const;
 

@@ -1,0 +1,42 @@
+name: api-health-check
+description: Check API health every 5 minutes and alert on failures
+
+triggers:
+  - type: cron.schedule
+    config:
+      expression: "*/5 * * * *"  # Every 5 minutes
+
+env:
+  API_URL: https://api.example.com/health
+  ALERT_CHANNEL: "#alerts"
+
+steps:
+  - id: check-health
+    action: http.get
+    config:
+      url: "{{ env.API_URL }}"
+    retry:
+      attempts: 3
+      delay: 5000
+
+  - id: check-status
+    action: condition
+    depends_on:
+      - check-health
+    config:
+      if: "{{ steps.check-health.status != 200 }}"
+
+  - id: alert-failure
+    action: slack.post
+    depends_on:
+      - check-status
+    config:
+      channel: "{{ env.ALERT_CHANNEL }}"
+      text: |
+        🚨 *API Health Check Failed*
+
+        *URL:* {{ env.API_URL }}
+        *Status:* {{ steps.check-health.status }}
+        *Time:* {{ now | date: '%Y-%m-%d %H:%M:%S' }}
+
+        Please investigate immediately!
