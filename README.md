@@ -4,6 +4,8 @@
 
 *Weave your dev life together.*
 
+[![CI](https://github.com/manthan787/weavr/actions/workflows/ci.yml/badge.svg)](https://github.com/manthan787/weavr/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/manthan787/weavr?include_prereleases&sort=semver)](https://github.com/manthan787/weavr/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
