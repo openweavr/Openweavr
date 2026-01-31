@@ -2,10 +2,21 @@ import { definePlugin, defineAction, defineTrigger } from '../../sdk/types.js';
 import { z } from 'zod';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir } from 'node:fs/promises';
 
 // Session storage location
 const AUTH_DIR = join(homedir(), '.weavr', 'whatsapp-auth');
+
+// Check if we have saved auth credentials
+async function hasExistingAuth(): Promise<boolean> {
+  try {
+    const files = await readdir(AUTH_DIR);
+    // Check for creds.json which indicates a saved session
+    return files.some(f => f.includes('creds'));
+  } catch {
+    return false;
+  }
+}
 
 // Active connection (singleton for now)
 let activeSocket: ReturnType<typeof import('@whiskeysockets/baileys').default> | null = null;
@@ -317,6 +328,42 @@ export default definePlugin({
   ],
 
   hooks: {
+    async onLoad() {
+      // Auto-reconnect if we have saved credentials
+      const hasAuth = await hasExistingAuth();
+      if (hasAuth) {
+        console.log('[whatsapp] Found saved session, auto-reconnecting...');
+        try {
+          await createSocket();
+          // Wait up to 30 seconds for reconnection
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              console.log('[whatsapp] Auto-reconnect timed out (this is normal if QR scan is needed)');
+              resolve();
+            }, 30000);
+
+            const checkConnection = () => {
+              if (connectionReady) {
+                clearTimeout(timeout);
+                console.log('[whatsapp] Auto-reconnected successfully!');
+                resolve();
+              } else if (!activeSocket) {
+                clearTimeout(timeout);
+                resolve();
+              } else {
+                setTimeout(checkConnection, 1000);
+              }
+            };
+            checkConnection();
+          });
+        } catch (err) {
+          console.log('[whatsapp] Auto-reconnect failed:', err);
+        }
+      } else {
+        console.log('[whatsapp] No saved session found. Run whatsapp.connect to login.');
+      }
+    },
+
     async onUnload() {
       if (activeSocket) {
         console.log('[whatsapp] Cleanup: disconnecting');

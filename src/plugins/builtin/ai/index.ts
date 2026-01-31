@@ -9,15 +9,96 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
-// Helper to fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 60000): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
+// Helper to sleep for a given duration
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Parse retry-after from error message or headers
+function parseRetryAfter(response: Response, errorBody?: string): number {
+  // Check Retry-After header first
+  const retryAfterHeader = response.headers.get('retry-after');
+  if (retryAfterHeader) {
+    const seconds = parseInt(retryAfterHeader, 10);
+    if (!isNaN(seconds)) return seconds * 1000;
   }
+
+  // Try to parse from error message (OpenAI format: "Please try again in 938ms")
+  if (errorBody) {
+    const msMatch = errorBody.match(/try again in (\d+)ms/i);
+    if (msMatch) return parseInt(msMatch[1], 10);
+
+    const secMatch = errorBody.match(/try again in (\d+(?:\.\d+)?)\s*(?:s|sec|seconds)/i);
+    if (secMatch) return parseFloat(secMatch[1]) * 1000;
+  }
+
+  return 0;
+}
+
+// Helper to fetch with timeout and retry on rate limits
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 60000,
+  maxRetries = 3,
+  logFn?: (msg: string) => void
+): Promise<Response> {
+  let lastError: Error | null = null;
+  let baseDelay = 1000; // Start with 1 second
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+
+      // Check for rate limit errors (429) or server errors (5xx)
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        const errorBody = await response.text();
+
+        if (attempt < maxRetries) {
+          // Calculate delay: use retry-after if available, otherwise exponential backoff
+          let delay = parseRetryAfter(response, errorBody);
+          if (delay === 0) {
+            delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000; // Exponential backoff with jitter
+          }
+
+          const reason = response.status === 429 ? 'rate limited' : `server error ${response.status}`;
+          logFn?.(`API ${reason}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`);
+
+          await sleep(delay);
+          continue;
+        }
+
+        // Max retries exceeded, throw with context
+        throw new Error(`API error after ${maxRetries} retries: ${response.status} - ${errorBody.slice(0, 200)}`);
+      }
+
+      return response;
+    } catch (err) {
+      clearTimeout(timeout);
+      lastError = err as Error;
+
+      // Don't retry on abort (timeout) or non-retryable errors
+      if ((err as Error).name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeoutMs}ms`);
+      }
+
+      // Retry on network errors
+      if (attempt < maxRetries && (err as Error).message?.includes('fetch')) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        logFn?.(`Network error, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await sleep(delay);
+        continue;
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastError ?? new Error('Request failed after retries');
 }
 
 // CLI-based AI execution
@@ -248,10 +329,11 @@ export default definePlugin({
               system: config.system,
               messages: [{ role: 'user', content: config.prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           if (!response.ok) {
-            throw new Error(`Anthropic API error: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`Anthropic API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
           const data = await response.json() as { content: Array<{ text: string }> };
@@ -282,10 +364,11 @@ export default definePlugin({
               temperature: config.temperature ?? 0.7,
               messages,
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           if (!response.ok) {
-            throw new Error(`OpenAI API error: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`OpenAI API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
           const data = await response.json() as { choices: Array<{ message: { content: string } }> };
@@ -346,12 +429,12 @@ Summary:`;
               system: systemPrompt,
               messages: [{ role: 'user', content: prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           if (!response.ok) {
             const errorText = await response.text();
             ctx.log(`Anthropic API error: ${response.status} - ${errorText}`);
-            throw new Error(`Anthropic API error: ${response.status}`);
+            throw new Error(`Anthropic API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
           const data = await response.json() as { content: Array<{ text: string }> };
@@ -374,12 +457,12 @@ Summary:`;
                 { role: 'user', content: prompt },
               ],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           if (!response.ok) {
             const errorText = await response.text();
             ctx.log(`OpenAI API error: ${response.status} - ${errorText}`);
-            throw new Error(`OpenAI API error: ${response.status}`);
+            throw new Error(`OpenAI API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
           const data = await response.json() as { choices: Array<{ message: { content: string } }> };
@@ -437,7 +520,7 @@ Return ONLY valid JSON, no other text.`;
               max_tokens: 1024,
               messages: [{ role: 'user', content: prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           const data = await response.json() as { content: Array<{ text: string }> };
           result = data.content[0]?.text ?? '{}';
@@ -454,7 +537,7 @@ Return ONLY valid JSON, no other text.`;
               response_format: { type: 'json_object' },
               messages: [{ role: 'user', content: prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           const data = await response.json() as { choices: Array<{ message: { content: string } }> };
           result = data.choices[0]?.message?.content ?? '{}';
@@ -506,7 +589,7 @@ Return ONLY the category name, nothing else.`;
               max_tokens: 100,
               messages: [{ role: 'user', content: prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           const data = await response.json() as { content: Array<{ text: string }> };
           category = data.content[0]?.text?.trim() ?? 'unknown';
@@ -522,7 +605,7 @@ Return ONLY the category name, nothing else.`;
               max_tokens: 100,
               messages: [{ role: 'user', content: prompt }],
             }),
-          });
+          }, 60000, 3, ctx.log);
 
           const data = await response.json() as { choices: Array<{ message: { content: string } }> };
           category = data.choices[0]?.message?.content?.trim() ?? 'unknown';
@@ -990,11 +1073,11 @@ Be thorough but efficient. Use tools when needed to gather information or take a
                 tools: availableTools,
                 messages,
               }),
-            }, 120000);
+            }, 120000, 3, ctx.log);
 
             if (!response.ok) {
-              const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
-              throw new Error(`Anthropic API error: ${err.error?.message ?? response.statusText}`);
+              const errText = await response.text();
+              throw new Error(`Anthropic API error: ${errText.slice(0, 200)}`);
             }
 
             responseData = await response.json() as Record<string, unknown>;
@@ -1065,11 +1148,11 @@ Be thorough but efficient. Use tools when needed to gather information or take a
                   },
                 })),
               }),
-            }, 120000);
+            }, 120000, 3, ctx.log);
 
             if (!response.ok) {
-              const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
-              throw new Error(`OpenAI API error: ${err.error?.message ?? response.statusText}`);
+              const errText = await response.text();
+              throw new Error(`OpenAI API error: ${errText.slice(0, 200)}`);
             }
 
             responseData = await response.json() as Record<string, unknown>;
