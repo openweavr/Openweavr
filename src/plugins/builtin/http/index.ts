@@ -1,10 +1,26 @@
 import { definePlugin, defineAction, defineTrigger } from '../../sdk/types.js';
 import { z } from 'zod';
 
+// Helper to parse headers that might be a JSON string or object
+function parseHeaders(headers: unknown): Record<string, string> {
+  if (!headers) return {};
+  if (typeof headers === 'string') {
+    try {
+      return JSON.parse(headers) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof headers === 'object') {
+    return headers as Record<string, string>;
+  }
+  return {};
+}
+
 const HttpRequestSchema = z.object({
   url: z.string().url(),
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('GET'),
-  headers: z.record(z.string()).optional(),
+  headers: z.union([z.string(), z.record(z.string())]).optional().transform(parseHeaders),
   body: z.unknown().optional(),
   timeout: z.number().default(30000),
 });
@@ -76,21 +92,35 @@ export default definePlugin({
       description: 'Make a GET request (shorthand)',
       async execute(ctx) {
         const url = ctx.config.url as string;
-        const headers = (ctx.config.headers as Record<string, string>) ?? {};
+        const headers = parseHeaders(ctx.config.headers);
+        const timeout = (ctx.config.timeout as number) ?? 30000;
 
         ctx.log(`GET ${url}`);
 
-        const response = await fetch(url, { headers });
-        const contentType = response.headers.get('content-type') ?? '';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        let data: unknown;
-        if (contentType.includes('application/json')) {
-          data = await response.json();
-        } else {
-          data = await response.text();
+        try {
+          const response = await fetch(url, { headers, signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          const contentType = response.headers.get('content-type') ?? '';
+
+          let data: unknown;
+          if (contentType.includes('application/json')) {
+            data = await response.json();
+          } else {
+            data = await response.text();
+          }
+
+          return { status: response.status, data, ok: response.ok };
+        } catch (err) {
+          clearTimeout(timeoutId);
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`Request timed out after ${timeout}ms`);
+          }
+          throw err;
         }
-
-        return { status: response.status, data, ok: response.ok };
       },
     }),
 
@@ -100,25 +130,39 @@ export default definePlugin({
       async execute(ctx) {
         const url = ctx.config.url as string;
         const body = ctx.config.body;
-        const headers = (ctx.config.headers as Record<string, string>) ?? {};
+        const headers = parseHeaders(ctx.config.headers);
+        const timeout = (ctx.config.timeout as number) ?? 30000;
 
         ctx.log(`POST ${url}`);
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: body ? JSON.stringify(body) : undefined,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const contentType = response.headers.get('content-type') ?? '';
-        let data: unknown;
-        if (contentType.includes('application/json')) {
-          data = await response.json();
-        } else {
-          data = await response.text();
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          const contentType = response.headers.get('content-type') ?? '';
+          let data: unknown;
+          if (contentType.includes('application/json')) {
+            data = await response.json();
+          } else {
+            data = await response.text();
+          }
+
+          return { status: response.status, data, ok: response.ok };
+        } catch (err) {
+          clearTimeout(timeoutId);
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`Request timed out after ${timeout}ms`);
+          }
+          throw err;
         }
-
-        return { status: response.status, data, ok: response.ok };
       },
     }),
   ],

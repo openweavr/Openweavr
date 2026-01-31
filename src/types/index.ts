@@ -8,12 +8,17 @@ export const StepSchema = z.object({
   action: z.string(),
   config: StepConfigSchema.optional(),
   depends_on: z.array(z.string()).optional(),
+  needs: z.array(z.string()).optional(), // Alias for depends_on
   retry: z.object({
     attempts: z.number().default(3),
     delay: z.number().default(1000),
   }).optional(),
   timeout: z.number().optional(),
-});
+}).transform((step) => ({
+  ...step,
+  // Merge needs into depends_on for backwards compatibility
+  depends_on: step.depends_on ?? step.needs ?? [],
+}));
 
 export const TriggerSchema = z.object({
   type: z.string(),

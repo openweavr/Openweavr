@@ -1,8 +1,10 @@
 import { useWebSocket } from '../hooks/useWebSocket';
 
+type Page = 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings';
+
 interface SidebarProps {
   currentPage: string;
-  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings') => void;
+  onNavigate: (page: Page, workflowName?: string) => void;
 }
 
 const navItems = [

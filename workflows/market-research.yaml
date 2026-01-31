@@ -1,0 +1,27 @@
+name: market-research
+
+trigger:
+  type: cron.schedule
+
+steps:
+  - id: agent
+    action: ai.agent
+    with:
+      tools: "web_search,web_fetch,shell,filesystem"
+      maxIterations: 10
+      task: "Market research based on latest data.  How's the dollar doing against gold and silver? What are good investment opportunities? Find Ray Dalio's newsletter from bridgewater and use that if it's recent enough"
+      system: "You're a helpful research assistant that is responsible for finding most reliable data and compiling it for decision making. You are an autonomous agent, so you should make your own plans to achieve the task. You can't rely on user inputs at all. "
+  - id: send
+    action: imessage.send
+    needs: [agent]
+    with:
+      service: "iMessage"
+      to: "6173717788"
+      text: "{{ steps.agent.result }}"
+  - id: send-1
+    action: imessage.send
+    needs: [agent]
+    with:
+      service: "iMessage"
+      to: "+12063553099"
+      text: "{{ steps.agent.result }}"

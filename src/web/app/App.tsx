@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
+import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { Workflows } from './pages/Workflows';
 import { Runs } from './pages/Runs';
@@ -12,17 +13,53 @@ type Page = 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' 
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [checkingConfig, setCheckingConfig] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<string | null>(null);
+  const [runsWorkflowFilter, setRunsWorkflowFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if user has completed onboarding
+    fetch('/api/config/status')
+      .then((res) => res.json())
+      .then((data) => {
+        setNeedsOnboarding(!data.configured);
+        setCheckingConfig(false);
+      })
+      .catch(() => {
+        // If we can't check, assume configured
+        setCheckingConfig(false);
+      });
+  }, []);
+
+  const handleOnboardingComplete = () => {
+    setNeedsOnboarding(false);
+  };
+
+  const handleNavigate = (page: Page, workflowName?: string) => {
+    setCurrentPage(page);
+    if (page === 'builder') {
+      setEditingWorkflow(workflowName ?? null);
+      setRunsWorkflowFilter(null);
+    } else if (page === 'runs') {
+      setEditingWorkflow(null);
+      setRunsWorkflowFilter(workflowName ?? null);
+    } else {
+      setEditingWorkflow(null);
+      setRunsWorkflowFilter(null);
+    }
+  };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={handleNavigate} />;
       case 'workflows':
-        return <Workflows onNavigate={setCurrentPage} />;
+        return <Workflows onNavigate={handleNavigate} />;
       case 'runs':
-        return <Runs />;
+        return <Runs workflowFilter={runsWorkflowFilter} onClearFilter={() => setRunsWorkflowFilter(null)} />;
       case 'builder':
-        return <Builder />;
+        return <Builder workflowName={editingWorkflow} onNavigate={handleNavigate} />;
       case 'plugins':
         return <Plugins />;
       case 'logs':
@@ -30,13 +67,38 @@ export function App() {
       case 'settings':
         return <Settings />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigate={handleNavigate} />;
     }
   };
 
+  // Show loading while checking config
+  if (checkingConfig) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          background: 'var(--bg-primary)',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧵</div>
+          <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show onboarding if needed
+  if (needsOnboarding) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
   return (
     <div className="app">
-      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="main-content">
         {renderPage()}
       </main>

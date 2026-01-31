@@ -16,8 +16,10 @@ interface RecentRun {
   duration?: number;
 }
 
+type Page = 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings';
+
 interface DashboardProps {
-  onNavigate: (page: 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' | 'settings') => void;
+  onNavigate: (page: Page, workflowName?: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -158,7 +160,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <button className="btn btn-secondary">
             <span>📥</span> Import
           </button>
-          <button className="btn btn-ghost">
+          <button
+            className="btn btn-ghost"
+            onClick={() => window.open('https://github.com/manthanthakar/weavr#readme', '_blank')}
+          >
             <span>📖</span> Documentation
           </button>
         </div>

@@ -4,6 +4,7 @@ import { loadConfig, ensureConfigDir } from '../../config/index.js';
 import { PluginRegistry } from '../../plugins/sdk/registry.js';
 import { PluginLoader } from '../../plugins/sdk/loader.js';
 import { PLUGINS_DIR } from '../../config/index.js';
+import { loadBuiltinPlugins, getLoadedPluginCount } from '../../plugins/loader.js';
 
 interface ServeOptions {
   port: string;
@@ -19,20 +20,24 @@ export async function serveCommand(options: ServeOptions): Promise<void> {
   config.server.port = parseInt(options.port, 10);
   config.server.host = options.host;
 
-  // Load plugins
+  // Load built-in plugins
+  loadBuiltinPlugins();
+  console.log(chalk.green(`✓ Loaded ${getLoadedPluginCount()} built-in plugin(s)`));
+
+  // Load custom plugins from user directory
   const registry = new PluginRegistry();
   const loader = new PluginLoader(registry);
 
   try {
     const plugins = await loader.loadFromDirectory(PLUGINS_DIR);
     if (plugins.length > 0) {
-      console.log(chalk.green(`✓ Loaded ${plugins.length} plugin(s)`));
+      console.log(chalk.green(`✓ Loaded ${plugins.length} custom plugin(s)`));
       for (const plugin of plugins) {
         console.log(chalk.dim(`  - ${plugin.name}@${plugin.version}`));
       }
     }
-  } catch (err) {
-    console.log(chalk.yellow('⚠ No plugins loaded'));
+  } catch {
+    // No custom plugins - that's fine
   }
 
   // Start server

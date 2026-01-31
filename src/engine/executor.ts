@@ -14,8 +14,8 @@ export class WorkflowExecutor {
 
   constructor(private options: ExecutorOptions) {}
 
-  async execute(workflow: Workflow, triggerData?: unknown): Promise<WorkflowRun> {
-    const runId = randomUUID();
+  async execute(workflow: Workflow, triggerData?: unknown, providedRunId?: string): Promise<WorkflowRun> {
+    const runId = providedRunId ?? randomUUID();
 
     const run: WorkflowRun = {
       id: runId,
@@ -123,12 +123,25 @@ export class WorkflowExecutor {
         stepResult.output = output;
         stepResult.status = 'completed';
       } else {
+        // Build interpolation context
+        const interpolationCtx = {
+          trigger: run.triggerData,
+          steps: this.getStepOutputs(run),
+          env: workflow.env ?? {},
+        };
+
+        // Interpolate config values
+        const interpolatedConfig = this.interpolateConfig(
+          (step.config ?? {}) as Record<string, unknown>,
+          interpolationCtx
+        );
+
         // Build context for plugin action
         const context: ActionContext = {
           workflowName: workflow.name,
           runId: run.id,
           stepId: step.id,
-          config: (step.config ?? {}) as Record<string, unknown>,
+          config: interpolatedConfig,
           trigger: run.triggerData,
           steps: this.getStepOutputs(run),
           env: workflow.env ?? {},
@@ -226,13 +239,51 @@ export class WorkflowExecutor {
     });
   }
 
+  private interpolateConfig(
+    config: Record<string, unknown>,
+    context: Record<string, unknown>
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(config)) {
+      if (typeof value === 'string') {
+        result[key] = this.interpolate(value, context);
+      } else if (Array.isArray(value)) {
+        result[key] = value.map((v) =>
+          typeof v === 'string' ? this.interpolate(v, context) : v
+        );
+      } else if (value && typeof value === 'object') {
+        result[key] = this.interpolateConfig(value as Record<string, unknown>, context);
+      } else {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  }
+
   private resolvePath(path: string, obj: Record<string, unknown>): unknown {
-    const parts = path.split('.');
+    // Handle array indexing like "steps.fetch-stories.data[0]"
+    const parts = path.split(/\.(?![^\[]*\])/);
     let current: unknown = obj;
 
     for (const part of parts) {
       if (current === null || current === undefined) return undefined;
-      current = (current as Record<string, unknown>)[part];
+
+      // Check for array index notation like "data[0]"
+      const arrayMatch = part.match(/^(.+?)\[(\d+)\]$/);
+      if (arrayMatch) {
+        const [, key, indexStr] = arrayMatch;
+        const index = parseInt(indexStr, 10);
+        const arr = (current as Record<string, unknown>)[key];
+        if (Array.isArray(arr)) {
+          current = arr[index];
+        } else {
+          return undefined;
+        }
+      } else {
+        current = (current as Record<string, unknown>)[part];
+      }
     }
 
     return current;

@@ -5,12 +5,16 @@ import { WORKFLOWS_DIR } from '../../config/index.js';
 import { WorkflowExecutor } from '../../engine/executor.js';
 import { parser } from '../../engine/parser.js';
 import { globalRegistry } from '../../plugins/sdk/registry.js';
+import { loadBuiltinPlugins } from '../../plugins/loader.js';
 
 interface RunOptions {
   data?: string;
 }
 
 export async function runCommand(workflowName: string, options: RunOptions): Promise<void> {
+  // Load built-in plugins
+  loadBuiltinPlugins();
+
   console.log(chalk.cyan(`\n▶ Running workflow: ${chalk.bold(workflowName)}\n`));
 
   // Load workflow file

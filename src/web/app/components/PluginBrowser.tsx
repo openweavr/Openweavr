@@ -255,7 +255,11 @@ export function PluginBrowser() {
             )}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }}>
+              <button
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => window.open(`https://github.com/manthanthakar/weavr#${selectedPlugin.name}-plugin`, '_blank')}
+              >
                 📖 Docs
               </button>
               {selectedPlugin.status === 'available' && (

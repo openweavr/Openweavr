@@ -31,16 +31,23 @@
   "dependencies": {
     "@clack/prompts": "^0.9.1",
     "@hono/node-server": "^1.13.8",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "@xyflow/react": "^12.10.0",
     "chalk": "^5.4.1",
+    "chokidar": "^5.0.0",
+    "clipboardy": "^5.1.0",
     "commander": "^13.1.0",
     "croner": "^9.0.0",
     "hono": "^4.7.4",
+    "node-notifier": "^10.0.1",
+    "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.0",
     "yaml": "^2.7.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
+    "@types/node-notifier": "^8.0.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.5.14",
