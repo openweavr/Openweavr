@@ -7,6 +7,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { runCommand } from './commands/run.js';
 import { listCommand } from './commands/list.js';
 import { createCommand } from './commands/create.js';
+import { askCommand } from './commands/ask.js';
 
 const program = new Command();
 
@@ -58,11 +59,11 @@ program
   .action(createCommand);
 
 program
-  .command('ask <prompt>')
+  .command('ask <prompt...>')
   .description('Generate a workflow from natural language')
-  .action(async (prompt: string) => {
-    console.log(chalk.yellow('AI workflow generation coming soon!'));
-    console.log(chalk.dim(`Prompt: "${prompt}"`));
+  .action(async (promptParts: string[]) => {
+    const prompt = promptParts.join(' ');
+    await askCommand(prompt);
   });
 
 program.parse();
