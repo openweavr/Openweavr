@@ -56,15 +56,11 @@ let globalBroadcast: ((channel: string, message: { type: string; payload: unknow
 let globalMCPManager: MCPManager | null = null;
 
 // Default MCP servers that should always be available
-const DEFAULT_MCP_SERVERS = [
-  {
-    name: 'web-search',
-    config: {
-      command: 'npx',
-      args: ['-y', 'web-search-mcp'],
-      timeout: 60000,
-    },
-  },
+// Note: Users can add MCP servers in ~/.weavr/config.yaml
+// The web search is handled by built-in DuckDuckGo fallback (no MCP needed)
+const DEFAULT_MCP_SERVERS: Array<{ name: string; config: { command: string; args: string[]; timeout?: number } }> = [
+  // No default MCP servers - web search uses built-in DuckDuckGo fallback
+  // Users can add their own MCP servers in config
 ];
 
 export function setGlobalBroadcast(fn: (channel: string, message: { type: string; payload: unknown }) => void): void {

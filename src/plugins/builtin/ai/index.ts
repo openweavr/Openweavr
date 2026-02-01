@@ -7,7 +7,6 @@ import { parse as parseYaml } from 'yaml';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getGlobalMCPManager } from '../../loader.js';
-
 const execAsync = promisify(exec);
 
 // Helper to sleep for a given duration
@@ -250,12 +249,22 @@ interface AIConfig {
   cliModel?: string;
 }
 
+interface WebSearchConfig {
+  provider?: 'brave' | 'tavily';
+  apiKey?: string;
+}
+
+interface GlobalConfig {
+  ai: AIConfig;
+  webSearch: WebSearchConfig;
+}
+
 // Cache for config to avoid reading file on every action
-let cachedConfig: AIConfig | null = null;
+let cachedConfig: GlobalConfig | null = null;
 let configLastRead = 0;
 const CONFIG_CACHE_MS = 5000; // Re-read config every 5 seconds
 
-function getGlobalAIConfig(): AIConfig {
+function getGlobalConfig(): GlobalConfig {
   const now = Date.now();
   if (cachedConfig && now - configLastRead < CONFIG_CACHE_MS) {
     return cachedConfig;
@@ -264,15 +273,31 @@ function getGlobalAIConfig(): AIConfig {
   try {
     const configPath = join(homedir(), '.weavr', 'config.yaml');
     const content = readFileSync(configPath, 'utf-8');
-    const config = parseYaml(content) as { ai?: AIConfig };
-    cachedConfig = config.ai ?? {};
+    const config = parseYaml(content) as { ai?: AIConfig; webSearch?: WebSearchConfig };
+    cachedConfig = {
+      ai: config.ai ?? {},
+      webSearch: config.webSearch ?? {},
+    };
     configLastRead = now;
     return cachedConfig;
   } catch {
-    cachedConfig = {};
+    cachedConfig = { ai: {}, webSearch: {} };
     configLastRead = now;
     return cachedConfig;
   }
+}
+
+function getGlobalAIConfig(): AIConfig {
+  return getGlobalConfig().ai;
+}
+
+function getWebSearchApiKey(): { brave?: string; tavily?: string } {
+  const config = getGlobalConfig().webSearch;
+  // Config takes precedence, then environment variables
+  return {
+    brave: config.apiKey && config.provider === 'brave' ? config.apiKey : process.env.BRAVE_API_KEY,
+    tavily: config.apiKey && config.provider === 'tavily' ? config.apiKey : process.env.TAVILY_API_KEY,
+  };
 }
 
 function getAnthropicKey(ctx: { env: Record<string, string>; config: Record<string, unknown> }): string | undefined {
@@ -825,70 +850,108 @@ Return ONLY the category name, nothing else.`;
                   }
                 }
 
-                // FALLBACK: API-based search (only if user has configured API keys)
-                const braveKey = process.env.BRAVE_API_KEY;
-                const tavilyKey = process.env.TAVILY_API_KEY;
+                // Primary: Brave Search API (from config or BRAVE_API_KEY env var)
+                const searchKeys = getWebSearchApiKey();
+                const braveKey = searchKeys.brave;
+                const tavilyKey = searchKeys.tavily;
 
                 if (braveKey) {
-                  ctx.log('Fallback: Using Brave Search API');
-                  const response = await fetchWithTimeout(
-                    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
-                    {
-                      headers: {
-                        'Accept': 'application/json',
-                        'X-Subscription-Token': braveKey,
+                  ctx.log('Using Brave Search API');
+                  try {
+                    const response = await fetchWithTimeout(
+                      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+                      {
+                        headers: {
+                          'Accept': 'application/json',
+                          'X-Subscription-Token': braveKey,
+                        },
                       },
-                    },
-                    15000, 2, ctx.log
-                  );
+                      15000, 2, ctx.log
+                    );
 
-                  if (response.ok) {
-                    const data = await response.json() as {
-                      web?: { results?: Array<{ title: string; url: string; description: string }> };
-                    };
-                    const results = data.web?.results ?? [];
-                    if (results.length > 0) {
-                      const formatted = results.slice(0, 8).map((r, i) =>
-                        `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.description}\n`
-                      ).join('\n');
-                      return `Search results for "${query}":\n\n${formatted}`;
+                    if (response.ok) {
+                      const data = await response.json() as {
+                        web?: { results?: Array<{ title: string; url: string; description: string }> };
+                      };
+                      const results = data.web?.results ?? [];
+                      if (results.length > 0) {
+                        const formatted = results.slice(0, 8).map((r, i) =>
+                          `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.description}\n`
+                        ).join('\n');
+                        ctx.log(`Brave Search found ${results.length} results`);
+                        return `Search results for "${query}":\n\n${formatted}`;
+                      }
+                      ctx.log('Brave Search returned no results');
+                    } else {
+                      const errText = await response.text();
+                      ctx.log(`Brave Search API error: ${response.status} - ${errText.slice(0, 200)}`);
                     }
+                  } catch (braveErr) {
+                    ctx.log(`Brave Search error: ${String(braveErr)}`);
                   }
                 }
 
+                // Fallback: Tavily Search API (requires TAVILY_API_KEY)
                 if (tavilyKey) {
                   ctx.log('Fallback: Using Tavily Search API');
-                  const response = await fetchWithTimeout('https://api.tavily.com/search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      api_key: tavilyKey,
-                      query,
-                      search_depth: 'basic',
-                      max_results: 8,
-                    }),
-                  }, 15000, 2, ctx.log);
+                  try {
+                    const response = await fetchWithTimeout('https://api.tavily.com/search', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        api_key: tavilyKey,
+                        query,
+                        search_depth: 'basic',
+                        max_results: 8,
+                      }),
+                    }, 15000, 2, ctx.log);
 
-                  if (response.ok) {
-                    const data = await response.json() as {
-                      results?: Array<{ title: string; url: string; content: string }>;
-                    };
-                    const results = data.results ?? [];
-                    if (results.length > 0) {
-                      const formatted = results.map((r, i) =>
-                        `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 300)}...\n`
-                      ).join('\n');
-                      return `Search results for "${query}":\n\n${formatted}`;
+                    if (response.ok) {
+                      const data = await response.json() as {
+                        results?: Array<{ title: string; url: string; content: string }>;
+                      };
+                      const results = data.results ?? [];
+                      if (results.length > 0) {
+                        const formatted = results.map((r, i) =>
+                          `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 300)}...\n`
+                        ).join('\n');
+                        ctx.log(`Tavily Search found ${results.length} results`);
+                        return `Search results for "${query}":\n\n${formatted}`;
+                      }
+                      ctx.log('Tavily Search returned no results');
                     }
+                  } catch (tavilyErr) {
+                    ctx.log(`Tavily Search error: ${String(tavilyErr)}`);
                   }
                 }
 
-                // Search failed - provide actionable guidance
-                return `[SEARCH FAILED] web-search-mcp could not be started or returned no results.
+                // No API keys configured - return helpful setup instructions
+                if (!braveKey && !tavilyKey) {
+                  return JSON.stringify({
+                    error: 'missing_search_api_key',
+                    message: 'web_search requires a search API key. Get a free Brave Search API key (2000 queries/month).',
+                    setup: {
+                      option1: 'Configure in Settings page (recommended)',
+                      option2: 'Run "weavr onboard" to set up via CLI',
+                      option3: 'Set BRAVE_API_KEY environment variable',
+                      brave: {
+                        url: 'https://brave.com/search/api/',
+                        plan: 'Data for Search (free tier: 2000 queries/month)',
+                      },
+                      tavily: {
+                        url: 'https://tavily.com/',
+                        plan: 'Free tier: 1000 queries/month',
+                        env: 'TAVILY_API_KEY',
+                      },
+                    },
+                    workaround: 'Use web_fetch with specific URLs instead (e.g., https://finance.yahoo.com for financial data)',
+                  }, null, 2);
+                }
 
-The agent uses web-search-mcp as the default search provider. Make sure Node.js/npx is available.
+                // API keys configured but search failed
+                return `[SEARCH FAILED] Search returned no results for "${query}".
 
-Alternative: Use web_fetch with specific URLs:
+Try web_fetch with specific URLs:
 - https://finance.yahoo.com/quote/AAPL for stock prices
 - https://www.reuters.com for news
 - https://en.wikipedia.org/wiki/${encodeURIComponent(query.replace(/ /g, '_'))} for general info`;
@@ -1038,23 +1101,66 @@ Alternative: Use web_fetch with specific URLs:
           }
         }
 
-        // Agentic loop with enhanced system prompt for better failure recovery
-        const defaultSystem = `You are an autonomous AI agent that accomplishes tasks by using tools and reasoning step by step.
+        // Agentic loop with enhanced system prompt for strategic planning and efficiency
+        const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-IMPORTANT GUIDELINES:
-1. THINK before acting: Analyze what information you need and plan your approach
-2. NEVER give up after a single failure: If a tool fails, try alternatives:
-   - If web_search fails, use web_fetch with specific known URLs
-   - If one URL fails, try alternative sources
-   - For financial data: try finance.yahoo.com, google.com/finance
-   - For news: try reuters.com, bbc.com, apnews.com
-   - For general info: try wikipedia.org
-3. VALIDATE results: If a tool returns "[FAILED]" or "[ERROR]", acknowledge it and try a different approach
-4. BE PERSISTENT: Use multiple iterations to gather complete information
-5. PROVIDE SOURCES: Always cite where you got your information from
+        // Date context is ALWAYS prepended to any system prompt (custom or default)
+        const dateContext = `## Current Date
+Today is ${currentDate}. Always use this date as your reference for "current", "today", "now", or "latest" queries. Do NOT use outdated dates from your training data.
 
-When you have gathered sufficient information, synthesize it into a clear, complete answer.
-If you truly cannot find the information after multiple attempts, explain what you tried and why it failed.`;
+`;
+        const defaultSystem = `You are an autonomous AI agent that accomplishes tasks through careful planning and strategic tool use.
+
+## Your Approach (Follow This Order)
+
+### 1. PLAN FIRST (Before ANY tool call)
+Before making your first tool call, create a brief plan:
+- What is the user asking for?
+- What information do I need to gather?
+- Which tools will I use and in what order?
+- Can I batch multiple searches into fewer calls?
+
+### 2. GATHER STRATEGICALLY
+When using tools:
+- Batch related queries when possible (search for multiple things at once)
+- Prefer web_search first, then web_fetch for specific URLs
+- If a tool fails, try alternatives immediately in the same turn
+- Don't make a new iteration just to try one more search
+
+### 3. REFLECT BEFORE CONTINUING
+After each tool result, briefly assess:
+- Did I get what I needed?
+- Do I have enough to answer, or do I need more?
+- What's the most efficient next step?
+
+### 4. SYNTHESIZE EARLY
+Once you have sufficient information (even if not perfect), synthesize your answer. Don't over-research.
+
+## Tool Selection Guide
+- **web_search**: Use first for discovery. Batch multiple queries if related.
+- **web_fetch**: Use for specific known URLs. Combine with search results.
+- **shell_exec**: Use for local commands. Check permissions first.
+- **read_file/write_file**: Use for local file operations.
+
+## Efficiency Rules
+- Aim to complete in 2-3 iterations, not 5+
+- If first search fails, try web_fetch with known URLs immediately (same turn)
+- Don't repeat failed approaches - adapt quickly
+- When you have 70%+ of needed info, start synthesizing
+
+## Failure Recovery
+If a tool returns [FAILED] or [ERROR]:
+- Try an alternative approach in the SAME response
+- Known reliable sources: finance.yahoo.com, reuters.com, wikipedia.org
+- Don't waste an iteration on a single retry
+
+## Output Requirements
+- Cite your sources
+- Be concise but complete
+- If information is unavailable, explain what you tried`;
+
+        // Always prepend date context to whatever system prompt is used
+        const finalSystemPrompt = dateContext + (systemPrompt ?? defaultSystem);
 
         const messages: Array<{ role: 'user' | 'assistant'; content: string | Array<{ type: string; text?: string; tool_use_id?: string; name?: string; input?: unknown; id?: string }> }> = [
           { role: 'user', content: task },
@@ -1081,7 +1187,7 @@ If you truly cannot find the information after multiple attempts, explain what y
               body: JSON.stringify({
                 model: globalConfig.model ?? 'claude-sonnet-4-20250514',
                 max_tokens: 4096,
-                system: systemPrompt ?? defaultSystem,
+                system: finalSystemPrompt,
                 tools: availableTools,
                 messages,
               }),
@@ -1154,7 +1260,7 @@ If you truly cannot find the information after multiple attempts, explain what y
               | { role: 'tool'; tool_call_id: string; content: string };
 
             const openaiMessages: OpenAIMessage[] = [
-              { role: 'system', content: systemPrompt ?? defaultSystem },
+              { role: 'system', content: finalSystemPrompt },
             ];
 
             // Convert internal messages to OpenAI format

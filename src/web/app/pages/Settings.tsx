@@ -11,6 +11,11 @@ interface Config {
     apiKey?: string;
     hasApiKey?: boolean;
   };
+  webSearch?: {
+    provider?: string;
+    apiKey?: string;
+    hasApiKey?: boolean;
+  };
   messaging?: {
     telegram?: {
       botToken?: string;
@@ -33,6 +38,10 @@ export function Settings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Web Search state
+  const [braveApiKey, setBraveApiKey] = useState('');
+  const [showBraveApiKey, setShowBraveApiKey] = useState(false);
 
   // Messaging state
   const [telegramToken, setTelegramToken] = useState('');
@@ -113,6 +122,10 @@ export function Settings() {
           ...config.ai,
           apiKey: apiKey || undefined,
         } : undefined,
+        webSearch: braveApiKey ? {
+          provider: 'brave',
+          apiKey: braveApiKey,
+        } : config.webSearch,
         messaging: {
           ...config.messaging,
           telegram: telegramToken ? {
@@ -131,6 +144,7 @@ export function Settings() {
       if (response.ok) {
         setMessage({ type: 'success', text: 'Settings saved successfully!' });
         setApiKey(''); // Clear the API key field after saving
+        setBraveApiKey(''); // Clear the Brave API key field after saving
         setTelegramToken(''); // Clear the telegram token field after saving
         // Reload config to get updated hasApiKey status
         const reloadRes = await fetch('/api/config');
@@ -362,6 +376,80 @@ export function Settings() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="card-title" style={{ marginBottom: '20px' }}>Web Search</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Enable web search for AI agents. Required for workflows that need to search the internet.
+            </p>
+
+            {/* Status Banner */}
+            <div style={{
+              padding: '12px 16px',
+              marginBottom: '16px',
+              borderRadius: 'var(--radius-md)',
+              background: config?.webSearch?.hasApiKey ? 'rgba(34, 197, 94, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+              border: `1px solid ${config?.webSearch?.hasApiKey ? 'rgba(34, 197, 94, 0.3)' : 'rgba(251, 191, 36, 0.3)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <span style={{ fontSize: '20px' }}>
+                {config?.webSearch?.hasApiKey ? '✅' : '⚠️'}
+              </span>
+              <div>
+                <div style={{ fontWeight: 600, color: config?.webSearch?.hasApiKey ? 'var(--accent-green)' : 'rgb(251, 191, 36)' }}>
+                  {config?.webSearch?.hasApiKey ? 'Web Search Active' : 'Web Search Not Configured'}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {config?.webSearch?.hasApiKey
+                    ? 'AI agents can search the web using Brave Search API'
+                    : 'Add a Brave API key to enable web search in workflows'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '24px' }}>🔍</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>Brave Search API</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Free tier: 2,000 queries/month
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showBraveApiKey ? 'text' : 'password'}
+                  className="input"
+                  value={braveApiKey}
+                  onChange={(e) => setBraveApiKey(e.target.value)}
+                  placeholder={config?.webSearch?.hasApiKey ? '••••••••••••••••' : 'Enter your Brave Search API key'}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setShowBraveApiKey(!showBraveApiKey)}
+                  style={{ padding: '8px 12px' }}
+                >
+                  {showBraveApiKey ? '🙈' : '👁️'}
+                </button>
+              </div>
+
+              {config?.webSearch?.hasApiKey && (
+                <p style={{ fontSize: '12px', color: 'var(--accent-green)', marginTop: '8px' }}>
+                  ✓ API key saved. Enter a new key above to replace it.
+                </p>
+              )}
+
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                Get a free API key from <a href="https://brave.com/search/api/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>Brave Search API</a>.
+                Choose the "Data for Search" plan.
+              </p>
             </div>
           </div>
 

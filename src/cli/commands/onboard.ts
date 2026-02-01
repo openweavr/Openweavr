@@ -49,6 +49,33 @@ export async function onboardCommand(): Promise<void> {
           },
         });
       },
+
+      setupWebSearch: () =>
+        p.confirm({
+          message: 'Set up web search for AI agents? (requires Brave Search API key - free tier available)',
+          initialValue: true,
+        }),
+
+      braveApiKey: ({ results }) => {
+        if (!results.setupWebSearch) {
+          return Promise.resolve(undefined);
+        }
+        p.note(
+          [
+            chalk.dim('Get a free API key at: ') + chalk.cyan('https://brave.com/search/api/'),
+            chalk.dim('Choose the "Data for Search" plan (2000 free queries/month)'),
+          ].join('\n'),
+          'Brave Search API'
+        );
+        return p.password({
+          message: 'Enter your Brave Search API key (or press Enter to skip)',
+          validate: (value) => {
+            if (value && value.length > 0 && value.length < 10) {
+              return 'Please enter a valid API key or leave empty to skip';
+            }
+          },
+        });
+      },
     },
     {
       onCancel: () => {
@@ -78,18 +105,30 @@ export async function onboardCommand(): Promise<void> {
     };
   }
 
+  // Add web search config if Brave API key was provided
+  if (answers.braveApiKey) {
+    config.webSearch = {
+      provider: 'brave',
+      apiKey: answers.braveApiKey as string,
+    };
+  }
+
   await saveConfig(config);
 
   s.stop('Configuration saved!');
 
-  p.note(
-    [
-      `${chalk.dim('Config:')} ${WEAVR_DIR}/config.yaml`,
-      `${chalk.dim('Workflows:')} ${WEAVR_DIR}/workflows/`,
-      `${chalk.dim('Plugins:')} ${WEAVR_DIR}/plugins/`,
-    ].join('\n'),
-    'Your Weavr home'
-  );
+  const noteLines = [
+    `${chalk.dim('Config:')} ${WEAVR_DIR}/config.yaml`,
+    `${chalk.dim('Workflows:')} ${WEAVR_DIR}/workflows/`,
+    `${chalk.dim('Plugins:')} ${WEAVR_DIR}/plugins/`,
+  ];
+
+  if (!answers.braveApiKey && answers.setupWebSearch) {
+    noteLines.push('');
+    noteLines.push(chalk.yellow('⚠ Web search not configured. Set BRAVE_API_KEY env var or run onboard again.'));
+  }
+
+  p.note(noteLines.join('\n'), 'Your Weavr home');
 
   p.outro(
     chalk.green('✓ Setup complete! ') +

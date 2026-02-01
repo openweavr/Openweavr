@@ -135,6 +135,10 @@ export interface WeavrConfig {
     model?: string;
     apiKey?: string;
   };
+  webSearch?: {
+    provider?: 'brave' | 'tavily';
+    apiKey?: string;
+  };
 }
 
 export const DEFAULT_CONFIG: WeavrConfig = {

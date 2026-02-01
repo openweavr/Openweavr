@@ -463,13 +463,18 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     try {
       const content = await readFile(configFile, 'utf-8');
       const config = parseYaml(content) as WeavrConfig;
-      // Don't send the actual API key, just indicate if one is set
+      // Don't send the actual API keys, just indicate if they are set
       const safeConfig = {
         ...config,
         ai: config.ai ? {
           ...config.ai,
           apiKey: config.ai.apiKey ? '••••••••' : undefined,
           hasApiKey: Boolean(config.ai.apiKey),
+        } : undefined,
+        webSearch: config.webSearch ? {
+          ...config.webSearch,
+          apiKey: config.webSearch.apiKey ? '••••••••' : undefined,
+          hasApiKey: Boolean(config.webSearch.apiKey),
         } : undefined,
       };
       return c.json({ config: safeConfig, exists: true });
@@ -484,7 +489,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   app.post('/api/config', async (c) => {
     try {
       const body = await c.req.json();
-      const { config: newConfig } = body as { config: Partial<WeavrConfig> & { ai?: { apiKey?: string } } };
+      const { config: newConfig } = body as { config: Partial<WeavrConfig> & { ai?: { apiKey?: string }; webSearch?: { provider?: string; apiKey?: string } } };
 
       // Load existing config to preserve API key if not changed
       let existingConfig: WeavrConfig = DEFAULT_CONFIG;
@@ -512,6 +517,20 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           mergedConfig.ai.apiKey = newConfig.ai.apiKey;
         } else if (existingConfig.ai?.apiKey) {
           mergedConfig.ai.apiKey = existingConfig.ai.apiKey;
+        }
+      }
+
+      // Handle webSearch config similarly
+      if (newConfig.webSearch) {
+        mergedConfig.webSearch = {
+          ...existingConfig.webSearch,
+          ...newConfig.webSearch,
+        };
+        // Only update API key if a new one is provided (not masked)
+        if (newConfig.webSearch.apiKey && newConfig.webSearch.apiKey !== '••••••••') {
+          mergedConfig.webSearch.apiKey = newConfig.webSearch.apiKey;
+        } else if (existingConfig.webSearch?.apiKey) {
+          mergedConfig.webSearch.apiKey = existingConfig.webSearch.apiKey;
         }
       }
 
