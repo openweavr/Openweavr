@@ -16,11 +16,12 @@ Weavr connects AI agents with your developer tools—GitHub, Linear, Notion, Sla
 ## ✨ Features
 
 - **🏠 Self-hosted** — Your workflows, your data, your infrastructure
-- **🤖 AI-native** — Generate workflows with natural language
+- **🤖 AI Agents** — Autonomous agents with web search, tool use, and multi-step reasoning
 - **🔌 Plugin ecosystem** — Extensible integrations for any tool
 - **📡 Real-time** — WebSocket-powered event streaming
 - **🎯 DAG execution** — Parallel steps, retries, error handling
 - **🖥️ CLI + Web UI** — Terminal power users and visual builders welcome
+- **💬 Messaging** — Built-in WhatsApp, Telegram, and iMessage support
 
 ## 🚀 Quick Start
 
@@ -38,31 +39,59 @@ weavr serve
 weavr create
 ```
 
-## 📖 Example Workflow
+## 📖 Example Workflows
+
+### AI Research Agent
+
+```yaml
+name: daily-market-research
+description: AI agent researches market data and sends a report
+
+trigger:
+  type: cron.schedule
+  with:
+    expression: "0 9 * * *"  # Every day at 9am
+
+steps:
+  - id: research
+    action: ai.agent
+    with:
+      tools: "web_search,web_fetch"
+      task: |
+        Research current market conditions:
+        - Gold and silver prices vs USD
+        - Top investment opportunities
+        - Key financial news from reliable sources
+        Compile into an easy-to-read report.
+
+  - id: notify
+    action: whatsapp.send
+    needs: [research]
+    with:
+      to: "+1234567890"
+      text: "{{ steps.research.result }}"
+```
+
+### GitHub to Slack Notifications
 
 ```yaml
 name: bug-to-slack
 description: Notify Slack when GitHub issues are labeled 'bug'
 
-triggers:
-  - type: github.issue.labeled
-    config:
-      label: bug
+trigger:
+  type: github.issue.labeled
+  with:
+    label: bug
 
 steps:
-  - id: format-message
-    action: transform
-    config:
-      template: |
-        🐛 New bug: {{ trigger.issue.title }}
-        {{ trigger.issue.html_url }}
-
-  - id: notify-slack
+  - id: notify
     action: slack.post
-    config:
+    with:
       channel: "#bugs"
-      message: "{{ steps.format-message.output }}"
+      message: "🐛 New bug: {{ trigger.issue.title }}\n{{ trigger.issue.html_url }}"
 ```
+
+See more examples in the [examples/](./examples) directory.
 
 ## 🛠️ CLI Commands
 
@@ -102,6 +131,21 @@ weavr ask "When PR is merged, deploy to staging"
       │             │ │  Slack...)  │ │  language)  │
       └─────────────┘ └─────────────┘ └─────────────┘
 ```
+
+## ⚙️ Configuration
+
+### AI Provider
+Configure your AI provider during onboarding or in Settings:
+- **Anthropic** (Claude) - Recommended
+- **OpenAI** (GPT-4)
+- **Ollama** (Local models)
+
+### Web Search (for AI Agents)
+AI agents need a search API to browse the web. Get a free Brave Search API key:
+
+1. Sign up at [brave.com/search/api](https://brave.com/search/api/)
+2. Choose "Data for Search" plan (2,000 free queries/month)
+3. Add your API key in Settings or set `BRAVE_API_KEY` environment variable
 
 ## 📁 Project Structure
 
