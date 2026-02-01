@@ -121,6 +121,13 @@ export interface GatewayClient {
   subscriptions: Set<string>;
 }
 
+// OAuth Token Types
+export interface OAuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number; // Unix timestamp in milliseconds
+}
+
 // Config Types
 export interface WeavrConfig {
   server: {
@@ -134,6 +141,9 @@ export interface WeavrConfig {
     provider?: 'anthropic' | 'openai' | 'ollama';
     model?: string;
     apiKey?: string;
+    // OAuth authentication (for OpenAI with ChatGPT Plus/Team subscriptions)
+    authMethod?: 'apikey' | 'oauth';
+    oauth?: OAuthTokens;
   };
   webSearch?: {
     provider?: 'brave' | 'tavily';

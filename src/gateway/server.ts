@@ -16,6 +16,14 @@ import { parser } from '../engine/parser.js';
 import { globalRegistry } from '../plugins/sdk/registry.js';
 import { TriggerScheduler } from '../engine/scheduler.js';
 import { initializePlugins, isPluginsInitialized } from '../plugins/loader.js';
+import {
+  generatePKCE,
+  buildAuthorizationURL,
+  exchangeCodeForTokens,
+  validateState,
+  getCallbackUrl,
+  type PendingOAuthState,
+} from '../auth/openai-oauth.js';
 
 export interface GatewayServer {
   start(): Promise<void>;
@@ -463,13 +471,16 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     try {
       const content = await readFile(configFile, 'utf-8');
       const config = parseYaml(content) as WeavrConfig;
-      // Don't send the actual API keys, just indicate if they are set
+      // Don't send the actual API keys or tokens, just indicate if they are set
       const safeConfig = {
         ...config,
         ai: config.ai ? {
           ...config.ai,
           apiKey: config.ai.apiKey ? '••••••••' : undefined,
           hasApiKey: Boolean(config.ai.apiKey),
+          // OAuth: don't expose tokens, just indicate if connected
+          oauth: undefined,
+          hasOAuth: Boolean(config.ai.oauth?.accessToken),
         } : undefined,
         webSearch: config.webSearch ? {
           ...config.webSearch,
@@ -555,6 +566,235 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
       return c.json({ configured: true });
     } catch {
       return c.json({ configured: false });
+    }
+  });
+
+  // OpenAI OAuth endpoints
+  // In-memory storage for pending OAuth states (5-minute expiry)
+  const pendingOAuthStates = new Map<string, PendingOAuthState>();
+
+  // Cleanup expired OAuth states every minute
+  setInterval(() => {
+    const now = Date.now();
+    const expiryMs = 5 * 60 * 1000; // 5 minutes
+    for (const [state, data] of pendingOAuthStates) {
+      if (now - data.createdAt > expiryMs) {
+        pendingOAuthStates.delete(state);
+      }
+    }
+  }, 60 * 1000);
+
+  // Initiate OAuth flow - returns authorization URL
+  app.get('/api/oauth/openai/authorize', async (c) => {
+    try {
+      const pkce = await generatePKCE();
+      const redirectUri = getCallbackUrl(config.server.port);
+      const authUrl = buildAuthorizationURL(pkce, redirectUri);
+
+      // Store the pending state
+      pendingOAuthStates.set(pkce.state, {
+        pkce,
+        redirectUri,
+        createdAt: Date.now(),
+      });
+
+      return c.json({ authUrl, state: pkce.state });
+    } catch (err) {
+      return c.json({ error: `Failed to initiate OAuth: ${String(err)}` }, 500);
+    }
+  });
+
+  // OAuth callback - exchange code for tokens
+  app.get('/api/oauth/openai/callback', async (c) => {
+    const code = c.req.query('code');
+    const state = c.req.query('state');
+    const error = c.req.query('error');
+    const errorDescription = c.req.query('error_description');
+
+    // Handle OAuth errors
+    if (error) {
+      const errorMsg = errorDescription ?? error;
+      return c.html(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>OAuth Error</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+          <div style="text-align: center; padding: 40px;">
+            <h1 style="color: #ef4444;">Authentication Failed</h1>
+            <p style="color: #999;">${errorMsg}</p>
+            <p style="margin-top: 20px;">You can close this window.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth-error', error: '${errorMsg}' }, '*');
+              }
+            </script>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    if (!code || !state) {
+      return c.html(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>OAuth Error</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+          <div style="text-align: center; padding: 40px;">
+            <h1 style="color: #ef4444;">Invalid Request</h1>
+            <p style="color: #999;">Missing authorization code or state parameter.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth-error', error: 'Missing authorization code or state' }, '*');
+              }
+            </script>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Validate state
+    const pendingState = pendingOAuthStates.get(state);
+    if (!pendingState || !validateState(state, pendingState.pkce.state)) {
+      return c.html(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>OAuth Error</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+          <div style="text-align: center; padding: 40px;">
+            <h1 style="color: #ef4444;">Invalid State</h1>
+            <p style="color: #999;">OAuth state mismatch or expired. Please try again.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth-error', error: 'Invalid or expired OAuth state' }, '*');
+              }
+            </script>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    try {
+      // Exchange code for tokens
+      const tokens = await exchangeCodeForTokens(
+        code,
+        pendingState.pkce.codeVerifier,
+        pendingState.redirectUri
+      );
+
+      // Clean up pending state
+      pendingOAuthStates.delete(state);
+
+      // Load existing config and update with OAuth tokens
+      let existingConfig: WeavrConfig = DEFAULT_CONFIG;
+      try {
+        const content = await readFile(configFile, 'utf-8');
+        existingConfig = parseYaml(content) as WeavrConfig;
+      } catch {
+        // No existing config
+      }
+
+      // Update AI config with OAuth
+      existingConfig.ai = {
+        ...existingConfig.ai,
+        provider: 'openai',
+        authMethod: 'oauth',
+        oauth: tokens,
+        // Clear API key when using OAuth
+        apiKey: undefined,
+      };
+
+      // Save updated config
+      await mkdir(weavrDir, { recursive: true });
+      await writeFile(configFile, stringifyYaml(existingConfig), 'utf-8');
+
+      return c.html(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>OAuth Success</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+          <div style="text-align: center; padding: 40px;">
+            <h1 style="color: #22c55e;">✓ Connected to OpenAI</h1>
+            <p style="color: #999;">You can close this window and return to Openweavr.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth-success' }, '*');
+                setTimeout(() => window.close(), 1500);
+              }
+            </script>
+          </div>
+        </body>
+        </html>
+      `);
+    } catch (err) {
+      pendingOAuthStates.delete(state);
+      const errorMsg = String(err).replace(/'/g, "\\'");
+      return c.html(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>OAuth Error</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+          <div style="text-align: center; padding: 40px;">
+            <h1 style="color: #ef4444;">Token Exchange Failed</h1>
+            <p style="color: #999;">${errorMsg}</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth-error', error: '${errorMsg}' }, '*');
+              }
+            </script>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  });
+
+  // Check OAuth status
+  app.get('/api/oauth/openai/status', async (c) => {
+    try {
+      const content = await readFile(configFile, 'utf-8');
+      const config = parseYaml(content) as WeavrConfig;
+
+      if (config.ai?.authMethod === 'oauth' && config.ai?.oauth?.accessToken) {
+        const isExpired = config.ai.oauth.expiresAt
+          ? Date.now() >= config.ai.oauth.expiresAt
+          : false;
+
+        return c.json({
+          connected: true,
+          hasRefreshToken: Boolean(config.ai.oauth.refreshToken),
+          isExpired,
+          expiresAt: config.ai.oauth.expiresAt,
+        });
+      }
+
+      return c.json({ connected: false });
+    } catch {
+      return c.json({ connected: false });
+    }
+  });
+
+  // Disconnect OAuth
+  app.post('/api/oauth/openai/disconnect', async (c) => {
+    try {
+      const content = await readFile(configFile, 'utf-8');
+      const existingConfig = parseYaml(content) as WeavrConfig;
+
+      // Clear OAuth tokens but keep provider setting
+      if (existingConfig.ai) {
+        existingConfig.ai = {
+          ...existingConfig.ai,
+          authMethod: undefined,
+          oauth: undefined,
+        };
+      }
+
+      await writeFile(configFile, stringifyYaml(existingConfig), 'utf-8');
+      return c.json({ success: true });
+    } catch (err) {
+      return c.json({ error: `Failed to disconnect: ${String(err)}` }, 500);
     }
   });
 

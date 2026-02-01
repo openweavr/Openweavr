@@ -10,6 +10,8 @@ interface Config {
     model?: string;
     apiKey?: string;
     hasApiKey?: boolean;
+    authMethod?: 'apikey' | 'oauth';
+    hasOAuth?: boolean;
   };
   webSearch?: {
     provider?: string;
@@ -43,6 +45,10 @@ export function Settings() {
   const [braveApiKey, setBraveApiKey] = useState('');
   const [showBraveApiKey, setShowBraveApiKey] = useState(false);
 
+  // OpenAI OAuth state
+  const [oauthConnected, setOauthConnected] = useState(false);
+  const [oauthConnecting, setOauthConnecting] = useState(false);
+
   // Messaging state
   const [telegramToken, setTelegramToken] = useState('');
   const [showTelegramToken, setShowTelegramToken] = useState(false);
@@ -73,6 +79,39 @@ export function Settings() {
       .catch(() => {
         // WhatsApp API may not be available
       });
+
+    // Check OpenAI OAuth status
+    fetch('/api/oauth/openai/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.connected) {
+          setOauthConnected(true);
+        }
+      })
+      .catch(() => {
+        // OAuth API may not be available
+      });
+  }, []);
+
+  // Listen for OAuth popup messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'oauth-success') {
+        setOauthConnected(true);
+        setOauthConnecting(false);
+        setMessage({ type: 'success', text: 'Connected to OpenAI via OAuth!' });
+        // Reload config
+        fetch('/api/config')
+          .then((res) => res.json())
+          .then((data) => setConfig(data.config));
+      } else if (event.data?.type === 'oauth-error') {
+        setOauthConnecting(false);
+        setMessage({ type: 'error', text: event.data.error ?? 'OAuth authentication failed' });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   // WebSocket for WhatsApp QR code updates
@@ -192,7 +231,53 @@ export function Settings() {
     }
   };
 
-  const needsApiKey = config?.ai?.provider && config.ai.provider !== 'ollama';
+  const needsApiKey = config?.ai?.provider && config.ai.provider !== 'ollama' && config?.ai?.authMethod !== 'oauth';
+  const isOpenAIWithOAuth = config?.ai?.provider === 'openai' && config?.ai?.authMethod === 'oauth';
+
+  const handleOAuthConnect = async () => {
+    setOauthConnecting(true);
+    try {
+      const response = await fetch('/api/oauth/openai/authorize');
+      const data = await response.json() as { authUrl?: string; error?: string };
+
+      if (data.authUrl) {
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+
+        window.open(
+          data.authUrl,
+          'openai-oauth',
+          `width=${width},height=${height},left=${left},top=${top},popup=yes`
+        );
+      } else {
+        setMessage({ type: 'error', text: data.error ?? 'Failed to start OAuth flow' });
+        setOauthConnecting(false);
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error: Could not start OAuth flow' });
+      setOauthConnecting(false);
+    }
+  };
+
+  const handleOAuthDisconnect = async () => {
+    try {
+      const response = await fetch('/api/oauth/openai/disconnect', { method: 'POST' });
+      if (response.ok) {
+        setOauthConnected(false);
+        setConfig((prev) =>
+          prev ? {
+            ...prev,
+            ai: prev.ai ? { ...prev.ai, authMethod: undefined } : undefined
+          } : null
+        );
+        setMessage({ type: 'success', text: 'Disconnected from OpenAI OAuth' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to disconnect OAuth' });
+    }
+  };
 
   const handleWhatsAppConnect = async () => {
     setWhatsappConnecting(true);
@@ -374,6 +459,55 @@ export function Settings() {
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
                     Ollama runs locally and doesn't require an API key. Make sure Ollama is running on your machine.
                   </p>
+                </div>
+              )}
+
+              {/* OpenAI OAuth Section */}
+              {config?.ai?.provider === 'openai' && (
+                <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>🔐</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600 }}>OpenAI OAuth</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        Sign in with your ChatGPT Plus or Team subscription
+                      </div>
+                    </div>
+                    {(oauthConnected || isOpenAIWithOAuth) ? (
+                      <span className="badge badge-success">connected</span>
+                    ) : (
+                      <span className="badge badge-default">not connected</span>
+                    )}
+                  </div>
+
+                  {(oauthConnected || isOpenAIWithOAuth) ? (
+                    <div>
+                      <p style={{ fontSize: '13px', color: 'var(--accent-green)', marginBottom: '12px' }}>
+                        ✓ Connected to OpenAI via OAuth. Your ChatGPT subscription is being used.
+                      </p>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={handleOAuthDisconnect}
+                        style={{ color: 'var(--accent-red)' }}
+                      >
+                        Disconnect OAuth
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                        Connect with your OpenAI account to use your ChatGPT Plus or Team subscription instead of an API key.
+                      </p>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleOAuthConnect}
+                        disabled={oauthConnecting}
+                        style={{ width: '100%' }}
+                      >
+                        {oauthConnecting ? 'Connecting...' : 'Connect with OpenAI'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

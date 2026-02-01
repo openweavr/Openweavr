@@ -1,20 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface OnboardingProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'ai' | 'apikey' | 'cli-setup' | 'complete';
+type Step = 'welcome' | 'ai' | 'auth-method' | 'apikey' | 'cli-setup' | 'complete';
+type AuthMethod = 'apikey' | 'oauth';
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState<Step>('welcome');
   const [provider, setProvider] = useState<string>('');
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('apikey');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cliTool, setCliTool] = useState<'auto' | 'claude' | 'ollama' | 'llm'>('auto');
   const [cliModel, setCliModel] = useState('');
+  const [oauthConnecting, setOauthConnecting] = useState(false);
+  const [oauthConnected, setOauthConnected] = useState(false);
+
+  // Listen for OAuth popup messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'oauth-success') {
+        setOauthConnected(true);
+        setOauthConnecting(false);
+        setError(null);
+      } else if (event.data?.type === 'oauth-error') {
+        setError(event.data.error ?? 'OAuth authentication failed');
+        setOauthConnecting(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleOAuthConnect = async () => {
+    setOauthConnecting(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/oauth/openai/authorize');
+      const data = await response.json() as { authUrl?: string; error?: string };
+
+      if (data.authUrl) {
+        // Open OAuth popup
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+
+        window.open(
+          data.authUrl,
+          'openai-oauth',
+          `width=${width},height=${height},left=${left},top=${top},popup=yes`
+        );
+      } else {
+        setError(data.error ?? 'Failed to start OAuth flow');
+        setOauthConnecting(false);
+      }
+    } catch (err) {
+      setError('Network error: Could not start OAuth flow');
+      setOauthConnecting(false);
+    }
+  };
 
   const handleFinish = async () => {
     setSaving(true);
@@ -30,12 +81,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           cliProvider: cliTool,
           cliModel: cliModel || undefined,
         };
+      } else if (provider === 'openai' && authMethod === 'oauth') {
+        // OAuth-based OpenAI configuration
+        // Tokens are already saved by the OAuth callback
+        // Just set the provider and auth method
+        aiConfig = {
+          provider: 'openai',
+          model: getDefaultModel('openai'),
+          authMethod: 'oauth',
+        };
       } else if (provider && provider !== 'none') {
-        // API-based AI configuration
+        // API key-based AI configuration
         aiConfig = {
           provider,
           model: getDefaultModel(provider),
           apiKey: apiKey || undefined,
+          authMethod: 'apikey',
         };
       }
 
@@ -73,7 +134,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  const needsApiKey = provider && provider !== 'none' && provider !== 'ollama' && provider !== 'cli';
+  const needsAuthMethod = provider === 'openai';
+  const needsApiKey = provider && provider !== 'none' && provider !== 'ollama' && provider !== 'cli' && !(provider === 'openai' && authMethod === 'oauth');
   const needsCliSetup = provider === 'cli';
 
   return (
@@ -211,7 +273,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  if (needsApiKey) {
+                  if (needsAuthMethod) {
+                    setStep('auth-method');
+                  } else if (needsApiKey) {
                     setStep('apikey');
                   } else if (needsCliSetup) {
                     setStep('cli-setup');
@@ -222,7 +286,175 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 disabled={!provider}
                 style={{ flex: 1 }}
               >
-                {needsApiKey || needsCliSetup ? 'Next' : 'Finish Setup'}
+                {needsAuthMethod || needsApiKey || needsCliSetup ? 'Next' : 'Finish Setup'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Auth Method Step (OpenAI only) */}
+        {step === 'auth-method' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '12px', textAlign: 'center' }}>
+              Choose Authentication Method
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '32px', textAlign: 'center' }}>
+              How would you like to authenticate with OpenAI?
+            </p>
+
+            <div style={{ display: 'grid', gap: '12px', marginBottom: '32px' }}>
+              <button
+                onClick={() => setAuthMethod('oauth')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  padding: '16px 20px',
+                  background: authMethod === 'oauth' ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                  border: `2px solid ${authMethod === 'oauth' ? 'var(--accent-purple)' : 'var(--border-color)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  transition: 'all 0.15s',
+                  color: '#fff',
+                }}
+              >
+                <span style={{ fontSize: '24px' }}>🔐</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: '2px', color: '#fff' }}>
+                    Sign in with OpenAI
+                    <span style={{
+                      marginLeft: '8px',
+                      fontSize: '11px',
+                      padding: '2px 6px',
+                      background: 'var(--accent-purple)',
+                      borderRadius: '4px',
+                      color: '#fff',
+                    }}>
+                      Recommended
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Use your ChatGPT Plus or Team subscription. No API key needed.
+                  </div>
+                </div>
+                {authMethod === 'oauth' && (
+                  <span style={{ color: 'var(--accent-purple)', fontSize: '20px' }}>✓</span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setAuthMethod('apikey')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  padding: '16px 20px',
+                  background: authMethod === 'apikey' ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                  border: `2px solid ${authMethod === 'apikey' ? 'var(--accent-purple)' : 'var(--border-color)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  transition: 'all 0.15s',
+                  color: '#fff',
+                }}
+              >
+                <span style={{ fontSize: '24px' }}>🔑</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: '2px', color: '#fff' }}>API Key</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Enter an OpenAI API key (requires separate API billing).
+                  </div>
+                </div>
+                {authMethod === 'apikey' && (
+                  <span style={{ color: 'var(--accent-purple)', fontSize: '20px' }}>✓</span>
+                )}
+              </button>
+            </div>
+
+            {authMethod === 'oauth' && (
+              <div style={{ marginBottom: '24px' }}>
+                {oauthConnected ? (
+                  <div style={{
+                    padding: '16px',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid var(--accent-green)',
+                    borderRadius: 'var(--radius-md)',
+                    textAlign: 'center',
+                  }}>
+                    <span style={{ fontSize: '24px', marginBottom: '8px', display: 'block' }}>✓</span>
+                    <div style={{ fontWeight: 600, color: 'var(--accent-green)' }}>Connected to OpenAI</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      Your account is authenticated and ready to use.
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleOAuthConnect}
+                    disabled={oauthConnecting}
+                    style={{ width: '100%', padding: '14px' }}
+                  >
+                    {oauthConnecting ? (
+                      <>
+                        <span style={{ marginRight: '8px' }}>◌</span>
+                        Waiting for authentication...
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ marginRight: '8px' }}>🔐</span>
+                        Connect with OpenAI
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {error && (
+              <div style={{
+                padding: '12px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid var(--accent-red)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--accent-red)',
+                fontSize: '13px',
+                marginBottom: '24px',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setStep('ai');
+                  setAuthMethod('apikey');
+                  setOauthConnected(false);
+                }}
+                style={{ flex: 1 }}
+              >
+                Back
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (authMethod === 'oauth') {
+                    if (oauthConnected) {
+                      handleFinish();
+                    }
+                    // If not connected, button is disabled
+                  } else {
+                    setStep('apikey');
+                  }
+                }}
+                disabled={authMethod === 'oauth' && !oauthConnected}
+                style={{ flex: 1 }}
+              >
+                {authMethod === 'oauth' ? 'Finish Setup' : 'Next'}
               </button>
             </div>
           </div>

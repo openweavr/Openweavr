@@ -1,7 +1,34 @@
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import { createServer } from 'node:http';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { ensureConfigDir, saveConfig, loadConfig, WEAVR_DIR } from '../../config/index.js';
 import type { WeavrConfig } from '../../types/index.js';
+import {
+  generatePKCE,
+  buildAuthorizationURL,
+  exchangeCodeForTokens,
+  getCallbackUrl,
+} from '../../auth/openai-oauth.js';
+
+const execAsync = promisify(exec);
+
+// Open URL in browser (cross-platform)
+async function openBrowser(url: string): Promise<void> {
+  const platform = process.platform;
+  let command: string;
+
+  if (platform === 'darwin') {
+    command = `open "${url}"`;
+  } else if (platform === 'win32') {
+    command = `start "" "${url}"`;
+  } else {
+    command = `xdg-open "${url}"`;
+  }
+
+  await execAsync(command);
+}
 
 export async function onboardCommand(): Promise<void> {
   console.clear();
@@ -36,8 +63,25 @@ export async function onboardCommand(): Promise<void> {
           ],
         }),
 
+      openaiAuthMethod: ({ results }) => {
+        if (results.aiProvider !== 'openai') {
+          return Promise.resolve(undefined);
+        }
+        return p.select({
+          message: 'How would you like to authenticate with OpenAI?',
+          options: [
+            { value: 'oauth', label: 'Sign in with OpenAI (ChatGPT Plus/Team) - Recommended' },
+            { value: 'apikey', label: 'API Key (separate API billing)' },
+          ],
+        });
+      },
+
       aiApiKey: ({ results }) => {
         if (results.aiProvider === 'none' || results.aiProvider === 'ollama') {
+          return Promise.resolve(undefined);
+        }
+        // Skip if OpenAI with OAuth
+        if (results.aiProvider === 'openai' && results.openaiAuthMethod === 'oauth') {
           return Promise.resolve(undefined);
         }
         return p.password({
@@ -85,6 +129,126 @@ export async function onboardCommand(): Promise<void> {
     }
   );
 
+  // Handle OpenAI OAuth flow if selected
+  let oauthTokens: { accessToken: string; refreshToken?: string; expiresAt?: number } | undefined;
+
+  if (answers.aiProvider === 'openai' && answers.openaiAuthMethod === 'oauth') {
+    const oauthSpinner = p.spinner();
+    oauthSpinner.start('Starting OAuth authentication...');
+
+    try {
+      // Generate PKCE challenge
+      const pkce = await generatePKCE();
+      const port = parseInt(answers.port as string, 10);
+      const redirectUri = getCallbackUrl(port);
+
+      // Create a temporary server to receive the OAuth callback
+      const callbackPromise = new Promise<{ code: string; state: string }>((resolve, reject) => {
+        const server = createServer((req, res) => {
+          const url = new URL(req.url || '', `http://localhost:${port}`);
+
+          if (url.pathname === '/api/oauth/openai/callback') {
+            const code = url.searchParams.get('code');
+            const state = url.searchParams.get('state');
+            const error = url.searchParams.get('error');
+
+            if (error) {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>OAuth Error</title></head>
+                <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+                  <div style="text-align: center; padding: 40px;">
+                    <h1 style="color: #ef4444;">Authentication Failed</h1>
+                    <p style="color: #999;">${url.searchParams.get('error_description') || error}</p>
+                    <p style="margin-top: 20px;">You can close this window.</p>
+                  </div>
+                </body>
+                </html>
+              `);
+              server.close();
+              reject(new Error(url.searchParams.get('error_description') || error));
+              return;
+            }
+
+            if (code && state) {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>OAuth Success</title></head>
+                <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+                  <div style="text-align: center; padding: 40px;">
+                    <h1 style="color: #22c55e;">✓ Connected to OpenAI</h1>
+                    <p style="color: #999;">You can close this window and return to the terminal.</p>
+                  </div>
+                </body>
+                </html>
+              `);
+              server.close();
+              resolve({ code, state });
+            } else {
+              res.writeHead(400);
+              res.end('Missing code or state');
+            }
+          } else {
+            res.writeHead(404);
+            res.end('Not found');
+          }
+        });
+
+        server.listen(port, '127.0.0.1', () => {
+          // Server ready
+        });
+
+        // Timeout after 2 minutes
+        setTimeout(() => {
+          server.close();
+          reject(new Error('OAuth timeout: No response received within 2 minutes'));
+        }, 2 * 60 * 1000);
+      });
+
+      // Build and open authorization URL
+      const authUrl = buildAuthorizationURL(pkce, redirectUri);
+      oauthSpinner.stop('Opening browser for OpenAI sign-in...');
+
+      p.note(
+        [
+          chalk.dim('A browser window will open for you to sign in to OpenAI.'),
+          chalk.dim('After signing in, you will be redirected back to complete the setup.'),
+        ].join('\n'),
+        'OpenAI OAuth'
+      );
+
+      await openBrowser(authUrl);
+
+      const waitSpinner = p.spinner();
+      waitSpinner.start('Waiting for authentication...');
+
+      // Wait for callback
+      const { code, state } = await callbackPromise;
+
+      // Validate state
+      if (state !== pkce.state) {
+        waitSpinner.stop('Authentication failed');
+        throw new Error('OAuth state mismatch - possible CSRF attack');
+      }
+
+      waitSpinner.message('Exchanging code for tokens...');
+
+      // Exchange code for tokens
+      oauthTokens = await exchangeCodeForTokens(code, pkce.codeVerifier, redirectUri);
+
+      waitSpinner.stop(chalk.green('✓') + ' Connected to OpenAI');
+    } catch (err) {
+      oauthSpinner.stop(chalk.red('✗') + ' OAuth authentication failed');
+      p.log.error(String(err));
+      p.cancel('Setup cancelled due to OAuth failure');
+      process.exit(1);
+    }
+  }
+
   const s = p.spinner();
   s.start('Creating configuration...');
 
@@ -99,10 +263,21 @@ export async function onboardCommand(): Promise<void> {
   };
 
   if (answers.aiProvider && answers.aiProvider !== 'none') {
-    config.ai = {
-      provider: answers.aiProvider as 'anthropic' | 'openai' | 'ollama',
-      apiKey: answers.aiApiKey as string | undefined,
-    };
+    if (answers.aiProvider === 'openai' && answers.openaiAuthMethod === 'oauth' && oauthTokens) {
+      // OAuth-based OpenAI configuration
+      config.ai = {
+        provider: 'openai',
+        authMethod: 'oauth',
+        oauth: oauthTokens,
+      };
+    } else {
+      // API key-based configuration
+      config.ai = {
+        provider: answers.aiProvider as 'anthropic' | 'openai' | 'ollama',
+        apiKey: answers.aiApiKey as string | undefined,
+        authMethod: 'apikey',
+      };
+    }
   }
 
   // Add web search config if Brave API key was provided

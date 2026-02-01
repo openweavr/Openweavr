@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getGlobalMCPManager } from '../../loader.js';
+import { refreshAccessToken, isTokenExpired, type OAuthTokens } from '../../../auth/openai-oauth.js';
 const execAsync = promisify(exec);
 
 // Helper to sleep for a given duration
@@ -243,6 +244,9 @@ interface AIConfig {
   provider?: string;
   model?: string;
   apiKey?: string;
+  // OAuth authentication (for OpenAI with ChatGPT Plus/Team)
+  authMethod?: 'apikey' | 'oauth';
+  oauth?: OAuthTokens;
   // CLI-based AI options (for users without API keys)
   useCLI?: boolean;
   cliProvider?: 'claude' | 'ollama' | 'llm' | 'auto';
@@ -311,11 +315,57 @@ function getAnthropicKey(ctx: { env: Record<string, string>; config: Record<stri
 
 function getOpenAIKey(ctx: { env: Record<string, string>; config: Record<string, unknown> }): string | undefined {
   const globalConfig = getGlobalAIConfig();
-  // Check if global config uses OpenAI
-  if (globalConfig.provider === 'openai' && globalConfig.apiKey) {
+  // Check if global config uses OpenAI with API key
+  if (globalConfig.provider === 'openai' && globalConfig.authMethod !== 'oauth' && globalConfig.apiKey) {
     return globalConfig.apiKey;
   }
   return (ctx.config.openaiApiKey as string) ?? ctx.env.OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+}
+
+// Get OpenAI OAuth access token, refreshing if expired
+async function getOpenAIOAuthToken(logFn?: (msg: string) => void): Promise<string | undefined> {
+  const globalConfig = getGlobalAIConfig();
+
+  if (globalConfig.provider !== 'openai' || globalConfig.authMethod !== 'oauth' || !globalConfig.oauth) {
+    return undefined;
+  }
+
+  const tokens = globalConfig.oauth;
+
+  // Check if token is expired and needs refresh
+  if (isTokenExpired(tokens)) {
+    if (!tokens.refreshToken) {
+      logFn?.('OAuth access token expired and no refresh token available');
+      return undefined;
+    }
+
+    logFn?.('OAuth access token expired, refreshing...');
+
+    try {
+      const newTokens = await refreshAccessToken(tokens.refreshToken);
+
+      // Update the config file with new tokens
+      const configPath = join(homedir(), '.weavr', 'config.yaml');
+      const content = readFileSync(configPath, 'utf-8');
+      const config = parseYaml(content) as { ai?: AIConfig };
+
+      if (config.ai) {
+        config.ai.oauth = newTokens;
+        writeFileSync(configPath, stringifyYaml(config), 'utf-8');
+
+        // Invalidate cache so next read gets fresh tokens
+        cachedConfig = null;
+      }
+
+      logFn?.('OAuth token refreshed successfully');
+      return newTokens.accessToken;
+    } catch (err) {
+      logFn?.(`Failed to refresh OAuth token: ${String(err)}`);
+      return undefined;
+    }
+  }
+
+  return tokens.accessToken;
 }
 
 function getConfiguredModel(): string | undefined {
@@ -337,6 +387,7 @@ export default definePlugin({
         const config = CompletionSchema.parse(ctx.config);
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
+        const oauthToken = await getOpenAIOAuthToken(ctx.log);
 
         if (anthropicKey) {
           ctx.log('Using Anthropic for completion');
@@ -368,8 +419,9 @@ export default definePlugin({
             model,
             provider: 'anthropic',
           };
-        } else if (openaiKey) {
-          ctx.log('Using OpenAI for completion');
+        } else if (oauthToken || openaiKey) {
+          const authToken = oauthToken ?? openaiKey;
+          ctx.log(oauthToken ? 'Using OpenAI with OAuth for completion' : 'Using OpenAI for completion');
           const model = config.model ?? getConfiguredModel() ?? 'gpt-4o';
 
           const messages = [];
@@ -382,7 +434,7 @@ export default definePlugin({
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiKey}`,
+              'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({
               model,
@@ -401,7 +453,7 @@ export default definePlugin({
           return {
             text: data.choices[0]?.message?.content ?? '',
             model,
-            provider: 'openai',
+            provider: oauthToken ? 'openai-oauth' : 'openai',
           };
         } else {
           // Fallback to CLI-based AI
@@ -437,6 +489,7 @@ Summary:`;
 
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
+        const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
         const systemPrompt = 'You are a helpful assistant that summarizes text clearly and accurately.';
 
@@ -467,13 +520,14 @@ Summary:`;
           const summary = data.content[0]?.text ?? '';
           ctx.log(`Generated summary: ${summary.substring(0, 100)}...`);
           return { summary };
-        } else if (openaiKey) {
-          ctx.log('Using OpenAI for summarization');
+        } else if (oauthToken || openaiKey) {
+          const authToken = oauthToken ?? openaiKey;
+          ctx.log(oauthToken ? 'Using OpenAI with OAuth for summarization' : 'Using OpenAI for summarization');
           const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiKey}`,
+              'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({
               model: 'gpt-4o',
@@ -529,6 +583,7 @@ Return ONLY valid JSON, no other text.`;
 
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
+        const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
 
         let result: string;
@@ -550,12 +605,13 @@ Return ONLY valid JSON, no other text.`;
 
           const data = await response.json() as { content: Array<{ text: string }> };
           result = data.content[0]?.text ?? '{}';
-        } else if (openaiKey) {
+        } else if (oauthToken || openaiKey) {
+          const authToken = oauthToken ?? openaiKey;
           const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiKey}`,
+              'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({
               model: 'gpt-4o',
@@ -598,6 +654,7 @@ Return ONLY the category name, nothing else.`;
 
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
+        const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
 
         let category: string;
@@ -619,12 +676,13 @@ Return ONLY the category name, nothing else.`;
 
           const data = await response.json() as { content: Array<{ text: string }> };
           category = data.content[0]?.text?.trim() ?? 'unknown';
-        } else if (openaiKey) {
+        } else if (oauthToken || openaiKey) {
+          const authToken = oauthToken ?? openaiKey;
           const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiKey}`,
+              'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({
               model: 'gpt-4o',
@@ -661,10 +719,11 @@ Return ONLY the category name, nothing else.`;
 
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
+        const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
 
-        if (!anthropicKey && !openaiKey) {
-          throw new Error('Agent action requires an API key (Anthropic or OpenAI) for tool use capabilities.');
+        if (!anthropicKey && !openaiKey && !oauthToken) {
+          throw new Error('Agent action requires an API key (Anthropic or OpenAI) or OAuth for tool use capabilities.');
         }
 
         // Use global MCP manager (initialized on server startup)
@@ -1250,9 +1309,10 @@ If a tool returns [FAILED] or [ERROR]:
               finalResult = textResponse;
               break;
             }
-          } else if (openaiKey) {
+          } else if (oauthToken || openaiKey) {
             // OpenAI with function calling - use separate message tracking for proper format
             // OpenAI requires: assistant message with tool_calls, then tool messages with tool_call_id
+            const authToken = oauthToken ?? openaiKey;
             type OpenAIMessage =
               | { role: 'system'; content: string }
               | { role: 'user'; content: string }
@@ -1310,7 +1370,7 @@ If a tool returns [FAILED] or [ERROR]:
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiKey}`,
+                'Authorization': `Bearer ${authToken}`,
               },
               body: JSON.stringify({
                 model: globalConfig.model ?? 'gpt-4o',
