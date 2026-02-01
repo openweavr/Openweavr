@@ -1,0 +1,5 @@
+# Run typecheck first to catch TypeScript errors
+npm run typecheck
+
+# Then run tests
+npm test

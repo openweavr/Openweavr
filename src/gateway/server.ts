@@ -4,12 +4,12 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import type { Server } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
-import { writeFile, mkdir, readdir, readFile, stat, access, unlink } from 'node:fs/promises';
+import { writeFile, mkdir, readdir, readFile, access, unlink } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { GatewayClient, GatewayMessage, WeavrConfig, WorkflowRun } from '../types/index.js';
+import type { GatewayClient, GatewayMessage, WeavrConfig } from '../types/index.js';
 import { DEFAULT_CONFIG } from '../types/index.js';
 import { WorkflowExecutor } from '../engine/executor.js';
 import { parser } from '../engine/parser.js';
@@ -763,11 +763,11 @@ Output ONLY the YAML code block, no additional text.`;
         });
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
+          const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
           return c.json({ error: `OpenAI API error: ${err.error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json();
+        const data = await response.json() as { choices?: { message?: { content?: string } }[] };
         yamlContent = data.choices?.[0]?.message?.content ?? '';
       } else if (aiConfig.provider === 'anthropic') {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -786,11 +786,11 @@ Output ONLY the YAML code block, no additional text.`;
         });
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
+          const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
           return c.json({ error: `Anthropic API error: ${err.error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json();
+        const data = await response.json() as { content?: { text?: string }[] };
         yamlContent = data.content?.[0]?.text ?? '';
       } else if (aiConfig.provider === 'ollama') {
         const response = await fetch('http://localhost:11434/api/generate', {
@@ -807,7 +807,7 @@ Output ONLY the YAML code block, no additional text.`;
           return c.json({ error: 'Ollama is not running or model not available' }, 500);
         }
 
-        const data = await response.json();
+        const data = await response.json() as { response?: string };
         yamlContent = data.response ?? '';
       } else {
         return c.json({ error: `Unsupported AI provider: ${aiConfig.provider}` }, 400);
@@ -1333,8 +1333,6 @@ steps:
   });
 
   // WhatsApp messaging endpoints
-  let whatsappBroadcast: ((channel: string, message: GatewayMessage) => void) | null = null;
-
   app.get('/api/messaging/whatsapp/status', async (c) => {
     const action = globalRegistry.getAction('whatsapp.status');
     if (!action) {
@@ -1362,9 +1360,6 @@ steps:
     if (!action) {
       return c.json({ error: 'WhatsApp plugin not loaded' }, 400);
     }
-
-    // Store broadcast function for WhatsApp to use
-    whatsappBroadcast = broadcast;
 
     // Start connection asynchronously
     action.execute({

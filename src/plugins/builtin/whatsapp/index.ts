@@ -181,32 +181,30 @@ export default definePlugin({
         const jid = normalizeJid(config.to);
         ctx.log(`Sending WhatsApp ${config.mediaType} to ${jid}`);
 
-        let messageContent: Record<string, unknown>;
-
         // Build message based on media type
+        let result;
         if (config.mediaType === 'image') {
-          messageContent = {
+          result = await activeSocket.sendMessage(jid, {
             image: { url: config.media },
             caption: config.caption,
-          };
+          });
         } else if (config.mediaType === 'video') {
-          messageContent = {
+          result = await activeSocket.sendMessage(jid, {
             video: { url: config.media },
             caption: config.caption,
-          };
+          });
         } else if (config.mediaType === 'audio') {
-          messageContent = {
+          result = await activeSocket.sendMessage(jid, {
             audio: { url: config.media },
             ptt: true, // Voice note
-          };
+          });
         } else {
-          messageContent = {
+          result = await activeSocket.sendMessage(jid, {
             document: { url: config.media },
+            mimetype: 'application/octet-stream',
             caption: config.caption,
-          };
+          });
         }
-
-        const result = await activeSocket.sendMessage(jid, messageContent);
 
         return {
           messageId: result?.key?.id,
@@ -298,7 +296,7 @@ export default definePlugin({
     defineTrigger({
       name: 'message',
       description: 'Trigger on incoming WhatsApp messages',
-      async setup(config, emit) {
+      async setup(_config, emit) {
         console.log('[whatsapp] Message trigger registered');
         console.log('[whatsapp] Note: WhatsApp must be connected for triggers to work');
 

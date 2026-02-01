@@ -233,7 +233,7 @@ export class TriggerScheduler {
   }
 
   stopAll(): void {
-    for (const [name, scheduled] of this.scheduledWorkflows) {
+    for (const [_name, scheduled] of this.scheduledWorkflows) {
       if (scheduled.cronJob) {
         scheduled.cronJob.stop();
       }

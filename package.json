@@ -26,7 +26,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
@@ -48,10 +49,12 @@
   "devDependencies": {
     "@types/node": "^22.12.0",
     "@types/node-notifier": "^8.0.5",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.5.14",
     "@vitejs/plugin-react": "^4.3.4",
+    "husky": "^9.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsdown": "^0.11.0",
