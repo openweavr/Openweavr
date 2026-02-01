@@ -15,7 +15,7 @@ const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const OAUTH_CALLBACK_PORT = 1455;
 const OAUTH_CALLBACK_PATH = '/auth/callback';
 
-// Scopes needed for API access
+// Scopes for ChatGPT OAuth (same as Codex CLI)
 const OPENAI_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 
 // Encryption key derivation (uses machine-specific info)
@@ -73,6 +73,7 @@ export function generatePKCE(): PKCEChallenge {
 
 /**
  * Build the OpenAI OAuth authorization URL
+ * Uses the same parameters as Codex CLI for ChatGPT Plus/Pro authentication
  */
 export function buildAuthorizationURL(pkce: PKCEChallenge, redirectUri: string): string {
   const params = new URLSearchParams({
@@ -83,8 +84,9 @@ export function buildAuthorizationURL(pkce: PKCEChallenge, redirectUri: string):
     state: pkce.state,
     code_challenge: pkce.codeChallenge,
     code_challenge_method: 'S256',
-    // Audience for API access
-    audience: 'https://api.openai.com/v1',
+    // Critical Codex CLI parameters for ChatGPT subscription access
+    id_token_add_organizations: 'true',
+    codex_cli_simplified_flow: 'true',
   });
 
   return `${OPENAI_AUTH_URL}?${params.toString()}`;

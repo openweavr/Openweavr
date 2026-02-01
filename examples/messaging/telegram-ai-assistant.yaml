@@ -1,0 +1,32 @@
+# Telegram AI Assistant
+# Responds to all private messages with AI-generated responses
+# Great for personal assistant bots
+
+name: telegram-ai-assistant
+description: AI-powered Telegram bot that responds to messages
+
+trigger:
+  type: telegram.message
+  with:
+    chatType: private
+
+steps:
+  - id: generate-response
+    action: ai.complete
+    with:
+      prompt: |
+        You are a helpful AI assistant on Telegram.
+
+        User: {{ trigger.from.name }}
+        Message: {{ trigger.text }}
+
+        Provide a helpful, concise response.
+      maxTokens: 300
+
+  - id: reply
+    action: telegram.send
+    needs: [generate-response]
+    with:
+      chatId: "{{ trigger.chat.id }}"
+      text: "{{ steps.generate-response.text }}"
+      replyToMessageId: "{{ trigger.messageId }}"

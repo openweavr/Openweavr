@@ -1,5 +1,208 @@
 import { definePlugin, defineAction, defineTrigger } from '../../sdk/types.js';
 import { z } from 'zod';
+import { WebSocket } from 'ws';
+
+// Slack Socket Mode connection state
+let socketConnection: WebSocket | null = null;
+let socketUrl: string | null = null;
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 5000;
+
+// Message handlers for all active triggers
+interface SlackMessageEvent {
+  type: string;
+  channel?: string;
+  channelName?: string;
+  user?: string;
+  text?: string;
+  ts?: string;
+  thread_ts?: string;
+  bot_id?: string;
+  subtype?: string;
+}
+
+type MessageHandler = (event: SlackMessageEvent) => void;
+const messageHandlers: MessageHandler[] = [];
+
+// Reaction handlers
+interface SlackReactionEvent {
+  type: string;
+  user: string;
+  reaction: string;
+  item: {
+    type: string;
+    channel: string;
+    ts: string;
+  };
+  event_ts: string;
+}
+
+type ReactionHandler = (event: SlackReactionEvent) => void;
+const reactionHandlers: ReactionHandler[] = [];
+
+/**
+ * Get the app-level token for Socket Mode
+ */
+function getAppToken(): string | undefined {
+  return process.env.SLACK_APP_TOKEN;
+}
+
+/**
+ * Connect to Slack using Socket Mode
+ */
+async function connectSocketMode(appToken: string): Promise<void> {
+  if (socketConnection && socketConnection.readyState === WebSocket.OPEN) {
+    console.log('[slack] Socket Mode already connected');
+    return;
+  }
+
+  console.log('[slack] Connecting to Slack Socket Mode...');
+
+  // Get WebSocket URL from Slack
+  const response = await fetch('https://slack.com/api/apps.connections.open', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${appToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
+
+  const data = await response.json() as { ok: boolean; url?: string; error?: string };
+
+  if (!data.ok || !data.url) {
+    throw new Error(`Failed to get Socket Mode URL: ${data.error ?? 'unknown error'}`);
+  }
+
+  socketUrl = data.url;
+
+  return new Promise((resolve, reject) => {
+    socketConnection = new WebSocket(socketUrl!);
+
+    socketConnection.on('open', () => {
+      console.log('[slack] Socket Mode connected');
+      reconnectAttempts = 0;
+      resolve();
+    });
+
+    socketConnection.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString()) as {
+          type: string;
+          envelope_id?: string;
+          payload?: {
+            event?: SlackMessageEvent | SlackReactionEvent;
+            type?: string;
+          };
+          num_connections?: number;
+        };
+
+        // Acknowledge the envelope if present
+        if (msg.envelope_id) {
+          socketConnection?.send(JSON.stringify({ envelope_id: msg.envelope_id }));
+        }
+
+        // Handle different message types
+        if (msg.type === 'hello') {
+          console.log(`[slack] Socket Mode ready (connections: ${msg.num_connections ?? 1})`);
+        } else if (msg.type === 'disconnect') {
+          console.log('[slack] Received disconnect message, will reconnect...');
+        } else if (msg.type === 'events_api' && msg.payload?.event) {
+          const event = msg.payload.event;
+
+          // Route to appropriate handlers
+          if (event.type === 'message' && !('subtype' in event && event.subtype)) {
+            messageHandlers.forEach(handler => {
+              try {
+                handler(event as SlackMessageEvent);
+              } catch (err) {
+                console.error('[slack] Message handler error:', err);
+              }
+            });
+          } else if (event.type === 'reaction_added') {
+            reactionHandlers.forEach(handler => {
+              try {
+                handler(event as SlackReactionEvent);
+              } catch (err) {
+                console.error('[slack] Reaction handler error:', err);
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[slack] Failed to parse Socket Mode message:', err);
+      }
+    });
+
+    socketConnection.on('close', (code, reason) => {
+      console.log(`[slack] Socket Mode disconnected (code: ${code}, reason: ${reason})`);
+      socketConnection = null;
+
+      // Attempt to reconnect if we have handlers
+      if (messageHandlers.length > 0 || reactionHandlers.length > 0) {
+        attemptReconnect(appToken);
+      }
+    });
+
+    socketConnection.on('error', (err) => {
+      console.error('[slack] Socket Mode error:', err);
+      if (socketConnection?.readyState !== WebSocket.OPEN) {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
+ * Attempt to reconnect to Socket Mode
+ */
+function attemptReconnect(appToken: string): void {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.error('[slack] Max reconnect attempts reached');
+    return;
+  }
+
+  reconnectAttempts++;
+  console.log(`[slack] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+
+  setTimeout(async () => {
+    try {
+      await connectSocketMode(appToken);
+    } catch (err) {
+      console.error('[slack] Reconnection failed:', err);
+      attemptReconnect(appToken);
+    }
+  }, RECONNECT_DELAY_MS);
+}
+
+/**
+ * Disconnect from Socket Mode
+ */
+function disconnectSocketMode(): void {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+
+  if (socketConnection) {
+    socketConnection.close();
+    socketConnection = null;
+  }
+
+  socketUrl = null;
+  reconnectAttempts = 0;
+}
+
+/**
+ * Check if Socket Mode should be disconnected (no handlers)
+ */
+function checkDisconnect(): void {
+  if (messageHandlers.length === 0 && reactionHandlers.length === 0) {
+    console.log('[slack] No more handlers, disconnecting Socket Mode...');
+    disconnectSocketMode();
+  }
+}
 
 const PostMessageSchema = z.object({
   channel: z.string(),
@@ -63,10 +266,62 @@ export default definePlugin({
     defineTrigger({
       name: 'message',
       description: 'Trigger on new messages in a channel',
-      async setup(config, _emit) {
-        const channel = (config as { channel?: string }).channel;
-        console.log(`[slack] Message trigger registered for ${channel ?? 'channel'}`);
-        return () => {};
+      schema: z.object({
+        channel: z.string().optional().describe('Channel ID or name (with #) to filter messages'),
+        pattern: z.string().optional().describe('Regex pattern to match in message text'),
+        ignoreBot: z.boolean().default(true).describe('Whether to ignore messages from bots'),
+      }),
+      async setup(config, emit) {
+        const appToken = getAppToken();
+        if (!appToken) {
+          console.log('[slack] SLACK_APP_TOKEN not set - message trigger will not receive events');
+          console.log('[slack] To enable: Create a Slack app with Socket Mode and set SLACK_APP_TOKEN');
+          return () => {};
+        }
+
+        const typedConfig = config as { channel?: string; pattern?: string; ignoreBot?: boolean };
+
+        // Connect to Socket Mode if not already connected
+        try {
+          await connectSocketMode(appToken);
+        } catch (err) {
+          console.error('[slack] Failed to connect Socket Mode:', err);
+          return () => {};
+        }
+
+        // Create handler for this trigger
+        const handler: MessageHandler = (event) => {
+          // Skip bot messages if configured
+          if (typedConfig.ignoreBot !== false && event.bot_id) {
+            return;
+          }
+
+          // Emit the event - filtering will be done by TriggerManager
+          emit({
+            type: 'slack.message',
+            channel: event.channel,
+            channelName: event.channelName,
+            user: event.user,
+            text: event.text ?? '',
+            ts: event.ts,
+            threadTs: event.thread_ts,
+            isBot: !!event.bot_id,
+            botId: event.bot_id,
+          });
+        };
+
+        messageHandlers.push(handler);
+        console.log(`[slack] Message trigger active for ${typedConfig.channel ?? 'all channels'}`);
+
+        // Return cleanup function
+        return () => {
+          const index = messageHandlers.indexOf(handler);
+          if (index >= 0) {
+            messageHandlers.splice(index, 1);
+          }
+          checkDisconnect();
+          console.log('[slack] Message trigger deactivated');
+        };
       },
     }),
 
@@ -76,6 +331,7 @@ export default definePlugin({
       async setup(config, _emit) {
         const command = (config as { command?: string }).command;
         console.log(`[slack] Slash command trigger registered: ${command ?? '/command'}`);
+        console.log('[slack] Note: Slash commands require a Request URL configured in Slack app settings');
         return () => {};
       },
     }),
@@ -83,9 +339,61 @@ export default definePlugin({
     defineTrigger({
       name: 'reaction_added',
       description: 'Trigger when a reaction is added',
-      async setup(_config, _emit) {
-        console.log(`[slack] Reaction trigger registered`);
-        return () => {};
+      schema: z.object({
+        reaction: z.string().optional().describe('Specific reaction name to filter (without colons)'),
+        channel: z.string().optional().describe('Channel ID to filter reactions'),
+      }),
+      async setup(config, emit) {
+        const appToken = getAppToken();
+        if (!appToken) {
+          console.log('[slack] SLACK_APP_TOKEN not set - reaction trigger will not receive events');
+          return () => {};
+        }
+
+        const typedConfig = config as { reaction?: string; channel?: string };
+
+        // Connect to Socket Mode if not already connected
+        try {
+          await connectSocketMode(appToken);
+        } catch (err) {
+          console.error('[slack] Failed to connect Socket Mode:', err);
+          return () => {};
+        }
+
+        // Create handler for this trigger
+        const handler: ReactionHandler = (event) => {
+          // Filter by reaction name if specified
+          if (typedConfig.reaction && event.reaction !== typedConfig.reaction) {
+            return;
+          }
+
+          // Filter by channel if specified
+          if (typedConfig.channel && event.item.channel !== typedConfig.channel) {
+            return;
+          }
+
+          emit({
+            type: 'slack.reaction_added',
+            user: event.user,
+            reaction: event.reaction,
+            channel: event.item.channel,
+            messageTs: event.item.ts,
+            eventTs: event.event_ts,
+          });
+        };
+
+        reactionHandlers.push(handler);
+        console.log(`[slack] Reaction trigger active${typedConfig.reaction ? ` for :${typedConfig.reaction}:` : ''}`);
+
+        // Return cleanup function
+        return () => {
+          const index = reactionHandlers.indexOf(handler);
+          if (index >= 0) {
+            reactionHandlers.splice(index, 1);
+          }
+          checkDisconnect();
+          console.log('[slack] Reaction trigger deactivated');
+        };
       },
     }),
   ],

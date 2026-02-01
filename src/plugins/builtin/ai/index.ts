@@ -315,8 +315,8 @@ function getAnthropicKey(ctx: { env: Record<string, string>; config: Record<stri
 
 function getOpenAIKey(ctx: { env: Record<string, string>; config: Record<string, unknown> }): string | undefined {
   const globalConfig = getGlobalAIConfig();
-  // Check if global config uses OpenAI with API key
-  if (globalConfig.provider === 'openai' && globalConfig.authMethod !== 'oauth' && globalConfig.apiKey) {
+  // Check if global config has an API key (regardless of authMethod - user might have both OAuth and API key)
+  if (globalConfig.provider === 'openai' && globalConfig.apiKey) {
     return globalConfig.apiKey;
   }
   return (ctx.config.openaiApiKey as string) ?? ctx.env.OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
@@ -721,9 +721,10 @@ Return ONLY the category name, nothing else.`;
         const openaiKey = getOpenAIKey(ctx);
         const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
+        const useCodexAPI = oauthToken && !openaiKey && !anthropicKey;
 
         if (!anthropicKey && !openaiKey && !oauthToken) {
-          throw new Error('Agent action requires an API key (Anthropic or OpenAI) or OAuth for tool use capabilities.');
+          throw new Error('Agent action requires an API key (Anthropic or OpenAI) or OAuth authentication.');
         }
 
         // Use global MCP manager (initialized on server startup)
@@ -1309,10 +1310,86 @@ If a tool returns [FAILED] or [ERROR]:
               finalResult = textResponse;
               break;
             }
+          } else if (useCodexAPI) {
+            // ChatGPT Backend API (Codex) for OAuth users
+            ctx.log('Using ChatGPT Backend API (Codex) with OAuth');
+
+            // Build conversation for Codex
+            const codexInput: Array<{ type: string; role?: string; content?: string }> = [];
+
+            // Add previous messages
+            for (const m of messages) {
+              if (typeof m.content === 'string') {
+                codexInput.push({ type: 'message', role: m.role, content: m.content });
+              }
+            }
+
+            // Codex API with streaming
+            const codexResponse = await fetch('https://chatgpt.com/backend-api/codex/responses', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${oauthToken}`,
+              },
+              body: JSON.stringify({
+                model: globalConfig.model ?? 'gpt-4o',
+                instructions: finalSystemPrompt,
+                input: codexInput,
+                stream: true,
+                store: false,
+              }),
+            });
+
+            if (!codexResponse.ok) {
+              const errText = await codexResponse.text();
+              throw new Error(`ChatGPT API error: ${errText.slice(0, 300)}`);
+            }
+
+            // Handle streaming response
+            const reader = codexResponse.body?.getReader();
+            if (!reader) {
+              throw new Error('No response body from ChatGPT API');
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullResponse = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() ?? '';
+
+              for (const line of lines) {
+                if (!line.trim() || !line.startsWith('data: ')) continue;
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const event = JSON.parse(data);
+                  if (event.type === 'response.output_text.delta') {
+                    fullResponse += event.delta ?? '';
+                  }
+                } catch {
+                  // Ignore parse errors
+                }
+              }
+            }
+
+            // For Codex, we don't have tool calling support, so the response is final
+            // The model should complete the task in one shot with the given instructions
+            if (fullResponse) {
+              finalResult = fullResponse;
+            }
+            break; // Exit loop - Codex doesn't support multi-turn tool calling
+
           } else if (oauthToken || openaiKey) {
             // OpenAI with function calling - use separate message tracking for proper format
             // OpenAI requires: assistant message with tool_calls, then tool messages with tool_call_id
-            const authToken = oauthToken ?? openaiKey;
+            const authToken = openaiKey!; // Only use API key here, OAuth is handled above
             type OpenAIMessage =
               | { role: 'system'; content: string }
               | { role: 'user'; content: string }

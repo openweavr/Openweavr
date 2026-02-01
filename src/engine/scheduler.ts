@@ -7,6 +7,7 @@ import type { Workflow } from '../types/index.js';
 import { parser } from './parser.js';
 import { WorkflowExecutor } from './executor.js';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
+import { TriggerManager } from './trigger-manager.js';
 
 export interface ScheduledWorkflow {
   name: string;
@@ -30,6 +31,7 @@ export class TriggerScheduler {
   private workflowsDir: string;
   private executor: WorkflowExecutor;
   private events: SchedulerEvents;
+  private triggerManager: TriggerManager;
 
   constructor(workflowsDir: string, registry: PluginRegistry, events: SchedulerEvents = {}) {
     this.workflowsDir = workflowsDir;
@@ -45,6 +47,20 @@ export class TriggerScheduler {
         this.events.onWorkflowCompleted?.(run.workflowName, run.id, run.status === 'completed' ? 'success' : 'failed');
       },
     });
+
+    // Create TriggerManager for custom triggers (messaging, etc.)
+    this.triggerManager = new TriggerManager(registry, workflowsDir, {
+      onWorkflowTriggered: events.onWorkflowTriggered,
+      onWorkflowCompleted: events.onWorkflowCompleted,
+      onExecuteWorkflow: events.onExecuteWorkflow,
+    });
+  }
+
+  /**
+   * Get the trigger manager instance for status queries
+   */
+  getTriggerManager(): TriggerManager {
+    return this.triggerManager;
   }
 
   async loadAndScheduleAll(): Promise<void> {
@@ -112,6 +128,16 @@ export class TriggerScheduler {
           console.log(`[scheduler] Cron scheduled: ${name} (${expression}) - next: ${scheduled.nextRun}`);
         }
       }
+      // Set up custom triggers via TriggerManager (messaging, etc.)
+      else if (triggerType !== 'http.webhook') {
+        // Use TriggerManager for all non-cron, non-webhook triggers
+        const success = await this.triggerManager.setupTrigger(name, triggerType, triggerConfig, yamlContent);
+        if (success) {
+          console.log(`[scheduler] Custom trigger set up: ${name} (${triggerType})`);
+        } else {
+          console.log(`[scheduler] Custom trigger registered (stub): ${name} (${triggerType})`);
+        }
+      }
 
       this.scheduledWorkflows.set(name, scheduled);
       return scheduled;
@@ -127,6 +153,8 @@ export class TriggerScheduler {
       if (scheduled.cronJob) {
         scheduled.cronJob.stop();
       }
+      // Stop custom triggers via TriggerManager
+      this.triggerManager.stopTrigger(name);
       this.scheduledWorkflows.delete(name);
       console.log(`[scheduler] Unscheduled: ${name}`);
       return true;
@@ -238,6 +266,8 @@ export class TriggerScheduler {
         scheduled.cronJob.stop();
       }
     }
+    // Stop all custom triggers
+    this.triggerManager.stopAll();
     this.scheduledWorkflows.clear();
     console.log('[scheduler] All workflows stopped');
   }

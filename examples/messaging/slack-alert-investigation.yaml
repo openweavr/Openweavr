@@ -1,0 +1,51 @@
+# Alert Investigation Workflow
+# Triggers when an [ALERT] message is posted
+# Uses AI to investigate and post root cause analysis
+
+name: alert-investigation
+description: Multi-step AI investigation of alerts
+
+trigger:
+  type: slack.message
+  with:
+    channel: "#alerts"
+    pattern: "\\[ALERT\\]"
+
+steps:
+  - id: gather-info
+    action: ai.complete
+    with:
+      prompt: |
+        An alert was received. Gather initial context:
+
+        Alert: {{ trigger.text }}
+
+        List the key information we need to investigate this alert.
+      maxTokens: 300
+
+  - id: analyze-logs
+    action: ai.complete
+    needs: [gather-info]
+    with:
+      prompt: |
+        Based on the initial analysis:
+        {{ steps.gather-info.text }}
+
+        Original alert: {{ trigger.text }}
+
+        Provide a root cause analysis and recommended actions.
+      maxTokens: 500
+
+  - id: post-rca
+    action: slack.post
+    needs: [analyze-logs]
+    with:
+      channel: "{{ trigger.channel }}"
+      thread_ts: "{{ trigger.ts }}"
+      text: |
+        ## Root Cause Analysis
+
+        {{ steps.analyze-logs.text }}
+
+        ---
+        _Automated analysis by Weavr AI_

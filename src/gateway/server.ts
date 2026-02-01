@@ -489,6 +489,26 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           apiKey: config.webSearch.apiKey ? '••••••••' : undefined,
           hasApiKey: Boolean(config.webSearch.apiKey),
         } : undefined,
+        // Messaging: hide tokens but indicate if configured
+        messaging: config.messaging ? {
+          telegram: config.messaging.telegram ? {
+            ...config.messaging.telegram,
+            botToken: config.messaging.telegram.botToken ? '••••••••' : undefined,
+            hasBotToken: Boolean(config.messaging.telegram.botToken),
+          } : undefined,
+          discord: config.messaging.discord ? {
+            ...config.messaging.discord,
+            botToken: config.messaging.discord.botToken ? '••••••••' : undefined,
+            hasBotToken: Boolean(config.messaging.discord.botToken),
+          } : undefined,
+          slack: config.messaging.slack ? {
+            ...config.messaging.slack,
+            botToken: config.messaging.slack.botToken ? '••••••••' : undefined,
+            hasBotToken: Boolean(config.messaging.slack.botToken),
+          } : undefined,
+          whatsapp: config.messaging.whatsapp,
+          imessage: config.messaging.imessage,
+        } : undefined,
       };
       return c.json({ config: safeConfig, exists: true });
     } catch (err) {
@@ -544,6 +564,50 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           mergedConfig.webSearch.apiKey = newConfig.webSearch.apiKey;
         } else if (existingConfig.webSearch?.apiKey) {
           mergedConfig.webSearch.apiKey = existingConfig.webSearch.apiKey;
+        }
+      }
+
+      // Handle messaging config - preserve tokens if masked value is sent
+      if (newConfig.messaging) {
+        mergedConfig.messaging = {
+          ...existingConfig.messaging,
+          ...newConfig.messaging,
+        };
+        // Telegram: preserve existing token if masked value is sent
+        if (newConfig.messaging.telegram) {
+          mergedConfig.messaging.telegram = {
+            ...existingConfig.messaging?.telegram,
+            ...newConfig.messaging.telegram,
+          };
+          if (newConfig.messaging.telegram.botToken && newConfig.messaging.telegram.botToken !== '••••••••') {
+            mergedConfig.messaging.telegram.botToken = newConfig.messaging.telegram.botToken;
+          } else if (existingConfig.messaging?.telegram?.botToken) {
+            mergedConfig.messaging.telegram.botToken = existingConfig.messaging.telegram.botToken;
+          }
+        }
+        // Discord: preserve existing token if masked value is sent
+        if (newConfig.messaging.discord) {
+          mergedConfig.messaging.discord = {
+            ...existingConfig.messaging?.discord,
+            ...newConfig.messaging.discord,
+          };
+          if (newConfig.messaging.discord.botToken && newConfig.messaging.discord.botToken !== '••••••••') {
+            mergedConfig.messaging.discord.botToken = newConfig.messaging.discord.botToken;
+          } else if (existingConfig.messaging?.discord?.botToken) {
+            mergedConfig.messaging.discord.botToken = existingConfig.messaging.discord.botToken;
+          }
+        }
+        // Slack: preserve existing token if masked value is sent
+        if (newConfig.messaging.slack) {
+          mergedConfig.messaging.slack = {
+            ...existingConfig.messaging?.slack,
+            ...newConfig.messaging.slack,
+          };
+          if (newConfig.messaging.slack.botToken && newConfig.messaging.slack.botToken !== '••••••••') {
+            mergedConfig.messaging.slack.botToken = newConfig.messaging.slack.botToken;
+          } else if (existingConfig.messaging?.slack?.botToken) {
+            mergedConfig.messaging.slack.botToken = existingConfig.messaging.slack.botToken;
+          }
         }
       }
 
@@ -955,6 +1019,13 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
 
 Reference previous step outputs: \`{{ steps.<step-id>.<field> }}\`
 Reference trigger data: \`{{ trigger.<field> }}\`
+Reference environment variables: \`{{ env.<var> }}\`
+
+Built-in variables (always available):
+- \`{{ currentDate }}\` - Today's date (YYYY-MM-DD)
+- \`{{ currentTime }}\` - Current time (HH:MM:SS)
+- \`{{ currentTimestamp }}\` - Unix timestamp in milliseconds
+- \`{{ currentISODate }}\` - Full ISO date string
 
 IMPORTANT: Use the correct output field for each action:
 - ai.summarize → \`{{ steps.summarize.summary }}\` (NOT .data)
@@ -994,6 +1065,11 @@ steps:
 3. Use "needs" array to specify step dependencies
 4. Use the CORRECT output field from the tables above (not generic .data)
 5. Include a description field for the workflow
+6. CRITICAL: For multiline text (like task prompts), use YAML block scalar with pipe:
+   task: |
+     Line 1 of the prompt
+     Line 2 of the prompt
+   NEVER use quotes with embedded newlines - that creates invalid YAML!
 6. For cron expressions: minute hour day month weekday (e.g., "0 9 * * *" = 9 AM daily)
 7. Wrap template expressions in quotes: "{{ steps.x.y }}"
 
@@ -1275,8 +1351,12 @@ Output ONLY the YAML code block, no additional text.`;
       // Get OpenAI auth token (OAuth or API key)
       const openaiAuthToken = hasOAuth ? aiConfig.oauth!.accessToken : aiConfig.apiKey;
 
+      // When OAuth is used, always use OpenAI (OAuth is only for OpenAI)
+      if (hasOAuth) {
+        aiConfig.provider = 'openai';
+      }
       // Auto-detect provider from API key if not explicitly set
-      if (!aiConfig.provider && aiConfig.apiKey) {
+      else if (!aiConfig.provider && aiConfig.apiKey) {
         // Anthropic keys typically start with 'sk-ant-'
         if (aiConfig.apiKey.startsWith('sk-ant-')) {
           aiConfig.provider = 'anthropic';
@@ -1304,24 +1384,230 @@ Output ONLY the YAML code block, no additional text.`;
       // Add user message
       session.messages.push({ role: 'user', content: message });
 
-      // Build system prompt for agentic workflow planning
-      const systemPrompt = `You are an AI assistant that helps users plan and create workflow automations for Weavr.
+      // Build dynamic context about available actions and user's configuration
+      const actions = globalRegistry.listActions();
+      const triggers = globalRegistry.listTriggers();
 
-Your role is to:
-1. Understand what the user wants to automate
-2. Research and gather information using tools when needed
-3. Ask clarifying questions if the requirements are unclear
-4. Create a detailed plan for the workflow
-5. When the plan is complete and approved, you'll generate the final YAML
+      // Build actions list with details
+      let actionsContext = '';
+      for (const { plugin, action } of actions) {
+        actionsContext += `- ${plugin}.${action.name}: ${action.description || 'No description'}\n`;
+      }
 
-Available tools:
-- web_search: Search the web for API documentation, service info, etc.
-- web_fetch: Fetch content from URLs (documentation, examples)
-- list_actions: List available Weavr actions and triggers
+      // Build triggers list with details
+      let triggersContext = '';
+      for (const { plugin, trigger } of triggers) {
+        triggersContext += `- ${plugin}.${trigger.name}: ${trigger.description || 'No description'}\n`;
+      }
 
-When you have a complete plan ready and the user approves it, respond with "[PLAN_READY]" at the end of your message.
+      // Build user's configured services context
+      let configuredServices = '';
+      if (aiConfig.provider) {
+        configuredServices += `- AI Provider: ${aiConfig.provider} (model: ${aiConfig.model || 'default'})\n`;
+      }
 
-Be conversational, helpful, and thorough. Ask questions when needed. Use tools to research APIs or services the user mentions.`;
+      // Check messaging config from the loaded config
+      try {
+        const fullConfig = parseYaml(await readFile(configFile, 'utf-8')) as WeavrConfig;
+        if (fullConfig.messaging?.telegram?.botToken) {
+          if (fullConfig.messaging.telegram.chatId) {
+            configuredServices += `- Telegram: Configured (chat ID: ${fullConfig.messaging.telegram.chatId})\n`;
+          } else {
+            configuredServices += `- Telegram: Bot configured, but user needs to provide their chat ID\n`;
+          }
+        }
+        if (fullConfig.messaging?.discord) {
+          configuredServices += `- Discord: Configured\n`;
+        }
+        if (fullConfig.messaging?.slack) {
+          configuredServices += `- Slack: Configured\n`;
+        }
+        if (fullConfig.webSearch?.apiKey) {
+          configuredServices += `- Web Search: Configured (${fullConfig.webSearch.provider || 'brave'})\n`;
+        }
+      } catch {
+        // Ignore config read errors
+      }
+
+      // Build comprehensive system prompt
+      const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+      const systemPrompt = `You are an expert workflow automation assistant for Weavr - a self-hosted automation platform with native AI agent support.
+
+**Today's Date: ${currentDate}**
+
+## CRITICAL RULES
+1. **ONLY use actions and triggers from the "Available" lists below** - never invent or guess action names
+2. **Variable syntax**: Use \`{{ steps.step_id.result }}\` for step outputs, \`{{ trigger.field }}\` for trigger data, \`{{ currentDate }}\` for today's date
+3. **AI Agent is powerful**: Use \`ai.agent\` for ANY open-ended task - research, analysis, summarization, decision-making, report generation
+4. **ALWAYS include \`{{ currentDate }}\` in agent tasks** that involve research or time-sensitive information
+
+## Available Triggers (USE ONLY THESE)
+${triggersContext || 'No triggers loaded'}
+
+## Available Actions (USE ONLY THESE)
+${actionsContext || 'No actions loaded'}
+
+## User's Configured Services (Ready to Use)
+${configuredServices || 'No services configured yet'}
+
+## The AI Agent Node (ai.agent) - IMPORTANT
+The \`ai.agent\` action is extremely powerful and should be used for:
+- **Research tasks**: Web searches, gathering information, competitive analysis
+- **Content generation**: Writing reports, summaries, emails, documentation
+- **Data processing**: Analyzing data, extracting insights, making decisions
+- **Multi-step reasoning**: Complex tasks that require thinking through steps
+
+The ai.agent has access to web_search and web_fetch tools when needed.
+
+### Writing Effective Agent Tasks (CRITICAL)
+Agent tasks must be **detailed and specific**. A good task should:
+
+1. **Always include the current date** for time-sensitive research:
+   \`Today's date is {{ currentDate }}. Search for the most recent...\`
+
+2. **Be specific about the task** - don't be vague:
+   - BAD: "Research AI news"
+   - GOOD: "Search for AI news from the past 7 days. Focus on: 1) Major product launches 2) Research breakthroughs 3) Industry acquisitions. For each item, note the date, source, and key details."
+
+3. **Specify output format** when needed:
+   - "Format your response as a bulleted list with: - Title - Date - 2-sentence summary"
+   - "Return a JSON object with fields: title, summary, sentiment"
+
+4. **Chain agents for complex tasks**:
+   - Agent 1: Research and gather raw data
+   - Agent 2: Analyze, filter, and synthesize findings
+   - Agent 3: Generate polished final output
+
+### Example of Well-Written Agent Tasks
+\`\`\`yaml
+- id: research
+  action: ai.agent
+  with:
+    task: |
+      Today's date is {{ currentDate }}.
+
+      Research the top 5 trending topics in artificial intelligence from the past week.
+
+      For each topic:
+      1. Search for recent news articles and announcements
+      2. Identify the key players/companies involved
+      3. Note any significant numbers or metrics mentioned
+
+      Focus on: product launches, research papers, funding news, and major partnerships.
+      Prioritize information from the last 7 days.
+
+- id: analyze
+  action: ai.agent
+  with:
+    task: |
+      Analyze this research and identify the most impactful stories:
+      {{ steps.research.result }}
+
+      Rank them by potential industry impact (High/Medium/Low).
+      For each story, write a 2-sentence summary suitable for a busy executive.
+
+      Format as:
+      🔥 [HIGH IMPACT]
+      📊 [MEDIUM IMPACT]
+      📌 [LOW IMPACT]
+\`\`\`
+
+## Workflow YAML Format
+\`\`\`yaml
+name: workflow-name-kebab-case
+description: Clear description of what this workflow does
+
+trigger:
+  type: <trigger from list above>
+  with:
+    # trigger-specific config
+
+steps:
+  - id: descriptive_step_id
+    action: <action from list above>
+    with:
+      # action inputs - check action description for required fields
+\`\`\`
+
+## Variable Reference Syntax
+- Previous step output: \`{{ steps.step_id.result }}\`
+- Trigger data: \`{{ trigger.fieldName }}\`
+- Current date: \`{{ currentDate }}\` - ALWAYS use this in agent tasks!
+- Nested fields: \`{{ steps.step_id.output.data.nested.field }}\`
+
+## Example: Research and Report Workflow
+\`\`\`yaml
+name: daily-market-research
+description: Research market trends and send daily report to Telegram
+
+trigger:
+  type: cron.schedule
+  with:
+    cron: "0 9 * * *"
+
+steps:
+  - id: research
+    action: ai.agent
+    with:
+      task: |
+        Today's date is {{ currentDate }}.
+
+        Research the latest AI and technology news from the past 24 hours.
+
+        Search for:
+        1. Major product announcements or launches
+        2. Significant funding rounds or acquisitions
+        3. Research breakthroughs or paper releases
+        4. Notable industry partnerships
+
+        For each story found, note:
+        - Headline and source
+        - Date published
+        - Key details in 2-3 sentences
+
+        Prioritize stories from reputable tech news sources.
+        Return at least 5 stories, ranked by significance.
+
+  - id: format_report
+    action: ai.agent
+    with:
+      task: |
+        Format this research as an executive daily briefing:
+        {{ steps.research.result }}
+
+        Structure:
+        📅 Daily Tech Briefing - {{ currentDate }}
+
+        🔥 TOP STORY
+        [Most important item with 3-sentence summary]
+
+        📰 OTHER HEADLINES
+        [Remaining items as bullet points with 1-sentence each]
+
+        💡 KEY TAKEAWAY
+        [One sentence on the day's theme]
+
+        Keep total length under 400 words.
+
+  - id: send_report
+    action: telegram.send
+    with:
+      chatId: "USER_CHAT_ID"
+      text: "{{ steps.format_report.result }}"
+\`\`\`
+
+## Common Patterns
+- **Cron schedule**: \`cron: "0 9 * * *"\` = daily at 9am, \`cron: "*/30 * * * *"\` = every 30 min
+- **HTTP webhook**: Use \`http.webhook\` trigger to receive external data
+- **Telegram chatId**: A numeric ID like \`123456789\`. User can get it by:
+  1. Messaging @userinfobot or @getmyid_bot on Telegram
+  2. The bot will reply with their chat ID
+  3. IMPORTANT: User must first send ANY message to their Weavr bot before it can message them
+
+When the plan is complete and user approves, respond with "[PLAN_READY]" at the end.
+
+Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, etc). For Telegram, always ask for the numeric chat ID if not provided.`;
 
       // Prepare messages for API
       const apiMessages = session.messages.map(m => ({
@@ -1352,7 +1638,95 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
             let response: Response;
             let responseData: Record<string, unknown>;
 
-            if (aiConfig.provider === 'anthropic') {
+            if (hasOAuth) {
+              // ChatGPT Backend API (for OAuth users with ChatGPT Plus/Pro)
+              // This uses a different endpoint and format than the standard OpenAI API
+              // Requires stream: true for the supported models
+              const codexModel = aiConfig.model ?? 'gpt-5.2-codex';
+
+              // Transform all messages to Codex input format
+              const codexInput = apiMessages.map(m => ({
+                type: 'message' as const,
+                role: m.role as 'user' | 'assistant',
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+              }));
+
+              response = await fetch('https://chatgpt.com/backend-api/codex/responses', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${openaiAuthToken}`,
+                },
+                body: JSON.stringify({
+                  model: codexModel,
+                  instructions: systemPrompt,
+                  input: codexInput,
+                  stream: true,
+                  store: false,
+                }),
+              });
+
+              if (!response.ok) {
+                const err = await response.text().catch(() => '');
+                let errMsg = response.statusText;
+                try {
+                  const errJson = JSON.parse(err);
+                  errMsg = errJson.detail ?? errJson.error ?? response.statusText;
+                } catch {
+                  errMsg = err || response.statusText;
+                }
+                send({ type: 'error', error: `ChatGPT API error: ${errMsg}` });
+                controller.close();
+                return;
+              }
+
+              // Handle streaming response (SSE format)
+              const reader = response.body?.getReader();
+              if (!reader) {
+                send({ type: 'error', error: 'No response body from ChatGPT API' });
+                controller.close();
+                return;
+              }
+
+              const decoder = new TextDecoder();
+              let buffer = '';
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+
+                for (const line of lines) {
+                  if (!line.trim() || !line.startsWith('data: ')) continue;
+                  const data = line.slice(6);
+                  if (data === '[DONE]') continue;
+
+                  try {
+                    const event = JSON.parse(data);
+
+                    // Handle different event types from Codex streaming
+                    if (event.type === 'response.output_text.delta') {
+                      const text = event.delta ?? '';
+                      if (text) {
+                        fullResponse += text;
+                        send({ type: 'delta', content: text });
+                      }
+                    } else if (event.type === 'response.completed' || event.type === 'response.done') {
+                      // Response complete
+                    }
+                  } catch {
+                    // Ignore parse errors for incomplete chunks
+                  }
+                }
+              }
+
+              // Codex API doesn't support tool calling in the same way, so we don't continue the loop
+              continueLoop = false;
+
+            } else if (aiConfig.provider === 'anthropic') {
               response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
@@ -1478,8 +1852,9 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
           if (fullResponse) {
             session!.messages.push({ role: 'assistant', content: fullResponse });
 
-            // Check if plan is ready
-            if (fullResponse.includes('[PLAN_READY]')) {
+            // Check if plan is ready - either by magic string or by detecting a YAML workflow
+            const hasYamlWorkflow = /```ya?ml\s*\n[\s\S]*?(?:trigger|steps):/i.test(fullResponse);
+            if (fullResponse.includes('[PLAN_READY]') || hasYamlWorkflow) {
               session!.planReady = true;
               send({ type: 'plan_ready' });
             }
@@ -1530,9 +1905,23 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
       }
 
       // Get OpenAI auth token (OAuth or API key)
-      const openaiAuthToken = aiConfig.authMethod === 'oauth' && aiConfig.oauth?.accessToken
-        ? aiConfig.oauth.accessToken
+      const hasOAuth = aiConfig.authMethod === 'oauth' && !!aiConfig.oauth?.accessToken;
+      const openaiAuthToken = hasOAuth
+        ? aiConfig.oauth!.accessToken
         : aiConfig.apiKey;
+
+      // When OAuth is used, always use OpenAI (OAuth is only for OpenAI)
+      if (hasOAuth) {
+        aiConfig.provider = 'openai';
+      }
+      // Auto-detect provider from API key if not explicitly set
+      else if (!aiConfig.provider && aiConfig.apiKey) {
+        if (aiConfig.apiKey.startsWith('sk-ant-')) {
+          aiConfig.provider = 'anthropic';
+        } else {
+          aiConfig.provider = 'openai';
+        }
+      }
 
       // Build conversation context
       const conversationContext = session.messages
@@ -1567,7 +1956,73 @@ steps:
 
       let yamlContent = '';
 
-      if (aiConfig.provider === 'anthropic') {
+      if (hasOAuth) {
+        // ChatGPT Backend API (for OAuth users with ChatGPT Plus/Pro)
+        // Requires stream: true for supported models
+        const codexModel = aiConfig.model ?? 'gpt-5.2-codex';
+
+        const response = await fetch('https://chatgpt.com/backend-api/codex/responses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiAuthToken}`,
+          },
+          body: JSON.stringify({
+            model: codexModel,
+            instructions: systemPrompt,
+            input: [
+              { type: 'message', role: 'user', content: 'Generate the final workflow YAML based on our conversation.' },
+            ],
+            stream: true,
+            store: false,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.text().catch(() => '');
+          let errMsg = response.statusText;
+          try {
+            const errJson = JSON.parse(err);
+            errMsg = errJson.detail ?? errJson.error ?? response.statusText;
+          } catch {
+            errMsg = err || response.statusText;
+          }
+          return c.json({ error: `ChatGPT API error: ${errMsg}` }, 500);
+        }
+
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        if (!reader) {
+          return c.json({ error: 'No response body from ChatGPT API' }, 500);
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const event = JSON.parse(data);
+              if (event.type === 'response.output_text.delta') {
+                yamlContent += event.delta ?? '';
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      } else if (aiConfig.provider === 'anthropic') {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -1620,10 +2075,23 @@ steps:
 
       // Extract YAML from markdown
       const yamlMatch = yamlContent.match(/```ya?ml\n([\s\S]*?)```/);
-      const yaml = yamlMatch ? yamlMatch[1].trim() : yamlContent.trim();
+      let yaml = yamlMatch ? yamlMatch[1].trim() : yamlContent.trim();
 
       if (!yaml) {
         return c.json({ error: 'Failed to generate workflow YAML' }, 500);
+      }
+
+      // Validate YAML before returning
+      try {
+        parseYaml(yaml);
+      } catch (parseErr) {
+        console.error('Generated YAML parsing error:', parseErr);
+        // Try to return the raw YAML and let the client handle it
+        // The error message will help the user fix the issue
+        return c.json({
+          yaml,
+          warning: `YAML may have syntax issues: ${String(parseErr)}`
+        });
       }
 
       // Clean up session
@@ -1701,6 +2169,63 @@ steps:
     } catch (err) {
       return c.json({ error: String(err) }, 500);
     }
+  });
+
+  // Messaging services status endpoint
+  app.get('/api/messaging/status', async (c) => {
+    const triggerManager = scheduler.getTriggerManager();
+    const connectionStatus = triggerManager.getConnectionStatus();
+
+    // Build services status object
+    const services: Record<string, { status: string; error?: string; workflowCount: number }> = {};
+
+    for (const [service, info] of connectionStatus) {
+      services[service] = {
+        status: info.status,
+        error: info.error,
+        workflowCount: info.workflowCount,
+      };
+    }
+
+    // Also include WhatsApp status from the plugin directly
+    try {
+      const whatsappAction = globalRegistry.getAction('whatsapp.status');
+      if (whatsappAction) {
+        const result = await whatsappAction.execute({
+          workflowName: '_status',
+          runId: '_status',
+          stepId: '_status',
+          config: {},
+          steps: {},
+          env: {},
+          log: () => {},
+        }) as { connected?: boolean };
+        services['whatsapp'] = {
+          status: result.connected ? 'connected' : 'disconnected',
+          workflowCount: services['whatsapp']?.workflowCount ?? 0,
+        };
+      }
+    } catch {
+      // WhatsApp plugin may not be loaded
+    }
+
+    // Add env var hints for services without configured tokens
+    const envHints: Record<string, string[]> = {};
+    if (!process.env.SLACK_APP_TOKEN) {
+      envHints['slack'] = ['SLACK_APP_TOKEN', 'SLACK_TOKEN'];
+    }
+    if (!process.env.TELEGRAM_BOT_TOKEN) {
+      envHints['telegram'] = ['TELEGRAM_BOT_TOKEN'];
+    }
+    if (!process.env.DISCORD_BOT_TOKEN) {
+      envHints['discord'] = ['DISCORD_BOT_TOKEN'];
+    }
+
+    return c.json({
+      services,
+      envHints,
+      activeSubscriptions: triggerManager.getSubscriptions().length,
+    });
   });
 
   // Webhook receiver - triggers scheduled workflows

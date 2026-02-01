@@ -14,7 +14,8 @@ import {
   NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { AIChat } from './AIChat';
+import { AIChat, ChatMessage } from './AIChat';
+import YAML from 'yaml';
 
 interface WorkflowBuilderProps {
   onSave?: (yaml: string, name: string) => void;
@@ -824,6 +825,29 @@ function VariableSuggestions({
   );
 }
 
+// Field aliases - map alternative field names to canonical names
+const FIELD_ALIASES: Record<string, Record<string, string>> = {
+  'telegram.send': { message: 'text' },
+  'slack.post': { message: 'text' },
+  'discord.send': { message: 'content' },
+  'whatsapp.send': { message: 'text' },
+};
+
+// Normalize config to use canonical field names
+function normalizeConfig(action: string, config: Record<string, unknown>): Record<string, unknown> {
+  const aliases = FIELD_ALIASES[action];
+  if (!aliases) return config;
+
+  const normalized = { ...config };
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    if (alias in normalized && !(canonical in normalized)) {
+      normalized[canonical] = normalized[alias];
+      delete normalized[alias];
+    }
+  }
+  return normalized;
+}
+
 // Property Editor Component
 function PropertyEditor({
   node,
@@ -842,7 +866,9 @@ function PropertyEditor({
   nodes: Node<StepData>[];
   edges: Edge[];
 }) {
-  const [config, setConfig] = useState<Record<string, unknown>>(node.data.config);
+  const [config, setConfig] = useState<Record<string, unknown>>(
+    normalizeConfig(node.data.action, node.data.config)
+  );
   const [stepId, setStepId] = useState(node.data.stepId);
   const [showSuggestions, setShowSuggestions] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -850,9 +876,9 @@ function PropertyEditor({
   const upstreamSteps = useMemo(() => getUpstreamSteps(node.id, nodes, edges), [node.id, nodes, edges]);
 
   useEffect(() => {
-    setConfig(node.data.config);
+    setConfig(normalizeConfig(node.data.action, node.data.config));
     setStepId(node.data.stepId);
-  }, [node.id, node.data.config, node.data.stepId]);
+  }, [node.id, node.data.action, node.data.config, node.data.stepId]);
 
   const handleFieldChange = (name: string, value: unknown) => {
     const newConfig = { ...config, [name]: value };
@@ -1322,93 +1348,41 @@ function getSchema(actionId: string, type: 'trigger' | 'step'): ActionSchema | u
   return schemas.find((s) => s.id === actionId);
 }
 
-function parseYamlToGraph(yaml: string): { nodes: Node<StepData>[]; edges: Edge[]; name: string } {
+function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Edge[]; name: string } {
   const nodes: Node<StepData>[] = [];
   const edges: Edge[] = [];
   let name = 'my-workflow';
 
   try {
-    const lines = yaml.split('\n');
-    let currentSection = '';
-    let currentStep: { id?: string; action?: string; needs?: string[]; with?: Record<string, unknown> } | null = null;
-    let triggerType = '';
-    let triggerConfig: Record<string, unknown> = {};
-    const steps: Array<{ id: string; action: string; needs?: string[]; config: Record<string, unknown> }> = [];
-    let inWith = false;
+    // Use proper YAML parser to handle multiline strings correctly
+    const parsed = YAML.parse(yamlStr) as {
+      name?: string;
+      trigger?: { type?: string; with?: Record<string, unknown> };
+      triggers?: { type?: string; with?: Record<string, unknown> };
+      steps?: Array<{
+        id: string;
+        action: string;
+        needs?: string[];
+        with?: Record<string, unknown>;
+      }>;
+    };
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-
-      if (trimmed.startsWith('name:')) {
-        name = trimmed.replace('name:', '').trim();
-        continue;
-      }
-
-      if (trimmed === 'trigger:' || trimmed === 'triggers:') {
-        currentSection = 'trigger';
-        inWith = false;
-        continue;
-      }
-      if (trimmed === 'steps:') {
-        currentSection = 'steps';
-        inWith = false;
-        continue;
-      }
-
-      if (currentSection === 'trigger') {
-        if (trimmed.startsWith('type:')) {
-          triggerType = trimmed.replace('type:', '').trim();
-        } else if (trimmed.startsWith('with:')) {
-          inWith = true;
-        } else if (inWith && trimmed.includes(':')) {
-          const [key, ...valueParts] = trimmed.split(':');
-          const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
-          triggerConfig[key.trim()] = value;
-        }
-      }
-
-      if (currentSection === 'steps') {
-        if (trimmed.startsWith('- id:')) {
-          if (currentStep?.id && currentStep?.action) {
-            steps.push({
-              id: currentStep.id,
-              action: currentStep.action,
-              needs: currentStep.needs,
-              config: currentStep.with ?? {},
-            });
-          }
-          currentStep = { id: trimmed.replace('- id:', '').trim() };
-          inWith = false;
-        } else if (trimmed.startsWith('action:') && currentStep) {
-          currentStep.action = trimmed.replace('action:', '').trim();
-        } else if (trimmed.startsWith('needs:') && currentStep) {
-          const needsStr = trimmed.replace('needs:', '').trim();
-          currentStep.needs = needsStr.replace(/[\[\]]/g, '').split(',').map((s) => s.trim()).filter(Boolean);
-        } else if (trimmed.startsWith('with:') && currentStep) {
-          currentStep.with = {};
-          inWith = true;
-        } else if (inWith && currentStep && trimmed.includes(':')) {
-          const colonIdx = trimmed.indexOf(':');
-          const key = trimmed.slice(0, colonIdx).trim();
-          let value: unknown = trimmed.slice(colonIdx + 1).trim();
-          if (value === 'true') value = true;
-          else if (value === 'false') value = false;
-          else if (!isNaN(Number(value)) && value !== '') value = Number(value);
-          else value = (value as string).replace(/^["']|["']$/g, '');
-          currentStep.with = currentStep.with ?? {};
-          currentStep.with[key] = value;
-        }
-      }
+    if (parsed.name) {
+      name = parsed.name;
     }
 
-    if (currentStep?.id && currentStep?.action) {
-      steps.push({
-        id: currentStep.id,
-        action: currentStep.action,
-        needs: currentStep.needs,
-        config: currentStep.with ?? {},
-      });
-    }
+    // Handle trigger (supports both 'trigger' and 'triggers' keys)
+    const trigger = parsed.trigger || parsed.triggers;
+    const triggerType = trigger?.type || '';
+    const triggerConfig = trigger?.with || {};
+
+    // Handle steps
+    const steps = (parsed.steps || []).map((step) => ({
+      id: step.id,
+      action: step.action,
+      needs: step.needs,
+      config: step.with || {},
+    }));
 
     if (triggerType) {
       const schema = getSchema(triggerType, 'trigger');
@@ -1505,6 +1479,9 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: Workflo
   const [showSelector, setShowSelector] = useState<'trigger' | 'step' | null>(null);
   const [showAI, setShowAI] = useState(false);
   const [showYaml, setShowYaml] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [hasGeneratedWorkflow, setHasGeneratedWorkflow] = useState(false);
 
   useEffect(() => {
     if (initialYaml) {
@@ -1650,13 +1627,17 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: Workflo
   }, [name, nodes, edges]);
 
   // Handle workflow generation from AIChat component
-  const handleAIGenerateWorkflow = useCallback((yaml: string) => {
+  const handleAIGenerateWorkflow = useCallback((yaml: string, messages: ChatMessage[], sessionId: string | null) => {
     try {
       const { nodes: parsedNodes, edges: parsedEdges, name: parsedName } = parseYamlToGraph(yaml);
       setNodes(parsedNodes);
       setEdges(parsedEdges);
       setName(parsedName);
-      setShowAI(false);
+      // Store chat history and keep sidebar open
+      setChatMessages(messages);
+      setChatSessionId(sessionId);
+      setHasGeneratedWorkflow(true);
+      // Don't close the chat - it will switch to sidebar mode
     } catch (err) {
       console.error('Failed to parse workflow:', err);
     }
@@ -1861,11 +1842,20 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: Workflo
         />
       )}
 
-      {/* AI Chat Modal */}
-      {showAI && (
+      {/* AI Chat - Modal (before generation) or Sidebar (after generation) */}
+      {(showAI || hasGeneratedWorkflow) && (
         <AIChat
-          onClose={() => setShowAI(false)}
+          onClose={() => {
+            setShowAI(false);
+            if (hasGeneratedWorkflow) {
+              // Don't clear chat history when closing sidebar, just hide it
+              setHasGeneratedWorkflow(false);
+            }
+          }}
           onGenerateWorkflow={handleAIGenerateWorkflow}
+          mode={hasGeneratedWorkflow ? 'sidebar' : 'modal'}
+          initialMessages={chatMessages}
+          initialSessionId={chatSessionId}
         />
       )}
     </div>

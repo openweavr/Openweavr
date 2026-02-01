@@ -1,0 +1,48 @@
+# Discord Support Bot
+# Monitors a support channel and provides AI-powered help
+
+name: discord-support-bot
+description: AI support bot for Discord server
+
+trigger:
+  type: discord.message
+  with:
+    channelId: "1234567890123456789"  # Replace with your support channel ID
+    ignoreBot: true
+
+steps:
+  - id: classify
+    action: ai.classify
+    with:
+      text: "{{ trigger.text }}"
+      categories:
+        - bug_report: "User reporting a bug or error"
+        - feature_request: "User requesting a new feature"
+        - question: "User asking a question"
+        - feedback: "User providing general feedback"
+        - other: "Other type of message"
+
+  - id: respond
+    action: ai.complete
+    needs: [classify]
+    with:
+      prompt: |
+        A user sent a message in our Discord support channel.
+
+        Category: {{ steps.classify.category }}
+        Message: {{ trigger.text }}
+        User: {{ trigger.author.username }}
+
+        Provide a helpful response appropriate for the category.
+        - For bug reports: Ask for reproduction steps if not provided
+        - For feature requests: Thank them and explain the feedback process
+        - For questions: Answer helpfully or point to documentation
+        - For feedback: Thank them for the feedback
+      maxTokens: 300
+
+  - id: send-reply
+    action: discord.send
+    needs: [respond]
+    with:
+      content: |
+        <@{{ trigger.author.id }}> {{ steps.respond.text }}

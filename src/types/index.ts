@@ -128,6 +128,31 @@ export interface OAuthTokens {
   expiresAt?: number; // Unix timestamp in milliseconds
 }
 
+// Messaging service config types
+export interface SlackConfig {
+  botToken?: string;      // Bot User OAuth Token (xoxb-...)
+  appToken?: string;      // App-Level Token for Socket Mode (xapp-...)
+}
+
+export interface TelegramConfig {
+  botToken?: string;      // Bot token from @BotFather
+  chatId?: string;        // Default chat ID for sending messages
+}
+
+export interface WhatsAppConfig {
+  phoneNumberId?: string; // WhatsApp Business Phone Number ID
+  accessToken?: string;   // Access token
+}
+
+export interface iMessageConfig {
+  // Placeholder for future iMessage integration
+  enabled?: boolean;
+}
+
+export interface DiscordConfig {
+  botToken?: string;      // Bot token from Discord Developer Portal
+}
+
 // Config Types
 export interface WeavrConfig {
   server: {
@@ -148,6 +173,14 @@ export interface WeavrConfig {
   webSearch?: {
     provider?: 'brave' | 'tavily';
     apiKey?: string;
+  };
+  // Messaging services config (grouped under messaging)
+  messaging?: {
+    slack?: SlackConfig;
+    telegram?: TelegramConfig;
+    discord?: DiscordConfig;
+    whatsapp?: WhatsAppConfig;
+    imessage?: iMessageConfig;
   };
 }
 

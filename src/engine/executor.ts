@@ -124,12 +124,8 @@ export class WorkflowExecutor {
         stepResult.output = output;
         stepResult.status = 'completed';
       } else {
-        // Build interpolation context
-        const interpolationCtx = {
-          trigger: run.triggerData,
-          steps: this.getStepOutputs(run),
-          env: workflow.env ?? {},
-        };
+        // Build interpolation context with built-in variables
+        const interpolationCtx = this.buildInterpolationContext(run, workflow);
 
         // Interpolate config values
         const interpolatedConfig = this.interpolateConfig(
@@ -176,30 +172,38 @@ export class WorkflowExecutor {
     }
   }
 
+  // Build interpolation context with built-in variables
+  private buildInterpolationContext(run: WorkflowRun, workflow: Workflow): Record<string, unknown> {
+    const now = new Date();
+    return {
+      trigger: run.triggerData,
+      steps: this.getStepOutputs(run),
+      env: workflow.env ?? {},
+      // Built-in date/time variables
+      currentDate: now.toISOString().split('T')[0], // YYYY-MM-DD
+      currentTime: now.toTimeString().split(' ')[0], // HH:MM:SS
+      currentTimestamp: now.getTime(), // Unix timestamp in ms
+      currentISODate: now.toISOString(), // Full ISO string
+    };
+  }
+
   private async executeBuiltinAction(
     step: Step,
     run: WorkflowRun,
     workflow: Workflow
   ): Promise<unknown> {
     const config = step.config ?? {};
+    const ctx = this.buildInterpolationContext(run, workflow);
 
     switch (step.action) {
       case 'transform': {
         const template = config.template as string;
-        return this.interpolate(template, {
-          trigger: run.triggerData,
-          steps: this.getStepOutputs(run),
-          env: workflow.env ?? {},
-        });
+        return this.interpolate(template, ctx);
       }
 
       case 'log': {
         const message = config.message as string;
-        const interpolated = this.interpolate(message, {
-          trigger: run.triggerData,
-          steps: this.getStepOutputs(run),
-          env: workflow.env ?? {},
-        });
+        const interpolated = this.interpolate(message, ctx);
         console.log(`[${workflow.name}] ${interpolated}`);
         return { logged: interpolated };
       }
@@ -212,11 +216,7 @@ export class WorkflowExecutor {
 
       case 'condition': {
         const expr = config.if as string;
-        const result = this.evaluateCondition(expr, {
-          trigger: run.triggerData,
-          steps: this.getStepOutputs(run),
-          env: workflow.env ?? {},
-        });
+        const result = this.evaluateCondition(expr, ctx);
         return { result };
       }
 

@@ -11,7 +11,10 @@ export interface ChatMessage {
 
 interface AIChatProps {
   onClose: () => void;
-  onGenerateWorkflow: (yaml: string) => void;
+  onGenerateWorkflow: (yaml: string, messages: ChatMessage[], sessionId: string | null) => void;
+  mode?: 'modal' | 'sidebar';
+  initialMessages?: ChatMessage[];
+  initialSessionId?: string | null;
 }
 
 // Simple markdown-like rendering for code blocks and formatting
@@ -80,14 +83,16 @@ function renderContent(content: string) {
   });
 }
 
-export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function AIChat({ onClose, onGenerateWorkflow, mode = 'modal', initialMessages = [], initialSessionId = null }: AIChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId);
   const [planReady, setPlanReady] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -202,13 +207,19 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
         };
         setMessages(prev => [...prev, assistantMessage]);
         setStreamingContent('');
+
+        // Client-side YAML detection as fallback
+        const hasYamlWorkflow = /```ya?ml\s*\n[\s\S]*?(?:trigger|steps):/i.test(fullContent);
+        if (hasYamlWorkflow && !planReady) {
+          setPlanReady(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, sessionId]);
+  }, [input, isLoading, sessionId, planReady]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -220,7 +231,7 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
   const handleGenerateWorkflow = useCallback(async () => {
     if (!sessionId) return;
 
-    setIsLoading(true);
+    setIsGenerating(true);
     setError(null);
 
     try {
@@ -237,20 +248,76 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
 
       const data = await response.json();
       if (data.yaml) {
-        onGenerateWorkflow(data.yaml);
+        onGenerateWorkflow(data.yaml, messages, sessionId);
       } else {
         throw new Error('No workflow generated');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate workflow');
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
-  }, [sessionId, onGenerateWorkflow]);
+  }, [sessionId, messages, onGenerateWorkflow]);
 
-  return (
-    <div
-      style={{
+  // Sidebar collapsed state - just show a toggle button
+  if (mode === 'sidebar' && isCollapsed) {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 100,
+        }}
+      >
+        <button
+          className="btn btn-secondary"
+          onClick={() => setIsCollapsed(false)}
+          style={{
+            padding: '12px 8px',
+            borderRadius: '8px 0 0 8px',
+            borderRight: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--bg-secondary)',
+          }}
+          title="Open AI Chat"
+        >
+          <span style={{ fontSize: '18px' }}>💬</span>
+          <span style={{ fontSize: '11px', writingMode: 'vertical-rl', textOrientation: 'mixed' }}>AI Chat</span>
+          {messages.length > 0 && (
+            <span
+              style={{
+                background: 'var(--accent-purple)',
+                color: 'white',
+                fontSize: '10px',
+                padding: '2px 6px',
+                borderRadius: '10px',
+              }}
+            >
+              {messages.length}
+            </span>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // Wrapper styles based on mode
+  const wrapperStyle: React.CSSProperties = mode === 'sidebar'
+    ? {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: '380px',
+        zIndex: 100,
+        display: 'flex',
+      }
+    : {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.8)',
@@ -258,27 +325,44 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-      }}
-      onClick={onClose}
+      };
+
+  const cardStyle: React.CSSProperties = mode === 'sidebar'
+    ? {
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: 0,
+        overflow: 'hidden',
+        borderRadius: 0,
+        borderLeft: '1px solid var(--border-color)',
+      }
+    : {
+        width: '680px',
+        maxWidth: '90vw',
+        height: '80vh',
+        maxHeight: '700px',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: 0,
+        overflow: 'hidden',
+      };
+
+  return (
+    <div
+      style={wrapperStyle}
+      onClick={mode === 'modal' ? onClose : undefined}
     >
       <div
         className="card"
-        style={{
-          width: '680px',
-          maxWidth: '90vw',
-          height: '80vh',
-          maxHeight: '700px',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: 0,
-          overflow: 'hidden',
-        }}
+        style={cardStyle}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: mode === 'sidebar' ? '12px 16px' : '16px 20px',
             borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
@@ -286,18 +370,33 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
           }}
         >
           <div>
-            <h3 style={{ marginBottom: '4px' }}>AI Workflow Assistant</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-              Describe your workflow and I'll help you build it
+            <h3 style={{ marginBottom: '2px', fontSize: mode === 'sidebar' ? '15px' : '18px' }}>
+              {mode === 'sidebar' ? '💬 AI Assistant' : 'AI Workflow Assistant'}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+              {mode === 'sidebar' ? 'Continue the conversation' : 'Describe your workflow and I\'ll help you build it'}
             </p>
           </div>
-          <button
-            className="btn btn-ghost"
-            onClick={onClose}
-            style={{ padding: '8px' }}
-          >
-            <span style={{ fontSize: '18px' }}>&times;</span>
-          </button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {mode === 'sidebar' && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => setIsCollapsed(true)}
+                style={{ padding: '6px' }}
+                title="Collapse"
+              >
+                <span style={{ fontSize: '16px' }}>→</span>
+              </button>
+            )}
+            <button
+              className="btn btn-ghost"
+              onClick={onClose}
+              style={{ padding: '6px' }}
+              title={mode === 'sidebar' ? 'Close chat' : 'Close'}
+            >
+              <span style={{ fontSize: '16px' }}>&times;</span>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -520,28 +619,52 @@ export function AIChat({ onClose, onGenerateWorkflow }: AIChatProps) {
             style={{
               margin: '12px 20px 0',
               padding: '12px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid var(--accent-green)',
+              background: isGenerating ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+              border: `1px solid ${isGenerating ? 'var(--accent-purple)' : 'var(--accent-green)'}`,
               borderRadius: 'var(--radius-md)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              transition: 'all 0.2s ease',
             }}
           >
             <div>
-              <div style={{ fontWeight: 500, color: 'var(--accent-green)', marginBottom: '2px' }}>
-                Plan Ready!
+              <div style={{ fontWeight: 500, color: isGenerating ? 'var(--accent-purple)' : 'var(--accent-green)', marginBottom: '2px' }}>
+                {isGenerating ? 'Generating...' : 'Plan Ready!'}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Generate the workflow when you're satisfied with the plan
+                {isGenerating ? 'Building your workflow graph...' : 'Generate the workflow when you\'re satisfied with the plan'}
               </div>
             </div>
             <button
               className="btn btn-primary"
               onClick={handleGenerateWorkflow}
-              disabled={isLoading}
+              disabled={isGenerating || isLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                minWidth: '160px',
+                justifyContent: 'center',
+              }}
             >
-              Generate Workflow
+              {isGenerating ? (
+                <>
+                  <span
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
+                  Generating...
+                </>
+              ) : (
+                'Generate Workflow'
+              )}
             </button>
           </div>
         )}

@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 
+// Models that support OAuth (ChatGPT backend API via Codex)
+const OAUTH_SUPPORTED_MODELS = ['gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5.2', 'gpt-5.1', 'gpt-5-codex'];
+
+// Check if a model supports OAuth
+const isOAuthSupportedModel = (model: string | undefined): boolean => {
+  if (!model) return false;
+  return OAUTH_SUPPORTED_MODELS.includes(model);
+};
+
 interface Config {
   server: {
     port: number;
@@ -22,6 +31,7 @@ interface Config {
     telegram?: {
       botToken?: string;
       hasBotToken?: boolean;
+      chatId?: string;
     };
     whatsapp?: {
       connected?: boolean;
@@ -52,6 +62,7 @@ export function Settings() {
   // Messaging state
   const [telegramToken, setTelegramToken] = useState('');
   const [showTelegramToken, setShowTelegramToken] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappConnecting, setWhatsappConnecting] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -167,9 +178,10 @@ export function Settings() {
         } : config.webSearch,
         messaging: {
           ...config.messaging,
-          telegram: telegramToken ? {
+          telegram: (telegramToken || telegramChatId) ? {
             ...config.messaging?.telegram,
-            botToken: telegramToken,
+            ...(telegramToken ? { botToken: telegramToken } : {}),
+            ...(telegramChatId ? { chatId: telegramChatId } : {}),
           } : config.messaging?.telegram,
         },
       };
@@ -185,6 +197,7 @@ export function Settings() {
         setApiKey(''); // Clear the API key field after saving
         setBraveApiKey(''); // Clear the Brave API key field after saving
         setTelegramToken(''); // Clear the telegram token field after saving
+        setTelegramChatId(''); // Clear the telegram chat ID field after saving
         // Reload config to get updated hasApiKey status
         const reloadRes = await fetch('/api/config');
         const reloadData = await reloadRes.json();
@@ -214,7 +227,7 @@ export function Settings() {
   const getDefaultModel = (provider: string): string => {
     switch (provider) {
       case 'anthropic': return 'claude-sonnet-4-20250514';
-      case 'openai': return 'gpt-4o';
+      case 'openai': return 'gpt-5.2-codex'; // Default to OAuth-compatible model
       case 'ollama': return 'llama3.2';
       default: return '';
     }
@@ -231,8 +244,9 @@ export function Settings() {
     }
   };
 
-  const needsApiKey = config?.ai?.provider && config.ai.provider !== 'ollama' && config?.ai?.authMethod !== 'oauth';
+  const canUseOAuth = config?.ai?.provider === 'openai' && isOAuthSupportedModel(config?.ai?.model);
   const isOpenAIWithOAuth = config?.ai?.provider === 'openai' && config?.ai?.authMethod === 'oauth';
+  const needsApiKey = config?.ai?.provider && config.ai.provider !== 'ollama' && !(isOpenAIWithOAuth && canUseOAuth);
 
   const handleOAuthConnect = async () => {
     setOauthConnecting(true);
@@ -400,9 +414,19 @@ export function Settings() {
                     )}
                     {config.ai.provider === 'openai' && (
                       <>
-                        <option value="gpt-4o">GPT-4o</option>
-                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <optgroup label="ChatGPT OAuth (Plus/Pro subscription)">
+                          <option value="gpt-5.2-codex">GPT-5.2 Codex (Latest)</option>
+                          <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
+                          <option value="gpt-5.2">GPT-5.2</option>
+                          <option value="gpt-5.1">GPT-5.1</option>
+                        </optgroup>
+                        <optgroup label="API Key Required">
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gpt-4o-mini">GPT-4o Mini</option>
+                          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                          <option value="o1-preview">o1 Preview</option>
+                          <option value="o1-mini">o1 Mini</option>
+                        </optgroup>
                       </>
                     )}
                     {config.ai.provider === 'ollama' && (
@@ -462,15 +486,15 @@ export function Settings() {
                 </div>
               )}
 
-              {/* OpenAI OAuth Section */}
-              {config?.ai?.provider === 'openai' && (
+              {/* OpenAI OAuth Section - Only for OAuth-compatible models */}
+              {config?.ai?.provider === 'openai' && canUseOAuth && (
                 <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginTop: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                     <span style={{ fontSize: '24px' }}>🔐</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>OpenAI OAuth</div>
+                      <div style={{ fontWeight: 600 }}>Sign in with ChatGPT</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        Sign in with your OpenAI account
+                        Use your ChatGPT Plus/Pro subscription
                       </div>
                     </div>
                     {(oauthConnected || isOpenAIWithOAuth) ? (
@@ -483,20 +507,20 @@ export function Settings() {
                   {(oauthConnected || isOpenAIWithOAuth) ? (
                     <div>
                       <p style={{ fontSize: '13px', color: 'var(--accent-green)', marginBottom: '12px' }}>
-                        ✓ Connected to OpenAI via OAuth.
+                        ✓ Connected via ChatGPT OAuth. No API credits needed!
                       </p>
                       <button
                         className="btn btn-ghost"
                         onClick={handleOAuthDisconnect}
                         style={{ color: 'var(--accent-red)' }}
                       >
-                        Disconnect OAuth
+                        Disconnect
                       </button>
                     </div>
                   ) : (
                     <div>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                        Connect with your OpenAI account for easier authentication.
+                        Sign in with your ChatGPT Plus or Pro account. No API key or credits required!
                       </p>
                       <button
                         className="btn btn-secondary"
@@ -504,10 +528,34 @@ export function Settings() {
                         disabled={oauthConnecting}
                         style={{ width: '100%' }}
                       >
-                        {oauthConnecting ? 'Connecting...' : 'Connect with OpenAI'}
+                        {oauthConnecting ? 'Connecting...' : 'Sign in with ChatGPT'}
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Warning if OAuth connected but model not supported */}
+              {config?.ai?.provider === 'openai' && !canUseOAuth && (oauthConnected || isOpenAIWithOAuth) && (
+                <div style={{ padding: '12px 16px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: 'var(--radius-md)', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'rgb(251, 191, 36)', marginBottom: '4px' }}>
+                        Model not compatible with OAuth
+                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                        The selected model requires an API key. OAuth works with: GPT-4o, GPT-5, GPT-5 Codex, Codex Mini.
+                      </p>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={handleOAuthDisconnect}
+                        style={{ color: 'var(--accent-red)', marginTop: '8px', padding: '4px 8px', fontSize: '12px' }}
+                      >
+                        Disconnect OAuth
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -609,7 +657,7 @@ export function Settings() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <input
                     type={showTelegramToken ? 'text' : 'password'}
                     className="input"
@@ -626,8 +674,20 @@ export function Settings() {
                     {showTelegramToken ? '🙈' : '👁️'}
                   </button>
                 </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '12px' }}>
                   Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>@BotFather</a> to get your token
+                </p>
+
+                <input
+                  type="text"
+                  className="input"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder={config?.messaging?.telegram?.chatId ? `Chat ID: ${config.messaging.telegram.chatId} (enter new to change)` : 'Your Telegram chat ID (optional)'}
+                  style={{ width: '100%' }}
+                />
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Message <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>@userinfobot</a> on Telegram to get your chat ID. Required for receiving messages.
                 </p>
               </div>
 

@@ -1,0 +1,36 @@
+# Customer Request Handler
+# Triggers when a message is posted in #customer-requests channel
+# Uses AI to analyze and respond in a thread
+
+name: customer-request-handler
+description: AI-powered customer request analysis and response
+
+trigger:
+  type: slack.message
+  with:
+    channel: "#customer-requests"
+    ignoreBot: true
+
+steps:
+  - id: analyze
+    action: ai.complete
+    with:
+      prompt: |
+        Analyze this customer request and provide a helpful response:
+
+        From: {{ trigger.user }}
+        Message: {{ trigger.text }}
+
+        Provide:
+        1. A brief summary of the request
+        2. Suggested next steps
+        3. A friendly response to the customer
+      maxTokens: 500
+
+  - id: reply
+    action: slack.post
+    needs: [analyze]
+    with:
+      channel: "{{ trigger.channel }}"
+      thread_ts: "{{ trigger.ts }}"
+      text: "{{ steps.analyze.text }}"

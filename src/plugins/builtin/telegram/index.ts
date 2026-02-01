@@ -1,13 +1,167 @@
 import { definePlugin, defineAction, defineTrigger } from '../../sdk/types.js';
 import { z } from 'zod';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { parse as parseYaml } from 'yaml';
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 
+// Get bot token from global Weavr config
+function getGlobalBotToken(): string | undefined {
+  try {
+    const configPath = join(homedir(), '.weavr', 'config.yaml');
+    if (!existsSync(configPath)) return undefined;
+    const content = readFileSync(configPath, 'utf-8');
+    const config = parseYaml(content) as { messaging?: { telegram?: { botToken?: string } } };
+    return config?.messaging?.telegram?.botToken;
+  } catch {
+    return undefined;
+  }
+}
+
+// Long-polling state
+let pollingActive = false;
+let lastUpdateId = 0;
+let pollingAbortController: AbortController | null = null;
+
+// Message handlers for all active triggers
+interface TelegramMessage {
+  message_id: number;
+  from: {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+    is_bot: boolean;
+  };
+  chat: {
+    id: number;
+    type: 'private' | 'group' | 'supergroup' | 'channel';
+    title?: string;
+    username?: string;
+  };
+  date: number;
+  text?: string;
+  reply_to_message?: TelegramMessage;
+}
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  edited_message?: TelegramMessage;
+  channel_post?: TelegramMessage;
+}
+
+type MessageHandler = (update: TelegramUpdate) => void;
+const messageHandlers: MessageHandler[] = [];
+
+/**
+ * Start long-polling for Telegram updates
+ */
+async function startPolling(token: string): Promise<void> {
+  if (pollingActive) {
+    console.log('[telegram] Long-polling already active');
+    return;
+  }
+
+  pollingActive = true;
+  pollingAbortController = new AbortController();
+  console.log('[telegram] Starting long-polling for updates...');
+
+  // Delete any existing webhook to enable polling
+  try {
+    await fetch(`${TELEGRAM_API}${token}/deleteWebhook`, {
+      method: 'POST',
+    });
+  } catch {
+    console.log('[telegram] Could not delete webhook (may not exist)');
+  }
+
+  // Start the polling loop
+  pollLoop(token);
+}
+
+/**
+ * The main polling loop
+ */
+async function pollLoop(token: string): Promise<void> {
+  while (pollingActive) {
+    try {
+      const response = await fetch(
+        `${TELEGRAM_API}${token}/getUpdates?offset=${lastUpdateId + 1}&timeout=30&allowed_updates=["message","edited_message","channel_post"]`,
+        {
+          signal: pollingAbortController?.signal,
+        }
+      );
+
+      if (!response.ok) {
+        console.error(`[telegram] Polling error: ${response.status} ${response.statusText}`);
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
+      const data = await response.json() as { ok: boolean; result?: TelegramUpdate[] };
+
+      if (!data.ok || !data.result) {
+        console.error('[telegram] Invalid response from getUpdates');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
+      // Process each update
+      for (const update of data.result) {
+        lastUpdateId = Math.max(lastUpdateId, update.update_id);
+
+        // Notify all handlers
+        messageHandlers.forEach(handler => {
+          try {
+            handler(update);
+          } catch (err) {
+            console.error('[telegram] Handler error:', err);
+          }
+        });
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') {
+        console.log('[telegram] Polling stopped');
+        break;
+      }
+      console.error('[telegram] Polling error:', err);
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+}
+
+/**
+ * Stop long-polling
+ */
+function stopPolling(): void {
+  console.log('[telegram] Stopping long-polling...');
+  pollingActive = false;
+  pollingAbortController?.abort();
+  pollingAbortController = null;
+}
+
+/**
+ * Check if polling should stop (no handlers)
+ */
+function checkStopPolling(): void {
+  if (messageHandlers.length === 0) {
+    stopPolling();
+  }
+}
+
 // Helper to get bot token
 function getToken(ctx: { env: Record<string, string>; config: Record<string, unknown> }): string {
-  const token = (ctx.config.token as string) ?? ctx.env.TELEGRAM_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN;
+  const token = (ctx.config.token as string)
+    ?? ctx.env.TELEGRAM_BOT_TOKEN
+    ?? process.env.TELEGRAM_BOT_TOKEN
+    ?? getGlobalBotToken();
   if (!token) {
-    throw new Error('Telegram bot token required. Set TELEGRAM_BOT_TOKEN or pass token in config.');
+    throw new Error('Telegram bot token required. Set TELEGRAM_BOT_TOKEN or configure in Settings.');
   }
   return token;
 }
@@ -267,7 +421,83 @@ export default definePlugin({
   triggers: [
     defineTrigger({
       name: 'message',
-      description: 'Trigger on incoming Telegram messages (via webhook)',
+      description: 'Trigger on incoming Telegram messages (via long-polling - no public URL needed)',
+      schema: z.object({
+        chatId: z.union([z.string(), z.number()]).optional().describe('Specific chat ID to filter messages'),
+        pattern: z.string().optional().describe('Regex pattern to match in message text'),
+        chatType: z.enum(['private', 'group', 'supergroup', 'channel']).optional().describe('Filter by chat type'),
+      }),
+      async setup(config, emit) {
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        if (!token) {
+          console.log('[telegram] TELEGRAM_BOT_TOKEN not set - message trigger will not receive events');
+          console.log('[telegram] To enable: Create a bot via @BotFather and set TELEGRAM_BOT_TOKEN');
+          return () => {};
+        }
+
+        const typedConfig = config as { chatId?: string | number; pattern?: string; chatType?: string };
+
+        // Start long-polling if not already active
+        try {
+          await startPolling(token);
+        } catch (err) {
+          console.error('[telegram] Failed to start polling:', err);
+          return () => {};
+        }
+
+        // Create handler for this trigger
+        const handler: MessageHandler = (update) => {
+          const message = update.message || update.edited_message || update.channel_post;
+          if (!message) return;
+
+          // Filter by chat type if specified
+          if (typedConfig.chatType && message.chat.type !== typedConfig.chatType) {
+            return;
+          }
+
+          // Emit the event - filtering will be done by TriggerManager
+          emit({
+            type: 'telegram.message',
+            messageId: message.message_id,
+            from: message.from ? {
+              id: message.from.id,
+              name: `${message.from.first_name}${message.from.last_name ? ' ' + message.from.last_name : ''}`,
+              username: message.from.username,
+              isBot: message.from.is_bot,
+            } : undefined,
+            chat: {
+              id: message.chat.id,
+              type: message.chat.type,
+              title: message.chat.title,
+              username: message.chat.username,
+            },
+            chatId: message.chat.id,
+            text: message.text ?? '',
+            timestamp: message.date,
+            replyTo: message.reply_to_message?.message_id,
+            isEdited: !!update.edited_message,
+            isChannelPost: !!update.channel_post,
+          });
+        };
+
+        messageHandlers.push(handler);
+        console.log(`[telegram] Message trigger active${typedConfig.chatId ? ` for chat ${typedConfig.chatId}` : ''}`);
+
+        // Return cleanup function
+        return () => {
+          const index = messageHandlers.indexOf(handler);
+          if (index >= 0) {
+            messageHandlers.splice(index, 1);
+          }
+          checkStopPolling();
+          console.log('[telegram] Message trigger deactivated');
+        };
+      },
+    }),
+
+    defineTrigger({
+      name: 'webhook',
+      description: 'Trigger on incoming Telegram messages (via webhook - requires public URL)',
       schema: WebhookTriggerSchema,
       async setup(config, _emit) {
         const parsed = WebhookTriggerSchema.parse(config);
