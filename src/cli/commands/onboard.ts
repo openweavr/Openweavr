@@ -10,6 +10,7 @@ import {
   buildAuthorizationURL,
   exchangeCodeForTokens,
   getCallbackUrl,
+  getOAuthCallbackPort,
 } from '../../auth/openai-oauth.js';
 
 const execAsync = promisify(exec);
@@ -139,15 +140,15 @@ export async function onboardCommand(): Promise<void> {
     try {
       // Generate PKCE challenge
       const pkce = generatePKCE();
-      const port = parseInt(answers.port as string, 10);
-      const redirectUri = getCallbackUrl(port);
+      const oauthPort = getOAuthCallbackPort();
+      const redirectUri = getCallbackUrl();
 
       // Create a temporary server to receive the OAuth callback
       const callbackPromise = new Promise<{ code: string; state: string }>((resolve, reject) => {
         const server = createServer((req, res) => {
-          const url = new URL(req.url || '', `http://localhost:${port}`);
+          const url = new URL(req.url || '', `http://localhost:${oauthPort}`);
 
-          if (url.pathname === '/api/oauth/openai/callback') {
+          if (url.pathname === '/auth/callback') {
             const code = url.searchParams.get('code');
             const state = url.searchParams.get('state');
             const error = url.searchParams.get('error');
@@ -198,7 +199,7 @@ export async function onboardCommand(): Promise<void> {
           }
         });
 
-        server.listen(port, '127.0.0.1', () => {
+        server.listen(oauthPort, '127.0.0.1', () => {
           // Server ready
         });
 

@@ -9,7 +9,11 @@ const OPENAI_AUTH_URL = 'https://auth.openai.com/oauth/authorize';
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token';
 
 // Client ID for Codex CLI (publicly known, used for PKCE flow)
-const OPENAI_CLIENT_ID = 'pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh';
+const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+
+// Fixed port and path that OpenAI has whitelisted for Codex CLI
+const OAUTH_CALLBACK_PORT = 1455;
+const OAUTH_CALLBACK_PATH = '/auth/callback';
 
 // Scopes needed for API access
 const OPENAI_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
@@ -266,10 +270,17 @@ export function decryptTokens(encrypted: string): OAuthTokens {
 }
 
 /**
- * Create the OAuth callback URL for a given port
+ * Get the OAuth callback port (fixed by OpenAI whitelist)
  */
-export function getCallbackUrl(port: number): string {
-  return `http://127.0.0.1:${port}/api/oauth/openai/callback`;
+export function getOAuthCallbackPort(): number {
+  return OAUTH_CALLBACK_PORT;
+}
+
+/**
+ * Create the OAuth callback URL (fixed format required by OpenAI)
+ */
+export function getCallbackUrl(): string {
+  return `http://localhost:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`;
 }
 
 /**
