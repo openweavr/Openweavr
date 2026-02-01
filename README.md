@@ -4,8 +4,8 @@
 
 *Weave your workflows together.*
 
-[![CI](https://github.com/Openweavr/weavr/actions/workflows/ci.yml/badge.svg)](https://github.com/Openweavr/weavr/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Openweavr/weavr?include_prereleases&sort=semver)](https://github.com/Openweavr/weavr/releases)
+[![CI](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml/badge.svg)](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Openweavr/Openweavr?include_prereleases&sort=semver)](https://github.com/Openweavr/Openweavr/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
