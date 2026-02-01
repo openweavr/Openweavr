@@ -65,6 +65,15 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         payload: { runId, stepId },
       });
     },
+    onLog: (runId, stepId, message) => {
+      // Capture all logs from action execution (including tool calls)
+      addRunLog(runId, 'info', message, stepId);
+      // Also broadcast to connected clients in real-time
+      broadcast('runs', {
+        type: 'step.log',
+        payload: { runId, stepId, message },
+      });
+    },
     onStepComplete: (runId, stepId, result) => {
       if (result.status === 'completed') {
         addRunLog(runId, 'success', `Step completed in ${result.duration}ms`, stepId);
@@ -1468,7 +1477,11 @@ steps:
         const whatsappAction = globalRegistry.getAction('whatsapp.status');
         if (whatsappAction) {
           const result = await whatsappAction.execute({
+            workflowName: '_system',
+            runId: '_status_check',
+            stepId: '_status',
             config: {},
+            steps: {},
             env: {},
             log: () => {},
           });

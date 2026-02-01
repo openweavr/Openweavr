@@ -7,6 +7,7 @@ export interface ExecutorOptions {
   onStepStart?: (runId: string, stepId: string) => void;
   onStepComplete?: (runId: string, stepId: string, result: StepResult) => void;
   onRunComplete?: (run: WorkflowRun) => void;
+  onLog?: (runId: string, stepId: string, message: string) => void;
 }
 
 export class WorkflowExecutor {
@@ -147,6 +148,8 @@ export class WorkflowExecutor {
           env: workflow.env ?? {},
           log: (message: string) => {
             console.log(`[${workflow.name}:${step.id}] ${message}`);
+            // Also send to run history via callback
+            this.options.onLog?.(run.id, step.id, message);
           },
         };
 
