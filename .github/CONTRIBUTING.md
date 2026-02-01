@@ -1,6 +1,6 @@
-# Contributing to Patchwork
+# Contributing to Openweavr
 
-First off, thank you for considering contributing to Patchwork! 🧵
+First off, thank you for considering contributing to Openweavr! 🧵
 
 ## 🤖 AI-Assisted PRs Welcome
 
@@ -13,7 +13,7 @@ We explicitly encourage AI-assisted contributions. Whether you use Claude, GPT, 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/patchwork.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/Openweavr.git`
 3. Install dependencies: `npm install`
 4. Create a branch: `git checkout -b my-feature`
 
@@ -73,4 +73,4 @@ Open a discussion or reach out on Discord!
 
 ---
 
-Thank you for helping make Patchwork better! 🙏
+Thank you for helping make Openweavr better! 🙏

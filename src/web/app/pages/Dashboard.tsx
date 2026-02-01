@@ -162,7 +162,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </button>
           <button
             className="btn btn-ghost"
-            onClick={() => window.open('https://github.com/manthanthakar/weavr#readme', '_blank')}
+            onClick={() => window.open('https://github.com/openweavr/Openweavr#readme', '_blank')}
           >
             <span>📖</span> Documentation
           </button>

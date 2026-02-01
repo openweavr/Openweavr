@@ -258,7 +258,7 @@ export function PluginBrowser() {
               <button
                 className="btn btn-secondary"
                 style={{ flex: 1 }}
-                onClick={() => window.open(`https://github.com/manthanthakar/weavr#${selectedPlugin.name}-plugin`, '_blank')}
+                onClick={() => window.open(`https://github.com/openweavr/Openweavr#${selectedPlugin.name}-plugin`, '_blank')}
               >
                 📖 Docs
               </button>
