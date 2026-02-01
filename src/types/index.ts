@@ -141,7 +141,7 @@ export interface WeavrConfig {
     provider?: 'anthropic' | 'openai' | 'ollama';
     model?: string;
     apiKey?: string;
-    // OAuth authentication (for OpenAI with ChatGPT Plus/Team subscriptions)
+    // OAuth authentication (sign in with OpenAI account)
     authMethod?: 'apikey' | 'oauth';
     oauth?: OAuthTokens;
   };

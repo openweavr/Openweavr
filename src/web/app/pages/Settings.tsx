@@ -470,7 +470,7 @@ export function Settings() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600 }}>OpenAI OAuth</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        Sign in with your ChatGPT Plus or Team subscription
+                        Sign in with your OpenAI account
                       </div>
                     </div>
                     {(oauthConnected || isOpenAIWithOAuth) ? (
@@ -483,7 +483,7 @@ export function Settings() {
                   {(oauthConnected || isOpenAIWithOAuth) ? (
                     <div>
                       <p style={{ fontSize: '13px', color: 'var(--accent-green)', marginBottom: '12px' }}>
-                        ✓ Connected to OpenAI via OAuth. Your ChatGPT subscription is being used.
+                        ✓ Connected to OpenAI via OAuth.
                       </p>
                       <button
                         className="btn btn-ghost"
@@ -496,7 +496,7 @@ export function Settings() {
                   ) : (
                     <div>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                        Connect with your OpenAI account to use your ChatGPT Plus or Team subscription instead of an API key.
+                        Connect with your OpenAI account for easier authentication.
                       </p>
                       <button
                         className="btn btn-secondary"

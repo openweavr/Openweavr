@@ -336,7 +336,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     </span>
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                    Use your ChatGPT Plus or Team subscription. No API key needed.
+                    Sign in with your OpenAI account. No API key needed.
                   </div>
                 </div>
                 {authMethod === 'oauth' && (

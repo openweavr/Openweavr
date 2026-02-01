@@ -71,7 +71,7 @@ export async function onboardCommand(): Promise<void> {
         return p.select({
           message: 'How would you like to authenticate with OpenAI?',
           options: [
-            { value: 'oauth', label: 'Sign in with OpenAI (ChatGPT Plus/Team) - Recommended' },
+            { value: 'oauth', label: 'Sign in with OpenAI - Recommended' },
             { value: 'apikey', label: 'API Key (separate API billing)' },
           ],
         });

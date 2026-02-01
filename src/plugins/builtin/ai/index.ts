@@ -244,7 +244,7 @@ interface AIConfig {
   provider?: string;
   model?: string;
   apiKey?: string;
-  // OAuth authentication (for OpenAI with ChatGPT Plus/Team)
+  // OAuth authentication (sign in with OpenAI account)
   authMethod?: 'apikey' | 'oauth';
   oauth?: OAuthTokens;
   // CLI-based AI options (for users without API keys)
