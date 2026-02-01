@@ -858,7 +858,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
       }
 
       // Load config to get AI settings
-      let aiConfig: { provider?: string; model?: string; apiKey?: string } = {};
+      let aiConfig: { provider?: string; model?: string; apiKey?: string; authMethod?: string; oauth?: { accessToken?: string } } = {};
       try {
         const content = await readFile(configFile, 'utf-8');
         const config = parseYaml(content) as WeavrConfig;
@@ -867,9 +867,14 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         return c.json({ error: 'AI not configured. Go to Settings to add your API key.' }, 400);
       }
 
-      if (!aiConfig.apiKey && aiConfig.provider !== 'ollama') {
+      const hasApiKey = !!aiConfig.apiKey;
+      const hasOAuth = aiConfig.authMethod === 'oauth' && !!aiConfig.oauth?.accessToken;
+      if (!hasApiKey && !hasOAuth && aiConfig.provider !== 'ollama') {
         return c.json({ error: 'No API key configured. Go to Settings to add your API key.' }, 400);
       }
+
+      // Get OpenAI auth token (OAuth or API key)
+      const openaiAuthToken = hasOAuth ? aiConfig.oauth!.accessToken : aiConfig.apiKey;
 
       const systemPrompt = `You are a workflow automation expert for Weavr, a self-hosted automation platform. Generate valid YAML workflows based on user descriptions.
 
@@ -1038,7 +1043,7 @@ Output ONLY the YAML code block, no additional text.`;
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'Authorization': `Bearer ${openaiAuthToken}`,
           },
           body: JSON.stringify({
             model: aiConfig.model ?? 'gpt-4o-mini',
@@ -1252,7 +1257,7 @@ Output ONLY the YAML code block, no additional text.`;
       }
 
       // Load config for AI settings
-      let aiConfig: { provider?: string; model?: string; apiKey?: string } = {};
+      let aiConfig: { provider?: string; model?: string; apiKey?: string; authMethod?: string; oauth?: { accessToken?: string } } = {};
       try {
         const content = await readFile(configFile, 'utf-8');
         const config = parseYaml(content) as WeavrConfig;
@@ -1261,9 +1266,14 @@ Output ONLY the YAML code block, no additional text.`;
         return c.json({ error: 'AI not configured. Go to Settings to add your API key.' }, 400);
       }
 
-      if (!aiConfig.apiKey && aiConfig.provider !== 'ollama') {
+      const hasApiKey = !!aiConfig.apiKey;
+      const hasOAuth = aiConfig.authMethod === 'oauth' && !!aiConfig.oauth?.accessToken;
+      if (!hasApiKey && !hasOAuth && aiConfig.provider !== 'ollama') {
         return c.json({ error: 'No API key configured. Go to Settings to add your API key.' }, 400);
       }
+
+      // Get OpenAI auth token (OAuth or API key)
+      const openaiAuthToken = hasOAuth ? aiConfig.oauth!.accessToken : aiConfig.apiKey;
 
       // Auto-detect provider from API key if not explicitly set
       if (!aiConfig.provider && aiConfig.apiKey) {
@@ -1399,7 +1409,7 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${aiConfig.apiKey}`,
+                  'Authorization': `Bearer ${openaiAuthToken}`,
                 },
                 body: JSON.stringify({
                   model: aiConfig.model ?? 'gpt-4o-mini',
@@ -1510,7 +1520,7 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
       }
 
       // Load AI config
-      let aiConfig: { provider?: string; model?: string; apiKey?: string } = {};
+      let aiConfig: { provider?: string; model?: string; apiKey?: string; authMethod?: string; oauth?: { accessToken?: string } } = {};
       try {
         const content = await readFile(configFile, 'utf-8');
         const config = parseYaml(content) as WeavrConfig;
@@ -1518,6 +1528,11 @@ Be conversational, helpful, and thorough. Ask questions when needed. Use tools t
       } catch {
         return c.json({ error: 'AI not configured' }, 400);
       }
+
+      // Get OpenAI auth token (OAuth or API key)
+      const openaiAuthToken = aiConfig.authMethod === 'oauth' && aiConfig.oauth?.accessToken
+        ? aiConfig.oauth.accessToken
+        : aiConfig.apiKey;
 
       // Build conversation context
       const conversationContext = session.messages
@@ -1580,7 +1595,7 @@ steps:
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'Authorization': `Bearer ${openaiAuthToken}`,
           },
           body: JSON.stringify({
             model: aiConfig.model ?? 'gpt-4o-mini',
