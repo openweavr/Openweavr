@@ -65,7 +65,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/weavr/weavr.git"
+    "url": "https://github.com/Openweavr/weavr.git"
   },
   "keywords": [
     "automation",
