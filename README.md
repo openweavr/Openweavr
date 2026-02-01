@@ -2,7 +2,7 @@
 
 **Self-hosted workflow automation with AI agents.**
 
-*Weave your dev life together.*
+*Weave your workflows together.*
 
 [![CI](https://github.com/Openweavr/weavr/actions/workflows/ci.yml/badge.svg)](https://github.com/Openweavr/weavr/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Openweavr/weavr?include_prereleases&sort=semver)](https://github.com/Openweavr/weavr/releases)
