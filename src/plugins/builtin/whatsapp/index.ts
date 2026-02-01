@@ -24,6 +24,11 @@ let connectionReady = false;
 let broadcastFn: ((channel: string, message: { type: string; payload: unknown }) => void) | null = null;
 let isReconnecting = false;
 
+// Export function to set broadcast - called by plugin loader during initialization
+export function setWhatsAppBroadcast(fn: (channel: string, message: { type: string; payload: unknown }) => void): void {
+  broadcastFn = fn;
+}
+
 // Helper to create and setup a WhatsApp socket
 async function createSocket() {
   const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = await import('@whiskeysockets/baileys');

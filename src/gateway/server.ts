@@ -15,6 +15,7 @@ import { WorkflowExecutor } from '../engine/executor.js';
 import { parser } from '../engine/parser.js';
 import { globalRegistry } from '../plugins/sdk/registry.js';
 import { TriggerScheduler } from '../engine/scheduler.js';
+import { initializePlugins, isPluginsInitialized } from '../plugins/loader.js';
 
 export interface GatewayServer {
   start(): Promise<void>;
@@ -1455,6 +1456,44 @@ steps:
     }
   }
 
+  // Send current service status to a client
+  async function sendServiceStatus(socket: WebSocket): Promise<void> {
+    try {
+      // Check if plugins are initialized
+      const pluginsReady = isPluginsInitialized();
+
+      // Get WhatsApp status
+      let whatsappStatus = 'unknown';
+      try {
+        const whatsappAction = globalRegistry.getAction('whatsapp.status');
+        if (whatsappAction) {
+          const result = await whatsappAction.execute({
+            config: {},
+            env: {},
+            log: () => {},
+          });
+          whatsappStatus = (result as { connected?: boolean })?.connected ? 'connected' : 'disconnected';
+        }
+      } catch {
+        whatsappStatus = 'unavailable';
+      }
+
+      // Send status to client
+      socket.send(JSON.stringify({
+        type: 'services:status',
+        payload: {
+          pluginsInitialized: pluginsReady,
+          services: {
+            whatsapp: whatsappStatus,
+          },
+        },
+        timestamp: Date.now(),
+      }));
+    } catch (err) {
+      console.error('[gateway] Error sending service status:', err);
+    }
+  }
+
   function handleConnection(socket: WebSocket): void {
     const clientId = randomUUID();
     const client: GatewayClient = {
@@ -1470,6 +1509,9 @@ steps:
       payload: { clientId },
       timestamp: Date.now(),
     }));
+
+    // Send current service status to the newly connected client
+    sendServiceStatus(socket);
 
     socket.on('message', (data) => {
       try {
@@ -1557,6 +1599,14 @@ steps:
 
       console.log(`Gateway server running at http://${host}:${actualPort}`);
       console.log(`WebSocket available at ws://${host}:${actualPort}`);
+
+      // Initialize all plugins now that broadcast is available
+      // This will auto-connect services like WhatsApp if they have saved credentials
+      try {
+        await initializePlugins(broadcast);
+      } catch (err) {
+        console.error('[gateway] Plugin initialization failed:', err);
+      }
     },
 
     async stop() {

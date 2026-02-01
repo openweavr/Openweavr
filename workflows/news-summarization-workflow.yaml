@@ -18,7 +18,7 @@ steps:
     with:
       text: "{{ steps.fetch-news.data }}"
       maxLength: 200
-      style: "concise"
+      style: "bullet-points"
   - id: send-1
     action: whatsapp.send
     needs: [summarize-news]

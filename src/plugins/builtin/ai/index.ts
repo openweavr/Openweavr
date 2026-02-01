@@ -6,6 +6,7 @@ import { homedir, tmpdir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { MCPManager } from '../../../mcp/index.js';
 
 const execAsync = promisify(exec);
 
@@ -641,6 +642,58 @@ Return ONLY the category name, nothing else.`;
           throw new Error('Agent action requires an API key (Anthropic or OpenAI) for tool use capabilities.');
         }
 
+        // Initialize MCP manager for external tool servers
+        // web-search-mcp is the DEFAULT search method - no API keys required
+        let mcpManager: MCPManager | null = null;
+        try {
+          mcpManager = new MCPManager(ctx.log);
+          // First load any user-configured servers
+          await mcpManager.loadFromConfig();
+
+          // If no web search server is configured, automatically start web-search-mcp as default
+          if (tools.includes('web_search')) {
+            const mcpTools = mcpManager.getServers().size > 0 ? await mcpManager.getAllTools() : [];
+            const hasWebSearch = mcpTools.some(t =>
+              t.name.includes('search') || t.name.includes('web')
+            );
+
+            if (!hasWebSearch) {
+              ctx.log('Starting web-search-mcp as default search provider...');
+              try {
+                await mcpManager.connectServer('web-search', {
+                  command: 'npx',
+                  args: ['-y', '@anthropic/web-search-mcp'],
+                  timeout: 60000, // Give npx time to download if needed
+                });
+                ctx.log('web-search-mcp connected successfully');
+              } catch (webSearchErr) {
+                // Try alternative package name
+                try {
+                  await mcpManager.connectServer('web-search', {
+                    command: 'npx',
+                    args: ['-y', 'web-search-mcp'],
+                    timeout: 60000,
+                  });
+                  ctx.log('web-search-mcp connected successfully');
+                } catch {
+                  ctx.log(`web-search-mcp not available: ${String(webSearchErr)}. Falling back to built-in search.`);
+                }
+              }
+            }
+          }
+
+          const serverCount = mcpManager.getServers().size;
+          if (serverCount > 0) {
+            ctx.log(`Connected to ${serverCount} MCP server(s)`);
+          }
+        } catch (mcpErr) {
+          ctx.log(`MCP initialization skipped: ${String(mcpErr)}`);
+          mcpManager = null;
+        }
+
+        // Track failed tools for intelligent replanning
+        const failedTools: Map<string, { count: number; lastError: string }> = new Map();
+
         // Build available tools based on configuration
         const availableTools: Array<{
           name: string;
@@ -716,7 +769,67 @@ Return ONLY the category name, nothing else.`;
           });
         }
 
-        // Tool execution helper
+        // Add MCP tools to available tools (they get routed through executeTool)
+        if (mcpManager && mcpManager.getServers().size > 0) {
+          try {
+            const mcpTools = await mcpManager.getAllTools();
+            for (const tool of mcpTools) {
+              // Skip if we already have a tool with this name (prefer built-in)
+              if (availableTools.some(t => t.name === tool.name)) {
+                continue;
+              }
+              availableTools.push({
+                name: tool.name,
+                description: tool.description ?? `MCP tool from ${tool.server}`,
+                input_schema: tool.inputSchema as unknown as Record<string, unknown>,
+              });
+              ctx.log(`Added MCP tool: ${tool.name}`);
+            }
+          } catch (mcpErr) {
+            ctx.log(`Failed to load MCP tools: ${String(mcpErr)}`);
+          }
+        }
+
+        // Tool result validation helper
+        function validateToolResult(_toolName: string, result: string): { valid: boolean; feedback: string } {
+          // Check for explicit failure markers
+          if (result.startsWith('[SEARCH FAILED]') || result.startsWith('[FETCH FAILED]') ||
+              result.startsWith('[FETCH ERROR]') || result.startsWith('[SEARCH ERROR]')) {
+            return { valid: false, feedback: result };
+          }
+
+          // Check for too-short results that indicate failure
+          if (result.length < 50 && !result.includes('successfully')) {
+            return {
+              valid: false,
+              feedback: `${result}\n\n[VALIDATION: Result too short. Try an alternative approach.]`,
+            };
+          }
+
+          // Check for common error patterns
+          const errorPatterns = [
+            /no results found/i,
+            /could not find/i,
+            /access denied/i,
+            /403 forbidden/i,
+            /404 not found/i,
+            /rate limit/i,
+            /timeout/i,
+          ];
+
+          for (const pattern of errorPatterns) {
+            if (pattern.test(result)) {
+              return {
+                valid: false,
+                feedback: `${result}\n\n[VALIDATION: Result indicates an error. Try an alternative approach.]`,
+              };
+            }
+          }
+
+          return { valid: true, feedback: result };
+        }
+
+        // Tool execution helper with failure tracking
         async function executeTool(toolName: string, input: Record<string, unknown>): Promise<string> {
           ctx.log(`Agent using tool: ${toolName}`);
 
@@ -725,25 +838,48 @@ Return ONLY the category name, nothing else.`;
               const query = String(input.query);
               ctx.log(`Searching for: ${query}`);
 
-              // Check for search API keys
-              const braveKey = process.env.BRAVE_API_KEY;
-              const tavilyKey = process.env.TAVILY_API_KEY;
-              const serpApiKey = process.env.SERPAPI_KEY;
-              const isMac = process.platform === 'darwin';
-              const useBrowserSearch = process.env.USE_BROWSER_SEARCH !== 'false'; // enabled by default on macOS
-
               try {
-                // Option 1: Brave Search API (free tier: 2000 queries/month)
+                // PRIMARY: Use MCP web-search-mcp (default, no API keys required)
+                // web-search-mcp is automatically started if not already configured
+                if (mcpManager && mcpManager.getServers().size > 0) {
+                  const mcpTools = await mcpManager.getAllTools();
+                  // Look for web search tools from MCP (web-search-mcp provides these)
+                  const searchTool = mcpTools.find(t =>
+                    t.name === 'web_search' ||
+                    t.name === 'search' ||
+                    t.name.includes('search')
+                  );
+
+                  if (searchTool) {
+                    ctx.log(`Using MCP web search: ${searchTool.name}`);
+                    const result = await mcpManager.callTool(searchTool.name, { query });
+
+                    if (!result.isError && result.content.length > 0) {
+                      const text = result.content.map(c => c.text ?? '').join('\n');
+                      if (text.length > 20) {
+                        ctx.log(`MCP search returned ${text.length} characters`);
+                        return `Search results for "${query}":\n\n${text}`;
+                      }
+                    }
+                    ctx.log('MCP search returned empty results');
+                  }
+                }
+
+                // FALLBACK: API-based search (only if user has configured API keys)
+                const braveKey = process.env.BRAVE_API_KEY;
+                const tavilyKey = process.env.TAVILY_API_KEY;
+
                 if (braveKey) {
-                  ctx.log('Using Brave Search API');
-                  const response = await fetch(
+                  ctx.log('Fallback: Using Brave Search API');
+                  const response = await fetchWithTimeout(
                     `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
                     {
                       headers: {
                         'Accept': 'application/json',
                         'X-Subscription-Token': braveKey,
                       },
-                    }
+                    },
+                    15000, 2, ctx.log
                   );
 
                   if (response.ok) {
@@ -755,27 +891,23 @@ Return ONLY the category name, nothing else.`;
                       const formatted = results.slice(0, 8).map((r, i) =>
                         `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.description}\n`
                       ).join('\n');
-                      ctx.log(`Found ${results.length} Brave search results`);
                       return `Search results for "${query}":\n\n${formatted}`;
                     }
                   }
                 }
 
-                // Option 2: Tavily API (designed for AI agents, free tier available)
                 if (tavilyKey) {
-                  ctx.log('Using Tavily Search API');
-                  const response = await fetch('https://api.tavily.com/search', {
+                  ctx.log('Fallback: Using Tavily Search API');
+                  const response = await fetchWithTimeout('https://api.tavily.com/search', {
                     method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       api_key: tavilyKey,
                       query,
                       search_depth: 'basic',
                       max_results: 8,
                     }),
-                  });
+                  }, 15000, 2, ctx.log);
 
                   if (response.ok) {
                     const data = await response.json() as {
@@ -786,168 +918,52 @@ Return ONLY the category name, nothing else.`;
                       const formatted = results.map((r, i) =>
                         `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 300)}...\n`
                       ).join('\n');
-                      ctx.log(`Found ${results.length} Tavily search results`);
                       return `Search results for "${query}":\n\n${formatted}`;
                     }
                   }
                 }
 
-                // Option 3: SerpAPI (if configured)
-                if (serpApiKey) {
-                  ctx.log('Using SerpAPI');
-                  const response = await fetch(
-                    `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${serpApiKey}&num=10`
-                  );
+                // Search failed - provide actionable guidance
+                return `[SEARCH FAILED] web-search-mcp could not be started or returned no results.
 
-                  if (response.ok) {
-                    const data = await response.json() as {
-                      organic_results?: Array<{ title: string; link: string; snippet: string }>;
-                    };
-                    const results = data.organic_results ?? [];
-                    if (results.length > 0) {
-                      const formatted = results.slice(0, 8).map((r, i) =>
-                        `${i + 1}. ${r.title}\n   URL: ${r.link}\n   ${r.snippet}\n`
-                      ).join('\n');
-                      ctx.log(`Found ${results.length} SerpAPI search results`);
-                      return `Search results for "${query}":\n\n${formatted}`;
-                    }
-                  }
-                }
+The agent uses web-search-mcp as the default search provider. Make sure Node.js/npx is available.
 
-                // Option 4: macOS Safari-based search (uses local browser)
-                if (isMac && useBrowserSearch) {
-                  ctx.log('Using macOS Safari for web search');
-                  try {
-                    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-
-                    // AppleScript to open Safari, perform search, and extract results
-                    const appleScript = `
-                      tell application "Safari"
-                        -- Open in a new window to avoid disrupting user's browsing
-                        make new document with properties {URL:"${searchUrl}"}
-                        set searchWindow to front window
-
-                        -- Wait for page to load (up to 10 seconds)
-                        set maxWait to 10
-                        set waited to 0
-                        repeat while waited < maxWait
-                          delay 0.5
-                          set waited to waited + 0.5
-                          try
-                            set readyState to do JavaScript "document.readyState" in current tab of searchWindow
-                            if readyState is "complete" then exit repeat
-                          end try
-                        end repeat
-
-                        -- Extract search results using JavaScript
-                        set resultText to do JavaScript "
-                          (function() {
-                            const results = [];
-                            // Google search results
-                            const items = document.querySelectorAll('div.g');
-                            items.forEach((item, i) => {
-                              if (i >= 8) return;
-                              const titleEl = item.querySelector('h3');
-                              const linkEl = item.querySelector('a');
-                              const snippetEl = item.querySelector('div[data-sncf], div.VwiC3b, span.aCOpRe');
-                              if (titleEl && linkEl) {
-                                const title = titleEl.innerText || '';
-                                const url = linkEl.href || '';
-                                const snippet = snippetEl ? snippetEl.innerText : '';
-                                results.push((i+1) + '. ' + title + '\\\\nURL: ' + url + '\\\\n' + snippet + '\\\\n');
-                              }
-                            });
-                            return results.join('\\\\n');
-                          })()
-                        " in current tab of searchWindow
-
-                        -- Close the search window
-                        close searchWindow
-
-                        return resultText
-                      end tell
-                    `;
-
-                    const { stdout } = await execAsync(`osascript -e '${appleScript.replace(/'/g, "'\\''")}'`, {
-                      timeout: 20000,
-                    });
-
-                    const results = stdout.trim().replace(/\\\\n/g, '\n');
-                    if (results && results.length > 10) {
-                      ctx.log(`Safari search returned ${results.length} characters`);
-                      return `Search results for "${query}":\n\n${results}`;
-                    }
-                  } catch (err) {
-                    ctx.log(`Safari search error: ${String(err)}`);
-                    // Fall through to other methods
-                  }
-                }
-
-                // Fallback: DuckDuckGo Instant Answer API (limited but no CAPTCHA)
-                ctx.log('Using DuckDuckGo Instant Answer API (limited)');
-                const instantUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`;
-                const instantResponse = await fetch(instantUrl);
-                const instantData = await instantResponse.json() as {
-                  Abstract?: string;
-                  AbstractText?: string;
-                  AbstractURL?: string;
-                  RelatedTopics?: Array<{ Text?: string; FirstURL?: string }>;
-                };
-
-                const instantResults: string[] = [];
-                if (instantData.AbstractText) {
-                  instantResults.push(`Summary: ${instantData.AbstractText}`);
-                  if (instantData.AbstractURL) {
-                    instantResults.push(`Source: ${instantData.AbstractURL}`);
-                  }
-                }
-                if (instantData.RelatedTopics?.length) {
-                  instantResults.push('\nRelated:');
-                  for (const topic of instantData.RelatedTopics.slice(0, 5)) {
-                    if (topic.Text && topic.FirstURL) {
-                      instantResults.push(`- ${topic.Text}\n  URL: ${topic.FirstURL}`);
-                    }
-                  }
-                }
-
-                if (instantResults.length > 0) {
-                  return instantResults.join('\n');
-                }
-
-                // No search API configured and DuckDuckGo returned nothing
-                return `No search API configured. To enable web search, set one of these environment variables:
-- BRAVE_API_KEY (get free key at https://brave.com/search/api/)
-- TAVILY_API_KEY (get free key at https://tavily.com/)
-- SERPAPI_KEY (get key at https://serpapi.com/)
-
-Alternatively, use web_fetch with specific URLs like:
-- https://finance.yahoo.com for financial data
+Alternative: Use web_fetch with specific URLs:
+- https://finance.yahoo.com/quote/AAPL for stock prices
 - https://www.reuters.com for news
-- https://www.bloomberg.com for market analysis`;
+- https://en.wikipedia.org/wiki/${encodeURIComponent(query.replace(/ /g, '_'))} for general info`;
 
               } catch (err) {
                 ctx.log(`Search error: ${String(err)}`);
-                return `Search failed: ${String(err)}. Try using web_fetch with a specific URL instead.`;
+                return `[SEARCH ERROR] ${String(err)}. Try web_fetch with a specific URL instead.`;
               }
             }
 
             case 'web_fetch': {
               const url = String(input.url);
               ctx.log(`Fetching URL: ${url}`);
+
+              // Use fetchWithTimeout with retry logic
               try {
-                const response = await fetch(url, {
+                const response = await fetchWithTimeout(url, {
                   headers: {
-                    'User-Agent': 'Mozilla/5.0 (compatible; Weavr-Agent/1.0)',
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
                   },
-                });
+                }, 30000, 3, ctx.log);
 
                 if (!response.ok) {
-                  return `Fetch failed: HTTP ${response.status} ${response.statusText}`;
+                  return `[FETCH FAILED] HTTP ${response.status} ${response.statusText}. Try a different URL or source.`;
                 }
 
                 const contentType = response.headers.get('content-type') || '';
                 const text = await response.text();
+
+                // Validate response - check if we got meaningful content
+                if (text.length < 100) {
+                  return `[FETCH WARNING] Response too short (${text.length} chars). The page may require JavaScript or authentication.`;
+                }
 
                 // If it's HTML, extract readable content
                 if (contentType.includes('text/html')) {
@@ -957,7 +973,8 @@ Alternatively, use web_fetch with specific URLs like:
                     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
                     .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
                     .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-                    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+                    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+                    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
 
                   // Extract title
                   const titleMatch = content.match(/<title[^>]*>([^<]*)<\/title>/i);
@@ -991,17 +1008,25 @@ Alternatively, use web_fetch with specific URLs like:
                     .replace(/\s+/g, ' ')
                     .trim();
 
+                  // Validate extracted content
+                  if (mainContent.length < 50) {
+                    return `[FETCH WARNING] Extracted content too short. Page may be JavaScript-rendered or require authentication.\nRaw title: ${title}\nTry fetching a different URL.`;
+                  }
+
                   const result = `Title: ${title}\nURL: ${url}\n\nContent:\n${mainContent}`;
                   ctx.log(`Fetched ${result.length} characters from ${url}`);
                   return result.slice(0, 12000) + (result.length > 12000 ? '\n\n...(truncated)' : '');
                 }
 
-                // For non-HTML content, return as-is
+                // For non-HTML content (JSON, XML, plain text), return as-is
                 ctx.log(`Fetched ${text.length} characters (${contentType})`);
                 return text.slice(0, 12000) + (text.length > 12000 ? '\n...(truncated)' : '');
               } catch (err) {
                 ctx.log(`Fetch error: ${String(err)}`);
-                return `Fetch failed: ${String(err)}`;
+                return `[FETCH ERROR] ${String(err)}. Suggestions:
+- Check if the URL is correct
+- Try an alternative source
+- Some sites block automated requests`;
               }
             }
 
@@ -1034,15 +1059,42 @@ Alternatively, use web_fetch with specific URLs like:
               }
             }
 
-            default:
+            default: {
+              // Try MCP tools as fallback
+              if (mcpManager && mcpManager.getServers().size > 0) {
+                try {
+                  const result = await mcpManager.callTool(toolName, input);
+                  if (result.isError) {
+                    return `[MCP ERROR] ${result.content.map(c => c.text ?? '').join('\n')}`;
+                  }
+                  const text = result.content.map(c => c.text ?? '').join('\n');
+                  return text || '(empty result)';
+                } catch (mcpErr) {
+                  ctx.log(`MCP tool ${toolName} failed: ${String(mcpErr)}`);
+                }
+              }
               return `Unknown tool: ${toolName}`;
+            }
           }
         }
 
-        // Agentic loop
-        const defaultSystem = `You are an AI agent that accomplishes tasks by using tools and reasoning step by step.
-When you have completed the task, provide your final answer.
-Be thorough but efficient. Use tools when needed to gather information or take actions.`;
+        // Agentic loop with enhanced system prompt for better failure recovery
+        const defaultSystem = `You are an autonomous AI agent that accomplishes tasks by using tools and reasoning step by step.
+
+IMPORTANT GUIDELINES:
+1. THINK before acting: Analyze what information you need and plan your approach
+2. NEVER give up after a single failure: If a tool fails, try alternatives:
+   - If web_search fails, use web_fetch with specific known URLs
+   - If one URL fails, try alternative sources
+   - For financial data: try finance.yahoo.com, google.com/finance
+   - For news: try reuters.com, bbc.com, apnews.com
+   - For general info: try wikipedia.org
+3. VALIDATE results: If a tool returns "[FAILED]" or "[ERROR]", acknowledge it and try a different approach
+4. BE PERSISTENT: Use multiple iterations to gather complete information
+5. PROVIDE SOURCES: Always cite where you got your information from
+
+When you have gathered sufficient information, synthesize it into a clear, complete answer.
+If you truly cannot find the information after multiple attempts, explain what you tried and why it failed.`;
 
         const messages: Array<{ role: 'user' | 'assistant'; content: string | Array<{ type: string; text?: string; tool_use_id?: string; name?: string; input?: unknown; id?: string }> }> = [
           { role: 'user', content: task },
@@ -1105,11 +1157,24 @@ Be thorough but efficient. Use tools when needed to gather information or take a
 
               const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
               for (const toolUse of toolUses) {
-                const result = await executeTool(toolUse.name, toolUse.input as Record<string, unknown>);
+                const rawResult = await executeTool(toolUse.name, toolUse.input as Record<string, unknown>);
+
+                // Validate and potentially annotate the result
+                const validation = validateToolResult(toolUse.name, rawResult);
+                if (!validation.valid) {
+                  // Track the failure
+                  const existing = failedTools.get(toolUse.name) ?? { count: 0, lastError: '' };
+                  failedTools.set(toolUse.name, {
+                    count: existing.count + 1,
+                    lastError: rawResult.slice(0, 200),
+                  });
+                  ctx.log(`Tool ${toolUse.name} failed (attempt ${existing.count + 1})`);
+                }
+
                 toolResults.push({
                   type: 'tool_result',
                   tool_use_id: toolUse.id,
-                  content: result,
+                  content: validation.feedback,
                 });
               }
 
@@ -1120,11 +1185,60 @@ Be thorough but efficient. Use tools when needed to gather information or take a
               break;
             }
           } else if (openaiKey) {
-            // OpenAI with function calling
-            const openaiMessages = messages.map(m => ({
-              role: m.role,
-              content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-            }));
+            // OpenAI with function calling - use separate message tracking for proper format
+            // OpenAI requires: assistant message with tool_calls, then tool messages with tool_call_id
+            type OpenAIMessage =
+              | { role: 'system'; content: string }
+              | { role: 'user'; content: string }
+              | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
+              | { role: 'tool'; tool_call_id: string; content: string };
+
+            const openaiMessages: OpenAIMessage[] = [
+              { role: 'system', content: systemPrompt ?? defaultSystem },
+            ];
+
+            // Convert internal messages to OpenAI format
+            for (const m of messages) {
+              if (typeof m.content === 'string') {
+                openaiMessages.push({ role: m.role, content: m.content });
+              } else if (Array.isArray(m.content)) {
+                // This is either an assistant message with tool calls or tool results
+                // Check if it contains tool_use (assistant) or tool_result (user with tool results)
+                const hasToolUse = m.content.some((b: { type: string }) => b.type === 'tool_use');
+                const hasToolResult = m.content.some((b: { type: string }) => b.type === 'tool_result');
+
+                if (hasToolUse && m.role === 'assistant') {
+                  // Convert Anthropic tool_use to OpenAI tool_calls
+                  const textContent = m.content.find((b: { type: string }) => b.type === 'text') as { text?: string } | undefined;
+                  const toolUses = m.content.filter((b: { type: string }) => b.type === 'tool_use') as Array<{ id: string; name: string; input: unknown }>;
+
+                  openaiMessages.push({
+                    role: 'assistant',
+                    content: textContent?.text ?? null,
+                    tool_calls: toolUses.map(tu => ({
+                      id: tu.id,
+                      type: 'function' as const,
+                      function: {
+                        name: tu.name,
+                        arguments: JSON.stringify(tu.input),
+                      },
+                    })),
+                  });
+                } else if (hasToolResult) {
+                  // Convert Anthropic tool_result to OpenAI tool messages
+                  // The internal storage uses { type: 'tool_result', tool_use_id: string, content: string }
+                  type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string };
+                  const toolResults = m.content.filter((b): b is ToolResultBlock => b.type === 'tool_result');
+                  for (const tr of toolResults) {
+                    openaiMessages.push({
+                      role: 'tool',
+                      tool_call_id: tr.tool_use_id,
+                      content: tr.content,
+                    });
+                  }
+                }
+              }
+            }
 
             response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
@@ -1135,10 +1249,7 @@ Be thorough but efficient. Use tools when needed to gather information or take a
               body: JSON.stringify({
                 model: globalConfig.model ?? 'gpt-4o',
                 max_tokens: 4096,
-                messages: [
-                  { role: 'system', content: systemPrompt ?? defaultSystem },
-                  ...openaiMessages,
-                ],
+                messages: openaiMessages,
                 tools: availableTools.map(t => ({
                   type: 'function',
                   function: {
@@ -1157,23 +1268,56 @@ Be thorough but efficient. Use tools when needed to gather information or take a
 
             responseData = await response.json() as Record<string, unknown>;
             const choice = (responseData.choices as Array<{
-              message: { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
+              message: { content?: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
               finish_reason: string;
             }>)?.[0];
 
-            if (choice?.message?.tool_calls) {
-              // Execute tool calls
+            if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0) {
+              // Execute tool calls - store in Anthropic format for internal consistency
               const toolCalls = choice.message.tool_calls;
-              messages.push({ role: 'assistant', content: choice.message.content ?? '' });
 
-              for (const toolCall of toolCalls) {
-                const toolInput = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
-                const result = await executeTool(toolCall.function.name, toolInput);
-                messages.push({
-                  role: 'user',
-                  content: `[Tool Result: ${toolCall.function.name}]\n${result}`,
+              // Build assistant content with tool uses (Anthropic format for internal storage)
+              const assistantContent: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }> = [];
+              if (choice.message.content) {
+                assistantContent.push({ type: 'text', text: choice.message.content });
+              }
+              for (const tc of toolCalls) {
+                assistantContent.push({
+                  type: 'tool_use',
+                  id: tc.id,
+                  name: tc.function.name,
+                  input: JSON.parse(tc.function.arguments),
                 });
               }
+              messages.push({ role: 'assistant', content: assistantContent });
+
+              // Execute tools and build results with validation
+              const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
+              for (const toolCall of toolCalls) {
+                const toolInput = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+                const rawResult = await executeTool(toolCall.function.name, toolInput);
+
+                // Validate and potentially annotate the result
+                const validation = validateToolResult(toolCall.function.name, rawResult);
+                if (!validation.valid) {
+                  // Track the failure
+                  const existing = failedTools.get(toolCall.function.name) ?? { count: 0, lastError: '' };
+                  failedTools.set(toolCall.function.name, {
+                    count: existing.count + 1,
+                    lastError: rawResult.slice(0, 200),
+                  });
+                  ctx.log(`Tool ${toolCall.function.name} failed (attempt ${existing.count + 1})`);
+                }
+
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: toolCall.id,
+                  content: validation.feedback,
+                });
+              }
+
+              // Store tool results (will be converted to proper format on next iteration)
+              messages.push({ role: 'user', content: toolResults as unknown as string });
             } else {
               // No tool calls, agent is done
               finalResult = choice?.message?.content ?? '';
@@ -1182,7 +1326,24 @@ Be thorough but efficient. Use tools when needed to gather information or take a
           }
         }
 
+        // Cleanup MCP connections
+        if (mcpManager) {
+          try {
+            await mcpManager.disconnectAll();
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+
         ctx.log(`Agent completed in ${iteration} iterations`);
+
+        // Log any persistent failures
+        if (failedTools.size > 0) {
+          const failures = Array.from(failedTools.entries())
+            .map(([tool, info]) => `${tool}: ${info.count} failures`)
+            .join(', ');
+          ctx.log(`Tool failures during execution: ${failures}`);
+        }
 
         return {
           result: finalResult,
