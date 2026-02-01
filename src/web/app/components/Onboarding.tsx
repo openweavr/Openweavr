@@ -116,9 +116,27 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         {/* Welcome Step */}
         {step === 'welcome' && (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '64px', marginBottom: '24px' }}>🧵</div>
+            <svg viewBox="0 0 100 100" width="64" height="64" style={{ marginBottom: '24px' }}>
+              <defs>
+                <linearGradient id="onboardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{stopColor:'#8B5CF6'}}/>
+                  <stop offset="100%" style={{stopColor:'#EC4899'}}/>
+                </linearGradient>
+              </defs>
+              <rect x="8" y="8" width="84" height="84" rx="22" fill="url(#onboardGrad)"/>
+              <g transform="translate(50, 50)">
+                <rect x="-28" y="-20" width="56" height="10" rx="5" fill="white" opacity="0.9"/>
+                <rect x="-28" y="10" width="56" height="10" rx="5" fill="white" opacity="0.9"/>
+                <rect x="-20" y="-28" width="10" height="18" rx="5" fill="white" opacity="0.6"/>
+                <rect x="-20" y="0" width="10" height="10" rx="5" fill="white" opacity="0.9"/>
+                <rect x="-20" y="20" width="10" height="8" rx="5" fill="white" opacity="0.6"/>
+                <rect x="10" y="-28" width="10" height="10" rx="5" fill="white" opacity="0.9"/>
+                <rect x="10" y="-8" width="10" height="18" rx="5" fill="white" opacity="0.6"/>
+                <rect x="10" y="20" width="10" height="8" rx="5" fill="white" opacity="0.9"/>
+              </g>
+            </svg>
             <h1 style={{ fontSize: '32px', fontWeight: 700, marginBottom: '16px' }}>
-              Welcome to Weavr
+              Welcome to Openweavr
             </h1>
             <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '40px', lineHeight: 1.6 }}>
               Self-hosted workflow automation for developers.<br />
@@ -421,7 +439,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               You're all set!
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-              Weavr is ready. Redirecting to dashboard...
+              Openweavr is ready. Redirecting to dashboard...
             </p>
           </div>
         )}

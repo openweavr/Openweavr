@@ -226,7 +226,7 @@ export function Settings() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Configure your Weavr instance</p>
+          <p className="page-subtitle">Configure your Openweavr instance</p>
         </div>
       </div>
 

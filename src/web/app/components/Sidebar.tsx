@@ -24,8 +24,26 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo">
-          <span className="logo-icon">🧵</span>
-          <span>Weavr</span>
+          <svg className="logo-icon" viewBox="0 0 100 100" width="32" height="32">
+            <defs>
+              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style={{stopColor:'#8B5CF6'}}/>
+                <stop offset="100%" style={{stopColor:'#EC4899'}}/>
+              </linearGradient>
+            </defs>
+            <rect x="8" y="8" width="84" height="84" rx="22" fill="url(#logoGrad)"/>
+            <g transform="translate(50, 50)">
+              <rect x="-28" y="-20" width="56" height="10" rx="5" fill="white" opacity="0.9"/>
+              <rect x="-28" y="10" width="56" height="10" rx="5" fill="white" opacity="0.9"/>
+              <rect x="-20" y="-28" width="10" height="18" rx="5" fill="white" opacity="0.6"/>
+              <rect x="-20" y="0" width="10" height="10" rx="5" fill="white" opacity="0.9"/>
+              <rect x="-20" y="20" width="10" height="8" rx="5" fill="white" opacity="0.6"/>
+              <rect x="10" y="-28" width="10" height="10" rx="5" fill="white" opacity="0.9"/>
+              <rect x="10" y="-8" width="10" height="18" rx="5" fill="white" opacity="0.6"/>
+              <rect x="10" y="20" width="10" height="8" rx="5" fill="white" opacity="0.9"/>
+            </g>
+          </svg>
+          <span>Openweavr</span>
         </div>
       </div>
 
