@@ -1,4 +1,4 @@
-import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from 'node:crypto';
+import { randomBytes, createCipheriv, createDecipheriv, scryptSync, createHash } from 'node:crypto';
 import type { OAuthTokens } from '../types/index.js';
 
 // Re-export OAuthTokens for convenience
@@ -41,25 +41,21 @@ function generateRandomString(length: number): string {
 /**
  * Generate SHA256 hash and base64url encode it for PKCE challenge
  */
-async function sha256Base64Url(input: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = new Uint8Array(hashBuffer);
+function sha256Base64Url(input: string): string {
+  const hash = createHash('sha256').update(input).digest();
   // Convert to base64url
-  const base64 = Buffer.from(hashArray).toString('base64');
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return hash.toString('base64url');
 }
 
 /**
  * Generate PKCE code verifier and challenge
  */
-export async function generatePKCE(): Promise<PKCEChallenge> {
+export function generatePKCE(): PKCEChallenge {
   // Code verifier: 43-128 characters, using [A-Z], [a-z], [0-9], "-", ".", "_", "~"
   const codeVerifier = generateRandomString(64);
 
   // Code challenge: base64url(sha256(code_verifier))
-  const codeChallenge = await sha256Base64Url(codeVerifier);
+  const codeChallenge = sha256Base64Url(codeVerifier);
 
   // State: random string to prevent CSRF
   const state = generateRandomString(32);

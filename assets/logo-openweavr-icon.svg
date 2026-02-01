@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="t1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#A855F7"/>
+    </linearGradient>
+    <linearGradient id="t2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A855F7"/>
+      <stop offset="100%" style="stop-color:#D946EF"/>
+    </linearGradient>
+    <linearGradient id="t3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D946EF"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+    <linearGradient id="ctr" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a24"/>
+      <stop offset="100%" style="stop-color:#0a0a0f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="32" cy="32" r="30" fill="url(#bg)"/>
+
+  <!-- Radiating Threads -->
+  <g transform="translate(32, 32)">
+    <!-- Central hub -->
+    <circle cx="0" cy="0" r="7" fill="url(#ctr)"/>
+
+    <!-- 6 Radiating threads -->
+    <path d="M0,-7 Q2,-14 0,-20" fill="none" stroke="url(#t1)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="-20" r="2.5" fill="#8B5CF6"/>
+
+    <path d="M6,-3.5 Q12,-9 17,-15" fill="none" stroke="url(#t2)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="17" cy="-15" r="2.5" fill="#A855F7"/>
+
+    <path d="M6,3.5 Q11,7 18,11" fill="none" stroke="url(#t3)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="18" cy="11" r="2.5" fill="#D946EF"/>
+
+    <path d="M0,7 Q-2,14 0,20" fill="none" stroke="url(#t3)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="20" r="2.5" fill="#EC4899"/>
+
+    <path d="M-6,3.5 Q-11,7 -18,11" fill="none" stroke="url(#t1)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="-18" cy="11" r="2.5" fill="#7C3AED"/>
+
+    <path d="M-6,-3.5 Q-12,-9 -17,-15" fill="none" stroke="url(#t1)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="-17" cy="-15" r="2.5" fill="#8B5CF6"/>
+
+    <!-- Center highlight -->
+    <circle cx="0" cy="0" r="3.5" fill="white" opacity="0.15"/>
+  </g>
+</svg>

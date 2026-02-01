@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="ogrd3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagonal "open" shape with woven center -->
+  <g transform="translate(50, 50)">
+    <!-- Outer hexagon ring - chunky and bold -->
+    <polygon
+      points="0,-38 33,-19 33,19 0,38 -33,19 -33,-19"
+      fill="none"
+      stroke="url(#ogrd3)"
+      stroke-width="10"
+      stroke-linejoin="round"
+    />
+
+    <!-- Inner woven pattern -->
+    <line x1="-15" y1="-10" x2="15" y2="10" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+    <line x1="15" y1="-10" x2="-15" y2="10" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+
+    <!-- Center knot -->
+    <circle cx="0" cy="0" r="6" fill="white"/>
+  </g>
+</svg>

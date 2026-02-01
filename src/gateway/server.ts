@@ -585,9 +585,9 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   }, 60 * 1000);
 
   // Initiate OAuth flow - returns authorization URL
-  app.get('/api/oauth/openai/authorize', async (c) => {
+  app.get('/api/oauth/openai/authorize', (c) => {
     try {
-      const pkce = await generatePKCE();
+      const pkce = generatePKCE();
       const redirectUri = getCallbackUrl(config.server.port);
       const authUrl = buildAuthorizationURL(pkce, redirectUri);
 

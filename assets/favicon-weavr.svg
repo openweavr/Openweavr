@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Simplified infinity for small sizes -->
+  <g transform="translate(16, 16)">
+    <path
+      d="M-10,0 C-10,-6 -6,-6 0,-3 C6,0 10,-6 10,-3 C10,0 10,6 6,3 C0,0 -6,6 -10,3 C-10,0 -10,-6 -10,0"
+      fill="none"
+      stroke="url(#fg)"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+    <circle cx="-10" cy="0" r="2.5" fill="#8B5CF6"/>
+    <circle cx="0" cy="0" r="2.5" fill="#A855F7"/>
+    <circle cx="10" cy="0" r="2.5" fill="#EC4899"/>
+  </g>
+</svg>

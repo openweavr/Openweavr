@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Playful knot character - like a pretzel/infinity with eyes -->
+  <g transform="translate(50, 50)">
+    <!-- Main knot shape - thick, friendly, bold -->
+    <path
+      d="M-28,8
+         C-28,-15 -10,-25 0,-15
+         C10,-25 28,-15 28,8
+         C28,20 15,28 0,18
+         C-15,28 -28,20 -28,8Z"
+      fill="url(#mainGrad)"
+    />
+
+    <!-- Inner cutout to create the "woven" look -->
+    <ellipse cx="0" cy="5" rx="12" ry="10" fill="#0a0a0f"/>
+
+    <!-- Playful eyes -->
+    <circle cx="-12" cy="-5" r="5" fill="white"/>
+    <circle cx="12" cy="-5" r="5" fill="white"/>
+    <circle cx="-10" cy="-4" r="2.5" fill="#0a0a0f"/>
+    <circle cx="14" cy="-4" r="2.5" fill="#0a0a0f"/>
+
+    <!-- Eye shine -->
+    <circle cx="-11" cy="-6" r="1" fill="white"/>
+    <circle cx="13" cy="-6" r="1" fill="white"/>
+  </g>
+</svg>

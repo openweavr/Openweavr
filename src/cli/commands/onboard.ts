@@ -138,7 +138,7 @@ export async function onboardCommand(): Promise<void> {
 
     try {
       // Generate PKCE challenge
-      const pkce = await generatePKCE();
+      const pkce = generatePKCE();
       const port = parseInt(answers.port as string, 10);
       const redirectUri = getCallbackUrl(port);
 

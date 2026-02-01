@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
+  <defs>
+    <!-- Primary gradient: Purple to Pink -->
+    <linearGradient id="weavrGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Thread Infinity Loop with nodes -->
+  <g transform="translate(100, 50)">
+    <!-- Main infinity path - flowing thread -->
+    <path
+      d="M-35,0
+         C-35,-20 -20,-20 0,-10
+         C20,0 35,-20 35,-10
+         C35,0 35,20 20,10
+         C0,0 -20,20 -35,10
+         C-35,0 -35,-20 -35,0"
+      fill="none"
+      stroke="url(#weavrGradient)"
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Workflow nodes at intersections -->
+    <circle cx="-35" cy="0" r="5" fill="#8B5CF6"/>
+    <circle cx="0" cy="0" r="6" fill="#A855F7"/>
+    <circle cx="35" cy="0" r="5" fill="#EC4899"/>
+  </g>
+</svg>

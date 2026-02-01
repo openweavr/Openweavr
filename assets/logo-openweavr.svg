@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <!-- Radial gradient from center -->
+    <linearGradient id="thread1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#A855F7"/>
+    </linearGradient>
+    <linearGradient id="thread2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A855F7"/>
+      <stop offset="100%" style="stop-color:#D946EF"/>
+    </linearGradient>
+    <linearGradient id="thread3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D946EF"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+    <linearGradient id="thread4" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#EC4899"/>
+      <stop offset="100%" style="stop-color:#F472B6"/>
+    </linearGradient>
+    <linearGradient id="thread5" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="centerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(60, 60)">
+    <!-- Central hub -->
+    <circle cx="0" cy="0" r="12" fill="url(#centerGradient)"/>
+
+    <!-- Radiating threads (6 directions, curved for organic feel) -->
+
+    <!-- Thread 1: Top -->
+    <path d="M0,-12 Q5,-30 0,-48" fill="none" stroke="url(#thread1)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="-48" r="4" fill="#8B5CF6"/>
+
+    <!-- Thread 2: Top-right -->
+    <path d="M10,-6 Q30,-20 40,-35" fill="none" stroke="url(#thread2)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="40" cy="-35" r="4" fill="#A855F7"/>
+
+    <!-- Thread 3: Bottom-right -->
+    <path d="M10,6 Q25,15 42,28" fill="none" stroke="url(#thread3)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="42" cy="28" r="4" fill="#D946EF"/>
+
+    <!-- Thread 4: Bottom -->
+    <path d="M0,12 Q-5,30 0,48" fill="none" stroke="url(#thread4)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="48" r="4" fill="#EC4899"/>
+
+    <!-- Thread 5: Bottom-left -->
+    <path d="M-10,6 Q-25,15 -42,28" fill="none" stroke="url(#thread5)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="-42" cy="28" r="4" fill="#7C3AED"/>
+
+    <!-- Thread 6: Top-left -->
+    <path d="M-10,-6 Q-30,-20 -40,-35" fill="none" stroke="url(#thread1)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="-40" cy="-35" r="4" fill="#8B5CF6"/>
+
+    <!-- Inner glow on center -->
+    <circle cx="0" cy="0" r="6" fill="white" opacity="0.2"/>
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 80" width="280" height="80">
+  <defs>
+    <linearGradient id="weavrGradientWM" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Thread Infinity Loop -->
+  <g transform="translate(40, 40)">
+    <path
+      d="M-25,0
+         C-25,-15 -15,-15 0,-7
+         C15,0 25,-15 25,-7
+         C25,0 25,15 15,7
+         C0,0 -15,15 -25,7
+         C-25,0 -25,-15 -25,0"
+      fill="none"
+      stroke="url(#weavrGradientWM)"
+      stroke-width="3.5"
+      stroke-linecap="round"
+    />
+    <circle cx="-25" cy="0" r="4" fill="#8B5CF6"/>
+    <circle cx="0" cy="0" r="5" fill="#A855F7"/>
+    <circle cx="25" cy="0" r="4" fill="#EC4899"/>
+  </g>
+
+  <!-- Wordmark: weavr -->
+  <text x="85" y="50" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="32" font-weight="500" fill="#F8F8FC" letter-spacing="-0.02em">
+    weavr
+  </text>
+</svg>

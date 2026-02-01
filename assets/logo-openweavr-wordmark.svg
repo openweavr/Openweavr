@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 80" width="340" height="80">
+  <defs>
+    <linearGradient id="thread1OW" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#A855F7"/>
+    </linearGradient>
+    <linearGradient id="thread2OW" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A855F7"/>
+      <stop offset="100%" style="stop-color:#D946EF"/>
+    </linearGradient>
+    <linearGradient id="thread3OW" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D946EF"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+    <linearGradient id="centerOW" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Radiating Threads -->
+  <g transform="translate(40, 40)">
+    <!-- Central hub -->
+    <circle cx="0" cy="0" r="8" fill="url(#centerOW)"/>
+
+    <!-- 6 Radiating threads -->
+    <path d="M0,-8 Q3,-18 0,-28" fill="none" stroke="url(#thread1OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="0" cy="-28" r="3" fill="#8B5CF6"/>
+
+    <path d="M7,-4 Q18,-12 24,-22" fill="none" stroke="url(#thread2OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="24" cy="-22" r="3" fill="#A855F7"/>
+
+    <path d="M7,4 Q16,10 26,16" fill="none" stroke="url(#thread3OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="26" cy="16" r="3" fill="#D946EF"/>
+
+    <path d="M0,8 Q-3,18 0,28" fill="none" stroke="url(#thread3OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="0" cy="28" r="3" fill="#EC4899"/>
+
+    <path d="M-7,4 Q-16,10 -26,16" fill="none" stroke="url(#thread1OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="-26" cy="16" r="3" fill="#7C3AED"/>
+
+    <path d="M-7,-4 Q-18,-12 -24,-22" fill="none" stroke="url(#thread1OW)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="-24" cy="-22" r="3" fill="#8B5CF6"/>
+
+    <!-- Center highlight -->
+    <circle cx="0" cy="0" r="4" fill="white" opacity="0.15"/>
+  </g>
+
+  <!-- Wordmark: Openweavr -->
+  <text x="85" y="50" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="32" fill="#F8F8FC" letter-spacing="-0.02em">
+    <tspan font-weight="400">Open</tspan><tspan font-weight="600">weavr</tspan>
+  </text>
+</svg>
