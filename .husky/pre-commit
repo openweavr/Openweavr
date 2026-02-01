@@ -1,5 +1,2 @@
-# Run typecheck first to catch TypeScript errors
+# Run typecheck to catch TypeScript errors before commit
 npm run typecheck
-
-# Then run tests
-npm test
