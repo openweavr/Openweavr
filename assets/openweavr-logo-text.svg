@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" width="420" height="100">
+  <defs>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background (transparent, but defining the canvas) -->
+
+  <!-- Icon: Squircle with woven pattern (v6 scaled) -->
+  <g transform="translate(50, 50)">
+    <rect x="-38" y="-38" width="76" height="76" rx="20" fill="url(#logoGrad)"/>
+
+    <!-- Woven grid pattern -->
+    <g filter="url(#glow)">
+      <!-- Horizontal threads -->
+      <rect x="-24" y="-18" width="48" height="9" rx="4.5" fill="white" opacity="0.9"/>
+      <rect x="-24" y="9" width="48" height="9" rx="4.5" fill="white" opacity="0.9"/>
+
+      <!-- Vertical threads (woven under/over) -->
+      <rect x="-18" y="-26" width="9" height="16" rx="4.5" fill="white" opacity="0.6"/>
+      <rect x="-18" y="0" width="9" height="9" rx="4.5" fill="white" opacity="0.9"/>
+      <rect x="-18" y="18" width="9" height="8" rx="4.5" fill="white" opacity="0.6"/>
+
+      <rect x="9" y="-26" width="9" height="9" rx="4.5" fill="white" opacity="0.9"/>
+      <rect x="9" y="-7" width="9" height="16" rx="4.5" fill="white" opacity="0.6"/>
+      <rect x="9" y="18" width="9" height="8" rx="4.5" fill="white" opacity="0.9"/>
+    </g>
+  </g>
+
+  <!-- Text: Openweavr -->
+  <text x="105" y="62" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="42" letter-spacing="-0.02em">
+    <tspan fill="#F8F8FC" font-weight="400">Open</tspan><tspan fill="#F8F8FC" font-weight="600">weavr</tspan>
+  </text>
+</svg>

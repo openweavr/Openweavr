@@ -1,8 +1,11 @@
-# 🧵 Weavr
+<p align="center">
+  <img src="./assets/openweavr-logo-text.png" alt="Openweavr" width="400" />
+</p>
 
-**Self-hosted workflow automation with AI agents.**
-
-*Weave your workflows together.*
+<p align="center">
+  <strong>Self-hosted workflow automation with AI agents.</strong><br/>
+  <em>Weave your workflows together.</em>
+</p>
 
 [![CI](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml/badge.svg)](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Openweavr/Openweavr?include_prereleases&sort=semver)](https://github.com/Openweavr/Openweavr/releases)
