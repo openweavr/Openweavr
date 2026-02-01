@@ -6,7 +6,7 @@ import { homedir, tmpdir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { MCPManager } from '../../../mcp/index.js';
+import { getGlobalMCPManager } from '../../loader.js';
 
 const execAsync = promisify(exec);
 
@@ -642,53 +642,13 @@ Return ONLY the category name, nothing else.`;
           throw new Error('Agent action requires an API key (Anthropic or OpenAI) for tool use capabilities.');
         }
 
-        // Initialize MCP manager for external tool servers
-        // web-search-mcp is the DEFAULT search method - no API keys required
-        let mcpManager: MCPManager | null = null;
-        try {
-          mcpManager = new MCPManager(ctx.log);
-          // First load any user-configured servers
-          await mcpManager.loadFromConfig();
-
-          // If no web search server is configured, automatically start web-search-mcp as default
-          if (tools.includes('web_search')) {
-            const mcpTools = mcpManager.getServers().size > 0 ? await mcpManager.getAllTools() : [];
-            const hasWebSearch = mcpTools.some(t =>
-              t.name.includes('search') || t.name.includes('web')
-            );
-
-            if (!hasWebSearch) {
-              ctx.log('Starting web-search-mcp as default search provider...');
-              try {
-                await mcpManager.connectServer('web-search', {
-                  command: 'npx',
-                  args: ['-y', '@anthropic/web-search-mcp'],
-                  timeout: 60000, // Give npx time to download if needed
-                });
-                ctx.log('web-search-mcp connected successfully');
-              } catch (webSearchErr) {
-                // Try alternative package name
-                try {
-                  await mcpManager.connectServer('web-search', {
-                    command: 'npx',
-                    args: ['-y', 'web-search-mcp'],
-                    timeout: 60000,
-                  });
-                  ctx.log('web-search-mcp connected successfully');
-                } catch {
-                  ctx.log(`web-search-mcp not available: ${String(webSearchErr)}. Falling back to built-in search.`);
-                }
-              }
-            }
-          }
-
-          const serverCount = mcpManager.getServers().size;
-          if (serverCount > 0) {
-            ctx.log(`Connected to ${serverCount} MCP server(s)`);
-          }
-        } catch (mcpErr) {
-          ctx.log(`MCP initialization skipped: ${String(mcpErr)}`);
-          mcpManager = null;
+        // Use global MCP manager (initialized on server startup)
+        // web-search-mcp and other default servers are already running
+        const mcpManager = getGlobalMCPManager();
+        if (mcpManager && mcpManager.getServers().size > 0) {
+          ctx.log(`Using ${mcpManager.getServers().size} MCP server(s) from global manager`);
+        } else {
+          ctx.log('No MCP servers available (they may still be starting)');
         }
 
         // Track failed tools for intelligent replanning
@@ -1326,14 +1286,7 @@ If you truly cannot find the information after multiple attempts, explain what y
           }
         }
 
-        // Cleanup MCP connections
-        if (mcpManager) {
-          try {
-            await mcpManager.disconnectAll();
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
+        // Note: MCP connections are managed globally and stay alive between agent runs
 
         ctx.log(`Agent completed in ${iteration} iterations`);
 

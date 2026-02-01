@@ -1,4 +1,5 @@
 import { globalRegistry } from './sdk/registry.js';
+import { MCPManager } from '../mcp/index.js';
 
 // Import all built-in plugins
 import httpPlugin from './builtin/http/index.js';
@@ -51,6 +52,21 @@ let initialized = false;
 // Global broadcast function for plugins to use
 let globalBroadcast: ((channel: string, message: { type: string; payload: unknown }) => void) | null = null;
 
+// Global MCP manager - initialized on startup, shared with agents
+let globalMCPManager: MCPManager | null = null;
+
+// Default MCP servers that should always be available
+const DEFAULT_MCP_SERVERS = [
+  {
+    name: 'web-search',
+    config: {
+      command: 'npx',
+      args: ['-y', 'web-search-mcp'],
+      timeout: 60000,
+    },
+  },
+];
+
 export function setGlobalBroadcast(fn: (channel: string, message: { type: string; payload: unknown }) => void): void {
   globalBroadcast = fn;
   // Also set it for WhatsApp plugin
@@ -85,7 +101,14 @@ export async function initializePlugins(
   // Set the global broadcast function
   setGlobalBroadcast(broadcast);
 
-  console.log('[plugins] Initializing plugins...');
+  console.log('[plugins] Initializing plugins and MCP servers...');
+
+  // Initialize MCP servers first (so they're ready for plugins/agents)
+  try {
+    await initializeMCPServers(broadcast, console.log);
+  } catch (err) {
+    console.error('[plugins] MCP initialization failed:', err);
+  }
 
   // Broadcast that initialization is starting
   broadcast('*', { type: 'plugins:initializing', payload: { plugins: builtinPlugins.map(p => p.name) } });
@@ -127,4 +150,75 @@ export function getLoadedPluginCount(): number {
 
 export function isPluginsInitialized(): boolean {
   return initialized;
+}
+
+// Get the global MCP manager (for use by agents)
+export function getGlobalMCPManager(): MCPManager | null {
+  return globalMCPManager;
+}
+
+// Initialize MCP servers on startup
+async function initializeMCPServers(
+  broadcast: (channel: string, message: { type: string; payload: unknown }) => void,
+  log: (msg: string) => void
+): Promise<void> {
+  log('[mcp] Initializing MCP servers...');
+  broadcast('*', { type: 'mcp:initializing', payload: {} });
+
+  globalMCPManager = new MCPManager(log);
+
+  // First load user-configured servers from config
+  try {
+    await globalMCPManager.loadFromConfig();
+  } catch (err) {
+    log(`[mcp] Failed to load config: ${String(err)}`);
+  }
+
+  // Check which default servers are already configured
+  const existingServers = globalMCPManager.getServers();
+  const existingTools = existingServers.size > 0
+    ? await globalMCPManager.getAllTools()
+    : [];
+
+  // Start default MCP servers if not already configured
+  for (const defaultServer of DEFAULT_MCP_SERVERS) {
+    // Check if we already have a server providing similar tools
+    const hasSearchTool = existingTools.some(t =>
+      t.name.includes('search') || t.name.includes('web')
+    );
+
+    if (defaultServer.name === 'web-search' && hasSearchTool) {
+      log(`[mcp] Skipping ${defaultServer.name} - already have search tools configured`);
+      continue;
+    }
+
+    if (existingServers.has(defaultServer.name)) {
+      log(`[mcp] Skipping ${defaultServer.name} - already configured`);
+      continue;
+    }
+
+    log(`[mcp] Starting default MCP server: ${defaultServer.name}...`);
+    broadcast('*', { type: 'mcp:server:starting', payload: { name: defaultServer.name } });
+
+    try {
+      await globalMCPManager.connectServer(defaultServer.name, defaultServer.config);
+      log(`[mcp] ${defaultServer.name} connected successfully`);
+      broadcast('*', { type: 'mcp:server:connected', payload: { name: defaultServer.name } });
+    } catch (err) {
+      log(`[mcp] Failed to start ${defaultServer.name}: ${String(err)}`);
+      broadcast('*', { type: 'mcp:server:failed', payload: { name: defaultServer.name, error: String(err) } });
+    }
+  }
+
+  const serverCount = globalMCPManager.getServers().size;
+  const allTools = serverCount > 0 ? await globalMCPManager.getAllTools() : [];
+
+  log(`[mcp] Initialization complete: ${serverCount} server(s), ${allTools.length} tool(s) available`);
+  broadcast('*', {
+    type: 'mcp:initialized',
+    payload: {
+      servers: serverCount,
+      tools: allTools.map(t => ({ name: t.name, server: t.server })),
+    }
+  });
 }
