@@ -12,8 +12,21 @@ import {
   getCallbackUrl,
   getOAuthCallbackPort,
 } from '../../auth/openai-oauth.js';
+import { isInteractive } from '../utils/tty.js';
 
 const execAsync = promisify(exec);
+
+interface OnboardOptions {
+  port?: string;
+  host?: string;
+  aiProvider?: 'none' | 'anthropic' | 'openai' | 'ollama';
+  openaiAuth?: 'oauth' | 'apikey';
+  openaiAuthMethod?: 'oauth' | 'apikey';
+  apiKey?: string;
+  braveApiKey?: string;
+  skipWebSearch?: boolean;
+  nonInteractive?: boolean;
+}
 
 // Open URL in browser (cross-platform)
 async function openBrowser(url: string): Promise<void> {
@@ -31,12 +44,18 @@ async function openBrowser(url: string): Promise<void> {
   await execAsync(command);
 }
 
-export async function onboardCommand(): Promise<void> {
+export async function onboardCommand(options: OnboardOptions = {}): Promise<void> {
+  const existingConfig = await loadConfig();
+  const interactive = !options.nonInteractive && isInteractive();
+
+  if (!interactive) {
+    await runNonInteractiveOnboard(existingConfig, options);
+    return;
+  }
+
   console.clear();
 
   p.intro(chalk.magenta('🧵 Welcome to Weavr!'));
-
-  const existingConfig = await loadConfig();
 
   const answers = await p.group(
     {
@@ -312,4 +331,69 @@ export async function onboardCommand(): Promise<void> {
       chalk.cyan('weavr serve') +
       chalk.dim(' to start the gateway.')
   );
+}
+
+async function runNonInteractiveOnboard(
+  existingConfig: WeavrConfig,
+  options: OnboardOptions
+): Promise<void> {
+  const portValue = options.port ?? String(existingConfig.server.port);
+  const port = parseInt(portValue, 10);
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
+    console.error(chalk.red(`Invalid port: ${portValue}`));
+    process.exit(1);
+  }
+
+  const config: WeavrConfig = {
+    ...existingConfig,
+    server: {
+      ...existingConfig.server,
+      port,
+      host: options.host ?? existingConfig.server.host,
+    },
+  };
+
+  const provider = options.aiProvider ?? existingConfig.ai?.provider ?? 'none';
+  const authMethod = options.openaiAuth ?? options.openaiAuthMethod ?? existingConfig.ai?.authMethod ?? 'apikey';
+  const model = existingConfig.ai?.model;
+
+  if (provider === 'none') {
+    delete config.ai;
+  } else if (provider === 'ollama') {
+    config.ai = { provider: 'ollama', model };
+  } else if (provider === 'openai') {
+    if (authMethod === 'oauth') {
+      console.error(chalk.red('OpenAI OAuth requires an interactive TTY session.'));
+      console.error(chalk.dim('Re-run without --non-interactive or use --openai-auth apikey.'));
+      process.exit(1);
+    }
+    const apiKey = options.apiKey ?? existingConfig.ai?.apiKey ?? process.env.OPENAI_API_KEY;
+    config.ai = { provider: 'openai', apiKey, authMethod: 'apikey', model };
+    if (!apiKey) {
+      console.warn(chalk.yellow('⚠ OpenAI API key missing. Set --api-key or OPENAI_API_KEY.'));
+    }
+  } else if (provider === 'anthropic') {
+    const apiKey = options.apiKey ?? existingConfig.ai?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    config.ai = { provider: 'anthropic', apiKey, authMethod: 'apikey', model };
+    if (!apiKey) {
+      console.warn(chalk.yellow('⚠ Anthropic API key missing. Set --api-key or ANTHROPIC_API_KEY.'));
+    }
+  }
+
+  if (options.skipWebSearch) {
+    delete config.webSearch;
+  } else if (options.braveApiKey) {
+    config.webSearch = {
+      provider: 'brave',
+      apiKey: options.braveApiKey,
+    };
+  }
+
+  await ensureConfigDir();
+  await saveConfig(config);
+
+  console.log(chalk.green('✓ Configuration saved'));
+  console.log(chalk.dim(`Config: ${WEAVR_DIR}/config.yaml`));
+  console.log(chalk.dim(`Workflows: ${WEAVR_DIR}/workflows/`));
+  console.log(chalk.dim(`Plugins: ${WEAVR_DIR}/plugins/`));
 }

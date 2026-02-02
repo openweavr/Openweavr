@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - Getting Started</title>
+    <meta name="description" content="Install and build Weavr with verified commands." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html" aria-current="page">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>On this page</h3>
+        <a class="active" href="#prereqs">Prerequisites</a>
+        <a href="#install">Install and build</a>
+        <a href="#paths">Runtime paths</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="prereqs">
+          <h2>Prerequisites</h2>
+          <p>Verified with Node.js 22.22.0 on February 2, 2026.</p>
+          <div class="callout">
+            Use Node.js 22 or newer to match the build settings in the project.
+          </div>
+        </div>
+
+        <div class="section" id="install">
+          <h2>Install and build</h2>
+          <p>Run these commands from the project root.</p>
+          <div class="card">
+            <pre><code>npm install
+npm run build
+npm run build:web</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="paths">
+          <h2>Runtime paths</h2>
+          <p>These are the filesystem locations used by the CLI and gateway.</p>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">~/.weavr/config.yaml</span></td>
+                <td>CLI and gateway configuration.</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">~/.weavr/workflows/</span></td>
+                <td>Workflow files used by CLI commands.</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">workflows/</span></td>
+                <td>Default gateway workflow directory (relative to server CWD).</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">dist/</span></td>
+                <td>Backend and CLI build output.</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">dist/web/</span></td>
+                <td>Web UI build output served by the gateway.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">Verified commands were executed on 2026-02-02.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

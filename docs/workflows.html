@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - Workflows</title>
+    <meta name="description" content="Verified workflow YAML structure and examples." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html" aria-current="page">Workflows</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>Workflows</h3>
+        <a class="active" href="#anatomy">YAML anatomy</a>
+        <a href="#actions">Verified actions</a>
+        <a href="#triggers">Trigger example</a>
+        <a href="#interpolation">Interpolation</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="anatomy">
+          <h2>Workflow anatomy</h2>
+          <p>This workflow was created and run in the CLI guide.</p>
+          <div class="card">
+            <pre><code>name: hello-world
+description: Minimal workflow that logs a message.
+
+steps:
+  - id: greeting
+    action: transform
+    with:
+      template: "Hello from Weavr at {{ currentISODate }}"
+
+  - id: log-it
+    action: log
+    needs: [greeting]
+    with:
+      message: "Message: {{ steps.greeting }}"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="actions">
+          <h2>Verified actions</h2>
+          <p>These actions were exercised during the verification runs.</p>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">transform</span></td>
+                <td>Creates a value by interpolating a template string.</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">log</span></td>
+                <td>Prints a message to the run output.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section" id="triggers">
+          <h2>Trigger example (AI-generated)</h2>
+          <p>Generated with <span class="inline-code">weavr ask</span> in non-interactive mode.</p>
+          <div class="card">
+            <pre><code>name: log-hi
+description: Logs a hi message
+
+triggers:
+  - type: cron.schedule
+    config:
+      cron: "0 9 * * *"  # Every day at 9 AM
+
+steps:
+  - id: log-hi-message
+    action: log
+    config:
+      message: "hi"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="interpolation">
+          <h2>Interpolation</h2>
+          <p>These template variables were used in verified runs:</p>
+          <div class="grid">
+            <div class="card">
+              <h3>Run timestamp</h3>
+              <p><span class="inline-code">{{ currentISODate }}</span> resolves to the current time.</p>
+            </div>
+            <div class="card">
+              <h3>Step output</h3>
+              <p><span class="inline-code">{{ steps.greeting }}</span> resolves to the output from the <span class="inline-code">greeting</span> step.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">Workflow examples were verified on 2026-02-02.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

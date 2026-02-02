@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - Troubleshooting</title>
+    <meta name="description" content="Observed issues and workarounds from verification runs." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="troubleshooting.html" aria-current="page">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>Issues</h3>
+        <a class="active" href="#tty">TTY prompts</a>
+        <a href="#listen">Gateway listen errors</a>
+        <a href="#paths">Workflow path mismatch</a>
+        <a href="#doctor">Doctor warnings</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="tty">
+          <h2>TTY initialization failed</h2>
+          <p>Observed error: <span class="inline-code">ERR_TTY_INIT_FAILED</span>.</p>
+          <div class="callout">
+            Use non-interactive flags for <span class="inline-code">weavr onboard</span>,
+            <span class="inline-code">weavr create</span>, and <span class="inline-code">weavr ask</span>.
+          </div>
+          <div class="card">
+            <pre><code>node weavr.mjs onboard --non-interactive --ai-provider none --skip-web-search
+node weavr.mjs create --non-interactive --name docs-demo --trigger manual
+node weavr.mjs ask "Create a workflow that logs hi" --non-interactive --output /tmp/weavr-ask.yaml</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="listen">
+          <h2>Gateway listen errors</h2>
+          <p>Observed error: <span class="inline-code">listen EPERM</span> in restricted environments.</p>
+          <div class="callout">
+            Run the gateway in a normal terminal session with permission to bind to local ports.
+          </div>
+        </div>
+
+        <div class="section" id="paths">
+          <h2>Workflow directory mismatch</h2>
+          <p>The CLI uses <span class="inline-code">~/.weavr/workflows</span> while the gateway defaults to <span class="inline-code">workflows/</span> in its current working directory.</p>
+          <div class="callout">
+            Set <span class="inline-code">workflowsDir</span> in <span class="inline-code">~/.weavr/config.yaml</span> if you want the gateway to read the same workflows as the CLI.
+          </div>
+        </div>
+
+        <div class="section" id="doctor">
+          <h2>Doctor warnings</h2>
+          <p>The doctor command can warn when no plugins are installed. Built-in plugins still load.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">Troubleshooting notes captured on 2026-02-02.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

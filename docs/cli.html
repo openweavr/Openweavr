@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - CLI</title>
+    <meta name="description" content="Verified CLI usage for Weavr." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html" aria-current="page">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>CLI guide</h3>
+        <a class="active" href="#onboard">Configure (non-interactive)</a>
+        <a href="#create">Create a workflow</a>
+        <a href="#list">List workflows</a>
+        <a href="#run">Run a workflow</a>
+        <a href="#ask">Generate workflow with AI</a>
+        <a href="#doctor">Doctor</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="onboard">
+          <h2>Configure without a TTY</h2>
+          <p>This path avoids interactive prompts and works in non-TTY shells.</p>
+          <div class="card">
+            <pre><code>node weavr.mjs onboard --non-interactive --ai-provider none --skip-web-search</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="create">
+          <h2>Create a workflow</h2>
+          <p>Generate a starter workflow file from flags.</p>
+          <div class="card">
+            <pre><code>node weavr.mjs create --non-interactive \
+  --name docs-demo \
+  --description "Docs demo workflow" \
+  --trigger manual</code></pre>
+          </div>
+
+          <p>You can also create the YAML manually:</p>
+          <div class="card">
+            <pre><code>cat &lt;&lt;'EOF' &gt; ~/.weavr/workflows/hello.yaml
+name: hello-world
+description: Minimal workflow that logs a message.
+
+steps:
+  - id: greeting
+    action: transform
+    with:
+      template: "Hello from Weavr at {{ currentISODate }}"
+
+  - id: log-it
+    action: log
+    needs: [greeting]
+    with:
+      message: "Message: {{ steps.greeting }}"
+EOF</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="list">
+          <h2>List workflows</h2>
+          <div class="card">
+            <pre><code>node weavr.mjs list</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="run">
+          <h2>Run a workflow</h2>
+          <div class="card">
+            <pre><code>node weavr.mjs run hello</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="ask">
+          <h2>Generate a workflow with AI</h2>
+          <p>Non-interactive mode can write YAML to a file.</p>
+          <div class="card">
+            <pre><code>node weavr.mjs ask "Create a workflow that logs hi" \
+  --non-interactive \
+  --output /tmp/weavr-ask.yaml</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="doctor">
+          <h2>Doctor</h2>
+          <div class="card">
+            <pre><code>node weavr.mjs doctor</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">All CLI commands above were executed on 2026-02-02.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
