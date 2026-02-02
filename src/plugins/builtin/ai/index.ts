@@ -10,6 +10,38 @@ import { getGlobalMCPManager } from '../../loader.js';
 import { refreshAccessToken, isTokenExpired, type OAuthTokens } from '../../../auth/openai-oauth.js';
 const execAsync = promisify(exec);
 
+// Token usage tracking
+interface UsageStats {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalRequests: number;
+  lastUpdated: string;
+}
+
+let usageStats: UsageStats = {
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
+  totalRequests: 0,
+  lastUpdated: new Date().toISOString(),
+};
+
+// Export for API access
+export function getUsageStats(): UsageStats {
+  return { ...usageStats };
+}
+
+// Export AI config for stats endpoint
+export { type AIConfig };
+export { getGlobalAIConfig };
+
+// Helper to track usage from API responses
+function trackUsage(inputTokens: number, outputTokens: number): void {
+  usageStats.totalInputTokens += inputTokens;
+  usageStats.totalOutputTokens += outputTokens;
+  usageStats.totalRequests += 1;
+  usageStats.lastUpdated = new Date().toISOString();
+}
+
 // Helper to sleep for a given duration
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -413,7 +445,11 @@ export default definePlugin({
             throw new Error(`Anthropic API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
-          const data = await response.json() as { content: Array<{ text: string }> };
+          const data = await response.json() as { content: Array<{ text: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+          }
           return {
             text: data.content[0]?.text ?? '',
             model,
@@ -449,7 +485,11 @@ export default definePlugin({
             throw new Error(`OpenAI API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
-          const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+          const data = await response.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+          }
           return {
             text: data.choices[0]?.message?.content ?? '',
             model,
@@ -516,7 +556,11 @@ Summary:`;
             throw new Error(`Anthropic API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
-          const data = await response.json() as { content: Array<{ text: string }> };
+          const data = await response.json() as { content: Array<{ text: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+          }
           const summary = data.content[0]?.text ?? '';
           ctx.log(`Generated summary: ${summary.substring(0, 100)}...`);
           return { summary };
@@ -545,7 +589,11 @@ Summary:`;
             throw new Error(`OpenAI API error: ${response.status} - ${errorText.slice(0, 200)}`);
           }
 
-          const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+          const data = await response.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+          }
           const summary = data.choices[0]?.message?.content ?? '';
           ctx.log(`Generated summary: ${summary.substring(0, 100)}...`);
           return { summary };
@@ -603,7 +651,11 @@ Return ONLY valid JSON, no other text.`;
             }),
           }, 60000, 3, ctx.log);
 
-          const data = await response.json() as { content: Array<{ text: string }> };
+          const data = await response.json() as { content: Array<{ text: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+          }
           result = data.content[0]?.text ?? '{}';
         } else if (oauthToken || openaiKey) {
           const authToken = oauthToken ?? openaiKey;
@@ -621,7 +673,11 @@ Return ONLY valid JSON, no other text.`;
             }),
           }, 60000, 3, ctx.log);
 
-          const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+          const data = await response.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+          }
           result = data.choices[0]?.message?.content ?? '{}';
         } else if (globalConfig.useCLI) {
           ctx.log('Using CLI-based AI for extraction');
@@ -674,7 +730,11 @@ Return ONLY the category name, nothing else.`;
             }),
           }, 60000, 3, ctx.log);
 
-          const data = await response.json() as { content: Array<{ text: string }> };
+          const data = await response.json() as { content: Array<{ text: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+          }
           category = data.content[0]?.text?.trim() ?? 'unknown';
         } else if (oauthToken || openaiKey) {
           const authToken = oauthToken ?? openaiKey;
@@ -691,7 +751,11 @@ Return ONLY the category name, nothing else.`;
             }),
           }, 60000, 3, ctx.log);
 
-          const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+          const data = await response.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+          // Track usage
+          if (data.usage) {
+            trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+          }
           category = data.choices[0]?.message?.content?.trim() ?? 'unknown';
         } else if (globalConfig.useCLI) {
           ctx.log('Using CLI-based AI for classification');
@@ -1259,6 +1323,13 @@ If a tool returns [FAILED] or [ERROR]:
             }
 
             responseData = await response.json() as Record<string, unknown>;
+
+            // Track usage for Anthropic agent calls
+            const usage = responseData.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+            if (usage) {
+              trackUsage(usage.input_tokens ?? 0, usage.output_tokens ?? 0);
+            }
+
             const content = responseData.content as Array<{ type: string; text?: string; name?: string; input?: unknown; id?: string }>;
 
             // Process response
@@ -1470,6 +1541,13 @@ If a tool returns [FAILED] or [ERROR]:
             }
 
             responseData = await response.json() as Record<string, unknown>;
+
+            // Track usage for OpenAI agent calls
+            const openaiUsage = responseData.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+            if (openaiUsage) {
+              trackUsage(openaiUsage.prompt_tokens ?? 0, openaiUsage.completion_tokens ?? 0);
+            }
+
             const choice = (responseData.choices as Array<{
               message: { content?: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
               finish_reason: string;
