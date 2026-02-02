@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Weavr Docs - Getting Started</title>
-    <meta name="description" content="Install and build Weavr with verified commands." />
+    <meta name="description" content="Install and configure Weavr for workflow automation." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html">CLI</a>
           <a href="web-app.html">Web App</a>
           <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html">Troubleshooting</a>
         </nav>
       </div>
@@ -27,70 +29,184 @@
 
     <main class="container page">
       <aside class="sidebar">
-        <h3>On this page</h3>
-        <a class="active" href="#prereqs">Prerequisites</a>
-        <a href="#install">Install and build</a>
-        <a href="#paths">Runtime paths</a>
+        <h3>Getting Started</h3>
+        <a class="active" href="#prerequisites">Prerequisites</a>
+        <a href="#installation">Installation</a>
+        <a href="#configuration">Configuration</a>
+        <a href="#first-workflow">First Workflow</a>
+        <a href="#next-steps">Next Steps</a>
       </aside>
 
       <section class="content">
-        <div class="section" id="prereqs">
+        <div class="section" id="prerequisites">
           <h2>Prerequisites</h2>
-          <p>Verified with Node.js 22.22.0 on February 2, 2026.</p>
+          <ul>
+            <li><strong>Node.js 22+</strong> - Required for running Weavr</li>
+            <li><strong>npm</strong> - For installing dependencies</li>
+            <li><strong>Git</strong> - For cloning the repository</li>
+          </ul>
+
           <div class="callout">
-            Use Node.js 22 or newer to match the build settings in the project.
+            <strong>Optional:</strong> For AI agent features, you'll need an API key from
+            <a href="https://console.anthropic.com" target="_blank">Anthropic</a> or
+            <a href="https://platform.openai.com" target="_blank">OpenAI</a>.
           </div>
         </div>
 
-        <div class="section" id="install">
-          <h2>Install and build</h2>
-          <p>Run these commands from the project root.</p>
+        <div class="section" id="installation">
+          <h2>Installation</h2>
+          <p>Clone the repository and install dependencies:</p>
           <div class="card">
-            <pre><code>npm install
-npm run build
-npm run build:web</code></pre>
+            <pre><code>git clone https://github.com/openweavr/Openweavr.git
+cd Openweavr
+npm install</code></pre>
+          </div>
+
+          <h3>Build</h3>
+          <p>Build both the backend and web UI:</p>
+          <div class="card">
+            <pre><code>npm run build      # Build backend/CLI
+npm run build:web  # Build web UI</code></pre>
+          </div>
+
+          <h3>Verify Installation</h3>
+          <div class="card">
+            <pre><code>node weavr.mjs --version
+node weavr.mjs doctor</code></pre>
           </div>
         </div>
 
-        <div class="section" id="paths">
-          <h2>Runtime paths</h2>
-          <p>These are the filesystem locations used by the CLI and gateway.</p>
+        <div class="section" id="configuration">
+          <h2>Configuration</h2>
+          <p>Weavr stores configuration in <span class="inline-code">~/.weavr/config.yaml</span>.</p>
+
+          <h3>Initial Setup</h3>
+          <p>Run the onboard command to create your configuration:</p>
+          <div class="card">
+            <pre><code># Interactive setup
+node weavr.mjs onboard
+
+# Non-interactive (for scripts/CI)
+node weavr.mjs onboard --non-interactive --ai-provider anthropic</code></pre>
+          </div>
+
+          <h3>Manual Configuration</h3>
+          <p>Or create the config file manually:</p>
+          <div class="card">
+            <pre><code># ~/.weavr/config.yaml
+
+# LLM Provider (for AI agents)
+anthropicKey: sk-ant-...
+model: claude-sonnet-4-20250514
+
+# Or use OpenAI
+# openaiKey: sk-...
+# model: gpt-4o
+
+# Server settings (optional)
+port: 3847
+host: localhost</code></pre>
+          </div>
+
+          <h3>Environment Variables</h3>
           <table class="table">
             <thead>
               <tr>
-                <th>Path</th>
+                <th>Variable</th>
                 <th>Purpose</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><span class="inline-code">~/.weavr/config.yaml</span></td>
-                <td>CLI and gateway configuration.</td>
+                <td><span class="inline-code">ANTHROPIC_API_KEY</span></td>
+                <td>Anthropic API key for Claude models</td>
               </tr>
               <tr>
-                <td><span class="inline-code">~/.weavr/workflows/</span></td>
-                <td>Workflow files used by CLI commands.</td>
+                <td><span class="inline-code">OPENAI_API_KEY</span></td>
+                <td>OpenAI API key for GPT models</td>
               </tr>
               <tr>
-                <td><span class="inline-code">workflows/</span></td>
-                <td>Default gateway workflow directory (relative to server CWD).</td>
+                <td><span class="inline-code">BRAVE_API_KEY</span></td>
+                <td>Brave Search API for web search</td>
               </tr>
               <tr>
-                <td><span class="inline-code">dist/</span></td>
-                <td>Backend and CLI build output.</td>
+                <td><span class="inline-code">GITHUB_TOKEN</span></td>
+                <td>GitHub personal access token</td>
               </tr>
               <tr>
-                <td><span class="inline-code">dist/web/</span></td>
-                <td>Web UI build output served by the gateway.</td>
+                <td><span class="inline-code">TELEGRAM_BOT_TOKEN</span></td>
+                <td>Telegram bot token from BotFather</td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="section" id="first-workflow">
+          <h2>First Workflow</h2>
+          <p>Create a simple workflow to verify everything works.</p>
+
+          <h3>Create the Workflow</h3>
+          <div class="card">
+            <pre><code># Create workflow directory
+mkdir -p ~/.weavr/workflows
+
+# Create a simple workflow
+cat > ~/.weavr/workflows/hello.yaml << 'EOF'
+name: hello-world
+description: A simple test workflow
+
+steps:
+  - id: greet
+    action: transform
+    with:
+      template: "Hello from Weavr!"
+
+  - id: log
+    action: log
+    needs: [greet]
+    with:
+      message: "{{ steps.greet }}"
+EOF</code></pre>
+          </div>
+
+          <h3>Run the Workflow</h3>
+          <div class="card">
+            <pre><code>node weavr.mjs run hello</code></pre>
+          </div>
+
+          <p>You should see output indicating the workflow ran successfully.</p>
+        </div>
+
+        <div class="section" id="next-steps">
+          <h2>Next Steps</h2>
+          <div class="grid">
+            <a class="card" href="cli.html">
+              <h3>CLI Reference</h3>
+              <p>Learn all available CLI commands for workflow management.</p>
+            </a>
+            <a class="card" href="web-app.html">
+              <h3>Web Interface</h3>
+              <p>Start the server and use the visual workflow manager.</p>
+            </a>
+            <a class="card" href="workflows.html">
+              <h3>Workflow Syntax</h3>
+              <p>Deep dive into YAML structure, triggers, and actions.</p>
+            </a>
+            <a class="card" href="agents.html">
+              <h3>AI Agents</h3>
+              <p>Add AI-powered steps to your workflows.</p>
+            </a>
+          </div>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">Verified commands were executed on 2026-02-02.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - AI Agents</title>
+    <meta name="description" content="Build workflows powered by AI agents with tool use, web search, and MCP support." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html" aria-current="page">AI Agents</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>AI Agents</h3>
+        <a class="active" href="#overview">Overview</a>
+        <a href="#configuration">Configuration</a>
+        <a href="#basic-usage">Basic Usage</a>
+        <a href="#tools">Built-in Tools</a>
+        <a href="#web-search">Web Search</a>
+        <a href="#mcp">MCP Servers</a>
+        <a href="#providers">LLM Providers</a>
+        <a href="#examples">Examples</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="overview">
+          <h2>Overview</h2>
+          <p>
+            Weavr's AI agent action (<span class="inline-code">ai.agent</span>) enables workflows to leverage
+            large language models for complex reasoning, analysis, and task execution. Agents can use tools,
+            search the web, and interact with external systems through MCP servers.
+          </p>
+
+          <div class="grid">
+            <div class="card">
+              <h3>Claude & GPT</h3>
+              <p>Support for Anthropic Claude and OpenAI models with automatic tool use.</p>
+            </div>
+            <div class="card">
+              <h3>Tool Use</h3>
+              <p>Agents can read files, make HTTP requests, search the web, and more.</p>
+            </div>
+            <div class="card">
+              <h3>MCP Support</h3>
+              <p>Extend capabilities with Model Context Protocol servers.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="configuration">
+          <h2>Configuration</h2>
+          <p>Configure your AI provider in <span class="inline-code">~/.weavr/config.yaml</span>:</p>
+
+          <div class="card">
+            <pre><code># Anthropic (recommended)
+anthropicKey: sk-ant-...
+model: claude-sonnet-4-20250514
+
+# Or OpenAI
+openaiKey: sk-...
+model: gpt-4o
+
+# Web search (optional)
+# Set via environment: BRAVE_API_KEY or TAVILY_API_KEY</code></pre>
+          </div>
+
+          <div class="callout">
+            <strong>Environment variables:</strong> You can also set <span class="inline-code">ANTHROPIC_API_KEY</span>
+            or <span class="inline-code">OPENAI_API_KEY</span> instead of adding keys to the config file.
+          </div>
+        </div>
+
+        <div class="section" id="basic-usage">
+          <h2>Basic Usage</h2>
+          <p>Use the <span class="inline-code">ai.agent</span> action in your workflow steps:</p>
+
+          <div class="card">
+            <pre><code>steps:
+  - id: analyze
+    action: ai.agent
+    with:
+      task: |
+        Analyze this error log and suggest fixes:
+        {{ trigger.error }}
+
+      # Optional: customize the agent
+      model: claude-sonnet-4-20250514
+      maxTokens: 4096
+      temperature: 0.7
+      system: "You are a helpful debugging assistant."</code></pre>
+          </div>
+
+          <h3>Accessing Results</h3>
+          <p>The agent's response is available in subsequent steps:</p>
+          <div class="card">
+            <pre><code>- id: respond
+  action: slack.post
+  needs: [analyze]
+  with:
+    channel: "#alerts"
+    text: "{{ steps.analyze.response }}"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="tools">
+          <h2>Built-in Tools</h2>
+          <p>Agents have access to these tools by default:</p>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">read_file</span></td>
+                <td>Read contents of a file from the filesystem</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">write_file</span></td>
+                <td>Write content to a file</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">list_directory</span></td>
+                <td>List files in a directory</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">http_request</span></td>
+                <td>Make HTTP requests to APIs</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">web_search</span></td>
+                <td>Search the web (requires API key)</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">run_workflow</span></td>
+                <td>Execute another Weavr workflow</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Enabling/Disabling Tools</h3>
+          <div class="card">
+            <pre><code>- id: safe-agent
+  action: ai.agent
+  with:
+    task: "Analyze this code"
+    tools:
+      - read_file        # Only allow file reading
+      - http_request     # And HTTP requests</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="web-search">
+          <h2>Web Search</h2>
+          <p>Enable web search by setting a search API key:</p>
+
+          <div class="card">
+            <pre><code># In environment
+export BRAVE_API_KEY=your-key
+# or
+export TAVILY_API_KEY=your-key</code></pre>
+          </div>
+
+          <p>Then agents can search the web:</p>
+          <div class="card">
+            <pre><code>- id: research
+  action: ai.agent
+  with:
+    task: |
+      Research the latest developments in {{ topic }}
+      and provide a summary with sources.</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="mcp">
+          <h2>MCP Servers</h2>
+          <p>
+            Model Context Protocol (MCP) servers extend agent capabilities with custom tools.
+            Configure MCP servers in your config:
+          </p>
+
+          <div class="card">
+            <pre><code># ~/.weavr/config.yaml
+mcpServers:
+  filesystem:
+    command: npx
+    args: [-y, "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
+
+  postgres:
+    command: npx
+    args: [-y, "@modelcontextprotocol/server-postgres"]
+    env:
+      DATABASE_URL: postgresql://user:pass@localhost/db
+
+  github:
+    command: npx
+    args: [-y, "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "{{ env.GITHUB_TOKEN }}"</code></pre>
+          </div>
+
+          <p>Tools from MCP servers are automatically available to agents.</p>
+        </div>
+
+        <div class="section" id="providers">
+          <h2>LLM Providers</h2>
+
+          <h3>Anthropic Claude</h3>
+          <div class="card">
+            <pre><code>model: claude-sonnet-4-20250514      # Recommended
+model: claude-opus-4-20250514        # Most capable
+model: claude-haiku-3-5-20241022     # Fastest</code></pre>
+          </div>
+
+          <h3>OpenAI</h3>
+          <div class="card">
+            <pre><code>model: gpt-4o                        # Recommended
+model: gpt-4o-mini                   # Faster/cheaper
+model: o1                            # Reasoning model</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="examples">
+          <h2>Examples</h2>
+
+          <h3>Code Review Agent</h3>
+          <div class="card">
+            <pre><code>name: pr-review
+trigger:
+  type: github.pull_request
+  with:
+    repo: your-org/repo
+    events: [opened, synchronize]
+
+steps:
+  - id: get-diff
+    action: http.request
+    with:
+      url: "{{ trigger.pullRequest.url }}.diff"
+      headers:
+        Accept: text/plain
+
+  - id: review
+    action: ai.agent
+    needs: [get-diff]
+    with:
+      task: |
+        Review this pull request diff and provide feedback:
+
+        {{ steps.get-diff.body }}
+
+        Focus on:
+        - Potential bugs
+        - Security issues
+        - Code style
+        - Performance concerns
+
+  - id: comment
+    action: github.create_comment
+    needs: [review]
+    with:
+      repo: your-org/repo
+      issue_number: "{{ trigger.number }}"
+      body: "{{ steps.review.response }}"</code></pre>
+          </div>
+
+          <h3>Research Assistant</h3>
+          <div class="card">
+            <pre><code>name: research-topic
+trigger:
+  type: telegram.message
+
+steps:
+  - id: research
+    action: ai.agent
+    with:
+      task: |
+        Research the following topic and provide a comprehensive summary:
+
+        {{ trigger.text }}
+
+        Include:
+        - Key facts and findings
+        - Recent developments
+        - Relevant sources
+
+  - id: respond
+    action: telegram.send
+    needs: [research]
+    with:
+      chatId: "{{ trigger.chatId }}"
+      text: "{{ steps.research.response }}"</code></pre>
+          </div>
+
+          <h3>Daily Digest</h3>
+          <div class="card">
+            <pre><code>name: daily-digest
+trigger:
+  type: cron.schedule
+  with:
+    expression: "0 8 * * *"
+
+steps:
+  - id: gather
+    action: ai.agent
+    with:
+      task: |
+        Create a morning briefing with:
+        1. Top tech news from Hacker News
+        2. Weather for San Francisco
+        3. Any interesting AI developments
+
+        Keep it concise and actionable.
+
+  - id: send
+    action: slack.post
+    needs: [gather]
+    with:
+      channel: "#daily-digest"
+      text: "{{ steps.gather.response }}"</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Weavr Docs - Overview</title>
-    <meta name="description" content="Professional documentation for Weavr CLI and web app usage." />
+    <title>Weavr Documentation</title>
+    <meta name="description" content="Documentation for Weavr - self-hosted workflow automation with native AI agent support." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html">CLI</a>
           <a href="web-app.html">Web App</a>
           <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html">Troubleshooting</a>
         </nav>
       </div>
@@ -27,58 +29,135 @@
 
     <main class="container">
       <section class="hero fade">
-        <h1>Weavr usage docs built from verified runs</h1>
+        <h1>Self-hosted workflow automation with AI agents</h1>
         <p>
-          This documentation covers the CLI and web app paths I personally ran
-          on February 2, 2026. Each command shown in the guides was executed
-          before it was documented.
+          Weavr is an open-source workflow automation platform that combines the power of
+          traditional automation tools with native AI agent capabilities. Run it on your
+          own infrastructure with full data sovereignty.
         </p>
         <div class="hero-badges">
-          <span class="badge">Verified 2026-02-02</span>
+          <span class="badge">Open Source</span>
+          <span class="badge">Self-Hosted</span>
+          <span class="badge">AI-Native</span>
           <span class="badge">Node.js 22+</span>
-          <span class="badge">Weavr v0.1.0</span>
         </div>
       </section>
 
       <section class="section">
-        <h2>Start here</h2>
-        <p>Install dependencies, build the backend, then build the web UI.</p>
+        <h2>Quick Start</h2>
+        <p>Get up and running in under a minute.</p>
         <div class="card fade" style="--delay: 0.1s;">
-          <pre><code>npm install
+          <pre><code># Clone and install
+git clone https://github.com/openweavr/Openweavr.git
+cd Openweavr
+npm install
+
+# Build backend and web UI
 npm run build
-npm run build:web</code></pre>
+npm run build:web
+
+# Start the server
+node weavr.mjs serve</code></pre>
+        </div>
+        <p style="margin-top: 16px; color: var(--muted);">
+          Open <span class="inline-code">http://localhost:3847</span> to access the web interface.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Key Features</h2>
+        <div class="grid">
+          <div class="card fade" style="--delay: 0.1s;">
+            <h3>AI Agents</h3>
+            <p>Build workflows powered by Claude, GPT, and other LLMs with tool use, web search, and memory.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.15s;">
+            <h3>Event-Driven Triggers</h3>
+            <p>React to GitHub events, cron schedules, webhooks, Telegram messages, and more.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.2s;">
+            <h3>MCP Support</h3>
+            <p>Extend agent capabilities with Model Context Protocol servers for filesystem, databases, and APIs.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.25s;">
+            <h3>Full Control</h3>
+            <p>Self-host on your infrastructure. Your data never leaves your servers.</p>
+          </div>
         </div>
       </section>
 
       <section class="section">
-        <h2>Documentation map</h2>
+        <h2>Documentation</h2>
         <div class="grid">
           <a class="card fade" style="--delay: 0.1s;" href="getting-started.html">
             <h3>Getting Started</h3>
-            <p>Install, build, and understand the runtime paths.</p>
+            <p>Installation, configuration, and your first workflow.</p>
           </a>
-          <a class="card fade" style="--delay: 0.2s;" href="cli.html">
-            <h3>CLI</h3>
-            <p>Non-interactive setup, workflow creation, and execution.</p>
+          <a class="card fade" style="--delay: 0.15s;" href="cli.html">
+            <h3>CLI Reference</h3>
+            <p>Command-line interface for workflow management and execution.</p>
           </a>
-          <a class="card fade" style="--delay: 0.3s;" href="web-app.html">
-            <h3>Web App</h3>
-            <p>Start the gateway, verify UI, and use the REST endpoints.</p>
+          <a class="card fade" style="--delay: 0.2s;" href="web-app.html">
+            <h3>Web Interface</h3>
+            <p>Visual workflow management, execution monitoring, and chat.</p>
           </a>
-          <a class="card fade" style="--delay: 0.4s;" href="workflows.html">
-            <h3>Workflows</h3>
-            <p>Workflow YAML structure and verified examples.</p>
+          <a class="card fade" style="--delay: 0.25s;" href="workflows.html">
+            <h3>Workflow Reference</h3>
+            <p>YAML syntax, actions, triggers, and variable interpolation.</p>
           </a>
-          <a class="card fade" style="--delay: 0.5s;" href="troubleshooting.html">
-            <h3>Troubleshooting</h3>
-            <p>Known issues observed during verification runs.</p>
+          <a class="card fade" style="--delay: 0.3s;" href="integrations.html">
+            <h3>Integrations</h3>
+            <p>GitHub, Telegram, Slack, Discord, Linear, and more.</p>
           </a>
+          <a class="card fade" style="--delay: 0.35s;" href="agents.html">
+            <h3>AI Agents</h3>
+            <p>Configure and use AI agents with tools, web search, and MCP.</p>
+          </a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Example Workflow</h2>
+        <p>A simple AI-powered workflow that responds to GitHub issues.</p>
+        <div class="card fade" style="--delay: 0.1s;">
+          <pre><code>name: issue-responder
+description: Auto-respond to new GitHub issues with AI analysis
+
+trigger:
+  type: github.issue.opened
+  with:
+    repo: your-org/your-repo
+
+steps:
+  - id: analyze
+    action: ai.agent
+    with:
+      task: |
+        Analyze this GitHub issue and provide a helpful initial response:
+
+        Title: {{ trigger.issue.title }}
+        Body: {{ trigger.issue.body }}
+
+        Be concise and helpful. If it's a bug, ask for reproduction steps.
+        If it's a feature request, acknowledge it and ask clarifying questions.
+
+  - id: respond
+    action: github.create_comment
+    needs: [analyze]
+    with:
+      repo: your-org/your-repo
+      issue_number: "{{ trigger.issue.number }}"
+      body: "{{ steps.analyze.response }}"</code></pre>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">Docs generated in <span class="inline-code">docs/</span> for future hosting.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

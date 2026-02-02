@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Weavr Docs - CLI</title>
-    <meta name="description" content="Verified CLI usage for Weavr." />
+    <title>Weavr Docs - CLI Reference</title>
+    <meta name="description" content="Command-line interface reference for Weavr workflow automation." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html" aria-current="page">CLI</a>
           <a href="web-app.html">Web App</a>
           <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html">Troubleshooting</a>
         </nav>
       </div>
@@ -27,90 +29,273 @@
 
     <main class="container page">
       <aside class="sidebar">
-        <h3>CLI guide</h3>
-        <a class="active" href="#onboard">Configure (non-interactive)</a>
-        <a href="#create">Create a workflow</a>
-        <a href="#list">List workflows</a>
-        <a href="#run">Run a workflow</a>
-        <a href="#ask">Generate workflow with AI</a>
-        <a href="#doctor">Doctor</a>
+        <h3>CLI Commands</h3>
+        <a class="active" href="#serve">serve</a>
+        <a href="#run">run</a>
+        <a href="#list">list</a>
+        <a href="#create">create</a>
+        <a href="#ask">ask</a>
+        <a href="#onboard">onboard</a>
+        <a href="#doctor">doctor</a>
       </aside>
 
       <section class="content">
-        <div class="section" id="onboard">
-          <h2>Configure without a TTY</h2>
-          <p>This path avoids interactive prompts and works in non-TTY shells.</p>
-          <div class="card">
-            <pre><code>node weavr.mjs onboard --non-interactive --ai-provider none --skip-web-search</code></pre>
-          </div>
-        </div>
+        <div class="section" id="serve">
+          <h2>serve</h2>
+          <p>Start the Weavr server with the web UI and API.</p>
 
-        <div class="section" id="create">
-          <h2>Create a workflow</h2>
-          <p>Generate a starter workflow file from flags.</p>
           <div class="card">
-            <pre><code>node weavr.mjs create --non-interactive \
-  --name docs-demo \
-  --description "Docs demo workflow" \
-  --trigger manual</code></pre>
+            <pre><code>node weavr.mjs serve [options]</code></pre>
           </div>
 
-          <p>You can also create the YAML manually:</p>
+          <h3>Options</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Description</th>
+                <th>Default</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">--port</span></td>
+                <td>Port to listen on</td>
+                <td>3847</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--host</span></td>
+                <td>Host to bind to</td>
+                <td>localhost</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
           <div class="card">
-            <pre><code>cat &lt;&lt;'EOF' &gt; ~/.weavr/workflows/hello.yaml
-name: hello-world
-description: Minimal workflow that logs a message.
+            <pre><code># Start with defaults
+node weavr.mjs serve
 
-steps:
-  - id: greeting
-    action: transform
-    with:
-      template: "Hello from Weavr at {{ currentISODate }}"
+# Custom port
+node weavr.mjs serve --port 8080
 
-  - id: log-it
-    action: log
-    needs: [greeting]
-    with:
-      message: "Message: {{ steps.greeting }}"
-EOF</code></pre>
-          </div>
-        </div>
-
-        <div class="section" id="list">
-          <h2>List workflows</h2>
-          <div class="card">
-            <pre><code>node weavr.mjs list</code></pre>
+# Bind to all interfaces (for remote access)
+node weavr.mjs serve --host 0.0.0.0</code></pre>
           </div>
         </div>
 
         <div class="section" id="run">
-          <h2>Run a workflow</h2>
+          <h2>run</h2>
+          <p>Execute a workflow by name.</p>
+
           <div class="card">
-            <pre><code>node weavr.mjs run hello</code></pre>
+            <pre><code>node weavr.mjs run <workflow-name> [options]</code></pre>
+          </div>
+
+          <h3>Options</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">--input, -i</span></td>
+                <td>JSON input data for the workflow</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--verbose, -v</span></td>
+                <td>Show detailed execution output</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <div class="card">
+            <pre><code># Run a workflow
+node weavr.mjs run hello-world
+
+# Run with input data
+node weavr.mjs run process-data -i '{"file": "data.csv"}'
+
+# Verbose output
+node weavr.mjs run my-workflow --verbose</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="list">
+          <h2>list</h2>
+          <p>List all available workflows.</p>
+
+          <div class="card">
+            <pre><code>node weavr.mjs list</code></pre>
+          </div>
+
+          <p>Displays workflows from <span class="inline-code">~/.weavr/workflows/</span> with their names and descriptions.</p>
+        </div>
+
+        <div class="section" id="create">
+          <h2>create</h2>
+          <p>Create a new workflow from a template.</p>
+
+          <div class="card">
+            <pre><code>node weavr.mjs create [options]</code></pre>
+          </div>
+
+          <h3>Options</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">--name</span></td>
+                <td>Workflow name</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--description</span></td>
+                <td>Workflow description</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--trigger</span></td>
+                <td>Trigger type (manual, cron, webhook, etc.)</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--non-interactive</span></td>
+                <td>Skip prompts, use flags only</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <div class="card">
+            <pre><code># Interactive mode
+node weavr.mjs create
+
+# Non-interactive
+node weavr.mjs create --non-interactive \
+  --name my-workflow \
+  --description "Process daily reports" \
+  --trigger cron</code></pre>
           </div>
         </div>
 
         <div class="section" id="ask">
-          <h2>Generate a workflow with AI</h2>
-          <p>Non-interactive mode can write YAML to a file.</p>
+          <h2>ask</h2>
+          <p>Generate a workflow using AI from a natural language description.</p>
+
           <div class="card">
-            <pre><code>node weavr.mjs ask "Create a workflow that logs hi" \
+            <pre><code>node weavr.mjs ask "<description>" [options]</code></pre>
+          </div>
+
+          <h3>Options</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">--output, -o</span></td>
+                <td>Save generated workflow to file</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--non-interactive</span></td>
+                <td>Skip confirmation prompts</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <div class="card">
+            <pre><code># Generate and review interactively
+node weavr.mjs ask "Create a workflow that backs up my database daily"
+
+# Generate and save directly
+node weavr.mjs ask "Monitor a URL and alert on errors" \
   --non-interactive \
-  --output /tmp/weavr-ask.yaml</code></pre>
+  --output ~/.weavr/workflows/url-monitor.yaml</code></pre>
+          </div>
+
+          <div class="callout">
+            <strong>Requires AI provider:</strong> Configure an Anthropic or OpenAI API key in your config.
+          </div>
+        </div>
+
+        <div class="section" id="onboard">
+          <h2>onboard</h2>
+          <p>Initial setup and configuration wizard.</p>
+
+          <div class="card">
+            <pre><code>node weavr.mjs onboard [options]</code></pre>
+          </div>
+
+          <h3>Options</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">--non-interactive</span></td>
+                <td>Skip prompts, use flags only</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--ai-provider</span></td>
+                <td>AI provider (anthropic, openai, none)</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">--skip-web-search</span></td>
+                <td>Skip web search API setup</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <div class="card">
+            <pre><code># Interactive setup
+node weavr.mjs onboard
+
+# Non-interactive for CI/scripts
+node weavr.mjs onboard --non-interactive --ai-provider anthropic</code></pre>
           </div>
         </div>
 
         <div class="section" id="doctor">
-          <h2>Doctor</h2>
+          <h2>doctor</h2>
+          <p>Check your Weavr installation and configuration.</p>
+
           <div class="card">
             <pre><code>node weavr.mjs doctor</code></pre>
           </div>
+
+          <p>Checks for:</p>
+          <ul>
+            <li>Node.js version compatibility</li>
+            <li>Configuration file presence and validity</li>
+            <li>API key configuration</li>
+            <li>Plugin availability</li>
+          </ul>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">All CLI commands above were executed on 2026-02-02.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

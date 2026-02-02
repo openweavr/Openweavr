@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Weavr Docs - Web App</title>
-    <meta name="description" content="Verified Web App usage for Weavr." />
+    <title>Weavr Docs - Web Interface</title>
+    <meta name="description" content="Visual workflow management and API reference for Weavr." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html">CLI</a>
           <a href="web-app.html" aria-current="page">Web App</a>
           <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html">Troubleshooting</a>
         </nav>
       </div>
@@ -27,81 +29,178 @@
 
     <main class="container page">
       <aside class="sidebar">
-        <h3>Web app</h3>
-        <a class="active" href="#serve">Start the gateway</a>
-        <a href="#verify">Verify UI and config</a>
-        <a href="#api">Workflows and runs API</a>
+        <h3>Web Interface</h3>
+        <a class="active" href="#starting">Starting the Server</a>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#workflows">Workflows</a>
+        <a href="#runs">Run History</a>
+        <a href="#chat">Chat Interface</a>
+        <a href="#api">REST API</a>
       </aside>
 
       <section class="content">
-        <div class="section" id="serve">
-          <h2>Start the gateway</h2>
-          <p>Serve the web UI and the API from a single process.</p>
+        <div class="section" id="starting">
+          <h2>Starting the Server</h2>
+          <p>Launch the Weavr server to access the web interface and API.</p>
+
           <div class="card">
-            <pre><code>node weavr.mjs serve --port 3851 --host 127.0.0.1</code></pre>
+            <pre><code>node weavr.mjs serve</code></pre>
           </div>
+
+          <p>
+            Open <a href="http://localhost:3847" target="_blank">http://localhost:3847</a> in your browser.
+          </p>
+
           <div class="callout">
-            Open <span class="inline-code">http://127.0.0.1:3851</span> in your browser after the gateway starts.
+            <strong>Build first:</strong> Make sure you've run <span class="inline-code">npm run build:web</span>
+            before starting the server.
           </div>
         </div>
 
-        <div class="section" id="verify">
-          <h2>Verify the UI and config endpoint</h2>
-          <div class="card">
-            <pre><code>curl -I http://127.0.0.1:3851/
-curl -s http://127.0.0.1:3851/api/config/status</code></pre>
+        <div class="section" id="dashboard">
+          <h2>Dashboard</h2>
+          <p>The dashboard provides an overview of your Weavr instance:</p>
+          <ul>
+            <li><strong>Workflow count</strong> - Total number of registered workflows</li>
+            <li><strong>Recent runs</strong> - Latest workflow executions and their status</li>
+            <li><strong>Configuration status</strong> - API keys and integration health</li>
+          </ul>
+        </div>
+
+        <div class="section" id="workflows">
+          <h2>Workflows</h2>
+          <p>The Workflows page lets you manage your workflow definitions:</p>
+
+          <h3>Viewing Workflows</h3>
+          <p>Browse all workflows loaded from your workflows directory. Click a workflow to see its YAML definition and configuration.</p>
+
+          <h3>Creating Workflows</h3>
+          <p>Create new workflows directly in the web UI with the built-in YAML editor.</p>
+
+          <h3>Running Workflows</h3>
+          <p>Execute any workflow with optional input data. The UI shows real-time execution progress.</p>
+        </div>
+
+        <div class="section" id="runs">
+          <h2>Run History</h2>
+          <p>View the execution history of all workflows:</p>
+          <ul>
+            <li><strong>Status</strong> - Success, failed, or running</li>
+            <li><strong>Duration</strong> - How long the run took</li>
+            <li><strong>Step details</strong> - Individual step outputs and errors</li>
+            <li><strong>Logs</strong> - Full execution logs for debugging</li>
+          </ul>
+        </div>
+
+        <div class="section" id="chat">
+          <h2>Chat Interface</h2>
+          <p>
+            Interact with an AI agent directly from the web UI. The chat interface
+            supports multi-turn conversations and can execute workflows on your behalf.
+          </p>
+
+          <div class="callout">
+            <strong>Requires AI provider:</strong> Configure an Anthropic or OpenAI API key to use the chat feature.
           </div>
         </div>
 
         <div class="section" id="api">
-          <h2>Create and run a workflow via API</h2>
-          <p>The Workflows and Runs screens use these endpoints.</p>
+          <h2>REST API</h2>
+          <p>The server exposes a REST API for programmatic access.</p>
+
+          <h3>Endpoints</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/workflows</td>
+                <td>List all workflows</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">POST</span></td>
+                <td>/api/workflows</td>
+                <td>Create a workflow</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/workflows/:name</td>
+                <td>Get workflow details</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">POST</span></td>
+                <td>/api/workflows/:name/run</td>
+                <td>Execute a workflow</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/runs</td>
+                <td>List all runs</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/runs/:id</td>
+                <td>Get run details</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/config/status</td>
+                <td>Check configuration status</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+
+          <h4>List Workflows</h4>
           <div class="card">
-            <pre><code>cat &lt;&lt;'EOF' &gt; /tmp/weavr-web-verified.yaml
-name: web-verified
-description: Workflow created via API for docs verification.
+            <pre><code>curl http://localhost:3847/api/workflows</code></pre>
+          </div>
 
-steps:
-  - id: greeting
-    action: transform
-    with:
-      template: "Hello from API at {{ currentISODate }}"
-
-  - id: log-it
-    action: log
-    needs: [greeting]
-    with:
-      message: "Message: {{ steps.greeting }}"
-EOF
-
-python3 - &lt;&lt;'PY'
-import json
-from pathlib import Path
-payload = {
-  "name": "web-verified",
-  "yaml": Path("/tmp/weavr-web-verified.yaml").read_text()
-}
-Path("/tmp/weavr-web-verified.json").write_text(json.dumps(payload))
-PY
-
-curl -s -X POST http://127.0.0.1:3851/api/workflows \
+          <h4>Run a Workflow</h4>
+          <div class="card">
+            <pre><code>curl -X POST http://localhost:3847/api/workflows/hello-world/run \
   -H "Content-Type: application/json" \
-  --data-binary @/tmp/weavr-web-verified.json
+  -d '{}'</code></pre>
+          </div>
 
-curl -s http://127.0.0.1:3851/api/workflows
-
-curl -s -X POST http://127.0.0.1:3851/api/workflows/web-verified/run \
+          <h4>Run with Input Data</h4>
+          <div class="card">
+            <pre><code>curl -X POST http://localhost:3847/api/workflows/process-data/run \
   -H "Content-Type: application/json" \
-  -d '{}'
+  -d '{"input": {"file": "data.csv"}}'</code></pre>
+          </div>
 
-curl -s http://127.0.0.1:3851/api/runs</code></pre>
+          <h4>Create a Workflow</h4>
+          <div class="card">
+            <pre><code>curl -X POST http://localhost:3847/api/workflows \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-workflow",
+    "yaml": "name: my-workflow\nsteps:\n  - id: greet\n    action: log\n    with:\n      message: Hello!"
+  }'</code></pre>
+          </div>
+
+          <h4>Check Run Status</h4>
+          <div class="card">
+            <pre><code>curl http://localhost:3847/api/runs/run_abc123</code></pre>
           </div>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">Web app commands were executed on 2026-02-02.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Weavr Docs - Troubleshooting</title>
-    <meta name="description" content="Observed issues and workarounds from verification runs." />
+    <meta name="description" content="Common issues and solutions for Weavr workflow automation." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html">CLI</a>
           <a href="web-app.html">Web App</a>
           <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html" aria-current="page">Troubleshooting</a>
         </nav>
       </div>
@@ -27,53 +29,225 @@
 
     <main class="container page">
       <aside class="sidebar">
-        <h3>Issues</h3>
-        <a class="active" href="#tty">TTY prompts</a>
-        <a href="#listen">Gateway listen errors</a>
-        <a href="#paths">Workflow path mismatch</a>
-        <a href="#doctor">Doctor warnings</a>
+        <h3>Troubleshooting</h3>
+        <a class="active" href="#installation">Installation</a>
+        <a href="#configuration">Configuration</a>
+        <a href="#cli">CLI Issues</a>
+        <a href="#server">Server Issues</a>
+        <a href="#workflows">Workflow Errors</a>
+        <a href="#ai">AI Agent Issues</a>
+        <a href="#integrations">Integration Issues</a>
       </aside>
 
       <section class="content">
-        <div class="section" id="tty">
-          <h2>TTY initialization failed</h2>
-          <p>Observed error: <span class="inline-code">ERR_TTY_INIT_FAILED</span>.</p>
+        <div class="section" id="installation">
+          <h2>Installation Issues</h2>
+
+          <h3>Node.js version errors</h3>
+          <p><strong>Error:</strong> <span class="inline-code">SyntaxError: Unexpected token</span> or similar</p>
           <div class="callout">
-            Use non-interactive flags for <span class="inline-code">weavr onboard</span>,
-            <span class="inline-code">weavr create</span>, and <span class="inline-code">weavr ask</span>.
+            <strong>Solution:</strong> Weavr requires Node.js 22 or later. Check your version with
+            <span class="inline-code">node --version</span> and upgrade if needed.
+          </div>
+
+          <h3>Build failures</h3>
+          <p><strong>Error:</strong> Build fails with TypeScript or bundler errors</p>
+          <div class="card">
+            <pre><code># Clean and rebuild
+rm -rf node_modules dist
+npm install
+npm run build
+npm run build:web</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="configuration">
+          <h2>Configuration Issues</h2>
+
+          <h3>Config file not found</h3>
+          <p><strong>Error:</strong> Weavr can't find configuration</p>
+          <div class="card">
+            <pre><code># Create config directory and file
+mkdir -p ~/.weavr
+touch ~/.weavr/config.yaml
+
+# Or run onboard to create it
+node weavr.mjs onboard</code></pre>
+          </div>
+
+          <h3>YAML syntax errors</h3>
+          <p><strong>Error:</strong> <span class="inline-code">YAMLException: bad indentation</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> YAML is sensitive to indentation. Use spaces (not tabs) and ensure
+            consistent indentation. Use a YAML validator to check your syntax.
+          </div>
+        </div>
+
+        <div class="section" id="cli">
+          <h2>CLI Issues</h2>
+
+          <h3>TTY initialization failed</h3>
+          <p><strong>Error:</strong> <span class="inline-code">ERR_TTY_INIT_FAILED</span></p>
+          <div class="callout">
+            <strong>Cause:</strong> Running in a non-interactive environment (CI, scripts, etc.)
           </div>
           <div class="card">
-            <pre><code>node weavr.mjs onboard --non-interactive --ai-provider none --skip-web-search
-node weavr.mjs create --non-interactive --name docs-demo --trigger manual
-node weavr.mjs ask "Create a workflow that logs hi" --non-interactive --output /tmp/weavr-ask.yaml</code></pre>
+            <pre><code># Use non-interactive mode
+node weavr.mjs onboard --non-interactive --ai-provider anthropic
+node weavr.mjs create --non-interactive --name my-workflow --trigger manual
+node weavr.mjs ask "Create a workflow" --non-interactive --output workflow.yaml</code></pre>
           </div>
-        </div>
 
-        <div class="section" id="listen">
-          <h2>Gateway listen errors</h2>
-          <p>Observed error: <span class="inline-code">listen EPERM</span> in restricted environments.</p>
+          <h3>Command not found</h3>
+          <p><strong>Error:</strong> <span class="inline-code">weavr: command not found</span></p>
           <div class="callout">
-            Run the gateway in a normal terminal session with permission to bind to local ports.
+            <strong>Solution:</strong> Run Weavr using <span class="inline-code">node weavr.mjs</span> from the
+            project directory, or add an alias to your shell configuration.
           </div>
         </div>
 
-        <div class="section" id="paths">
-          <h2>Workflow directory mismatch</h2>
-          <p>The CLI uses <span class="inline-code">~/.weavr/workflows</span> while the gateway defaults to <span class="inline-code">workflows/</span> in its current working directory.</p>
+        <div class="section" id="server">
+          <h2>Server Issues</h2>
+
+          <h3>Port already in use</h3>
+          <p><strong>Error:</strong> <span class="inline-code">EADDRINUSE: address already in use</span></p>
+          <div class="card">
+            <pre><code># Use a different port
+node weavr.mjs serve --port 8080
+
+# Or find and kill the process using the port
+lsof -i :3847
+kill -9 <PID></code></pre>
+          </div>
+
+          <h3>Permission denied (EPERM)</h3>
+          <p><strong>Error:</strong> <span class="inline-code">listen EPERM</span></p>
           <div class="callout">
-            Set <span class="inline-code">workflowsDir</span> in <span class="inline-code">~/.weavr/config.yaml</span> if you want the gateway to read the same workflows as the CLI.
+            <strong>Solution:</strong> Run in a terminal with permission to bind to ports.
+            Some restricted environments don't allow binding to ports.
+          </div>
+
+          <h3>Web UI not loading</h3>
+          <p><strong>Cause:</strong> Web UI hasn't been built</p>
+          <div class="card">
+            <pre><code># Build the web UI
+npm run build:web
+
+# Then start the server
+node weavr.mjs serve</code></pre>
           </div>
         </div>
 
-        <div class="section" id="doctor">
-          <h2>Doctor warnings</h2>
-          <p>The doctor command can warn when no plugins are installed. Built-in plugins still load.</p>
+        <div class="section" id="workflows">
+          <h2>Workflow Errors</h2>
+
+          <h3>Workflow not found</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Workflow 'name' not found</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Check that the workflow file exists in <span class="inline-code">~/.weavr/workflows/</span>
+            and has a <span class="inline-code">.yaml</span> or <span class="inline-code">.yml</span> extension.
+          </div>
+
+          <h3>Step dependency error</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Step 'x' depends on unknown step 'y'</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Check the <span class="inline-code">needs</span> array references existing step IDs.
+            Step IDs are case-sensitive.
+          </div>
+
+          <h3>Interpolation errors</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Cannot read property 'x' of undefined</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Ensure the step you're referencing has completed successfully and
+            the field you're accessing exists in its output.
+          </div>
+        </div>
+
+        <div class="section" id="ai">
+          <h2>AI Agent Issues</h2>
+
+          <h3>No API key configured</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Anthropic API key not configured</span></p>
+          <div class="card">
+            <pre><code># Set via environment variable
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Or add to config file
+# ~/.weavr/config.yaml
+anthropicKey: sk-ant-...</code></pre>
+          </div>
+
+          <h3>Rate limit exceeded</h3>
+          <p><strong>Error:</strong> <span class="inline-code">429 Too Many Requests</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Add delays between requests or upgrade your API plan.
+            Consider using a smaller model for less critical tasks.
+          </div>
+
+          <h3>Web search not working</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Web search API key not configured</span></p>
+          <div class="card">
+            <pre><code># Set a search API key
+export BRAVE_API_KEY=your-key
+# or
+export TAVILY_API_KEY=your-key</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="integrations">
+          <h2>Integration Issues</h2>
+
+          <h3>GitHub: gh CLI not found</h3>
+          <p><strong>Error:</strong> <span class="inline-code">gh CLI not found</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Install the GitHub CLI from
+            <a href="https://cli.github.com" target="_blank">cli.github.com</a> and run
+            <span class="inline-code">gh auth login</span> to authenticate.
+          </div>
+
+          <h3>GitHub: Not authenticated</h3>
+          <p><strong>Error:</strong> <span class="inline-code">gh CLI not authenticated</span></p>
+          <div class="card">
+            <pre><code># Authenticate with GitHub
+gh auth login
+
+# Verify authentication
+gh auth status</code></pre>
+          </div>
+
+          <h3>Telegram: Bot token invalid</h3>
+          <p><strong>Error:</strong> <span class="inline-code">Unauthorized</span></p>
+          <div class="callout">
+            <strong>Solution:</strong> Verify your bot token from
+            <a href="https://t.me/BotFather" target="_blank">@BotFather</a> is correct and hasn't been revoked.
+          </div>
+
+          <h3>Webhook not receiving events</h3>
+          <p><strong>Cause:</strong> Server not publicly accessible</p>
+          <div class="callout">
+            <strong>Solution:</strong> For local development, use polling mode instead of webhooks.
+            GitHub triggers default to polling mode which uses the <span class="inline-code">gh</span> CLI.
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Getting Help</h2>
+          <p>If you're still having issues:</p>
+          <ul>
+            <li>Check the <a href="https://github.com/openweavr/Openweavr/issues" target="_blank">GitHub Issues</a> for similar problems</li>
+            <li>Run <span class="inline-code">node weavr.mjs doctor</span> to check your configuration</li>
+            <li>Open a new issue with your error message and steps to reproduce</li>
+          </ul>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">Troubleshooting notes captured on 2026-02-02.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

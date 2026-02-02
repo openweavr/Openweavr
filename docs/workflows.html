@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Weavr Docs - Workflows</title>
-    <meta name="description" content="Verified workflow YAML structure and examples." />
+    <title>Weavr Docs - Workflow Reference</title>
+    <meta name="description" content="YAML workflow syntax, triggers, actions, and variable interpolation." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -20,6 +20,8 @@
           <a href="cli.html">CLI</a>
           <a href="web-app.html">Web App</a>
           <a href="workflows.html" aria-current="page">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
           <a href="troubleshooting.html">Troubleshooting</a>
         </nav>
       </div>
@@ -27,97 +29,382 @@
 
     <main class="container page">
       <aside class="sidebar">
-        <h3>Workflows</h3>
-        <a class="active" href="#anatomy">YAML anatomy</a>
-        <a href="#actions">Verified actions</a>
-        <a href="#triggers">Trigger example</a>
+        <h3>Workflow Reference</h3>
+        <a class="active" href="#structure">Structure</a>
+        <a href="#triggers">Triggers</a>
+        <a href="#steps">Steps</a>
+        <a href="#actions">Built-in Actions</a>
+        <a href="#dependencies">Dependencies</a>
         <a href="#interpolation">Interpolation</a>
+        <a href="#conditionals">Conditionals</a>
       </aside>
 
       <section class="content">
-        <div class="section" id="anatomy">
-          <h2>Workflow anatomy</h2>
-          <p>This workflow was created and run in the CLI guide.</p>
+        <div class="section" id="structure">
+          <h2>Workflow Structure</h2>
+          <p>Workflows are defined in YAML files with the following structure:</p>
+
           <div class="card">
-            <pre><code>name: hello-world
-description: Minimal workflow that logs a message.
+            <pre><code>name: workflow-name
+description: What this workflow does
 
+# Optional: Trigger that starts the workflow
+trigger:
+  type: trigger.type
+  with:
+    key: value
+
+# Required: Steps to execute
 steps:
-  - id: greeting
-    action: transform
+  - id: step-id
+    action: action.name
     with:
-      template: "Hello from Weavr at {{ currentISODate }}"
-
-  - id: log-it
-    action: log
-    needs: [greeting]
-    with:
-      message: "Message: {{ steps.greeting }}"</code></pre>
+      key: value</code></pre>
           </div>
-        </div>
 
-        <div class="section" id="actions">
-          <h2>Verified actions</h2>
-          <p>These actions were exercised during the verification runs.</p>
+          <h3>Fields</h3>
           <table class="table">
             <thead>
               <tr>
-                <th>Action</th>
-                <th>Purpose</th>
+                <th>Field</th>
+                <th>Required</th>
+                <th>Description</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><span class="inline-code">transform</span></td>
-                <td>Creates a value by interpolating a template string.</td>
+                <td><span class="inline-code">name</span></td>
+                <td>Yes</td>
+                <td>Unique identifier for the workflow</td>
               </tr>
               <tr>
-                <td><span class="inline-code">log</span></td>
-                <td>Prints a message to the run output.</td>
+                <td><span class="inline-code">description</span></td>
+                <td>No</td>
+                <td>Human-readable description</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">trigger</span></td>
+                <td>No</td>
+                <td>Event that starts the workflow automatically</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">steps</span></td>
+                <td>Yes</td>
+                <td>Array of steps to execute</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div class="section" id="triggers">
-          <h2>Trigger example (AI-generated)</h2>
-          <p>Generated with <span class="inline-code">weavr ask</span> in non-interactive mode.</p>
+          <h2>Triggers</h2>
+          <p>Triggers define events that automatically start a workflow.</p>
+
+          <h3>Available Triggers</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Trigger</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">cron.schedule</span></td>
+                <td>Run on a schedule (cron expression)</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">http.webhook</span></td>
+                <td>Run when a webhook is received</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">github.push</span></td>
+                <td>Run on GitHub push events</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">github.pull_request</span></td>
+                <td>Run on GitHub PR events</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">github.issue.opened</span></td>
+                <td>Run when a GitHub issue is opened</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">telegram.message</span></td>
+                <td>Run on incoming Telegram messages</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p>See <a href="integrations.html">Integrations</a> for detailed trigger configuration.</p>
+        </div>
+
+        <div class="section" id="steps">
+          <h2>Steps</h2>
+          <p>Steps are the individual units of work in a workflow.</p>
+
           <div class="card">
-            <pre><code>name: log-hi
-description: Logs a hi message
+            <pre><code>steps:
+  - id: unique-step-id       # Required: Unique identifier
+    action: plugin.action    # Required: Action to execute
+    needs: [other-step-id]   # Optional: Dependencies
+    if: "{{ condition }}"    # Optional: Conditional execution
+    with:                    # Optional: Action parameters
+      key: value
+    retry:                   # Optional: Retry configuration
+      attempts: 3
+      delay: 1000</code></pre>
+          </div>
 
-triggers:
-  - type: cron.schedule
-    config:
-      cron: "0 9 * * *"  # Every day at 9 AM
+          <h3>Step Fields</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">id</span></td>
+                <td>Unique identifier for referencing in other steps</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">action</span></td>
+                <td>The action to execute (plugin.action format)</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">needs</span></td>
+                <td>Array of step IDs that must complete first</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">if</span></td>
+                <td>Condition that must be true to run this step</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">with</span></td>
+                <td>Parameters passed to the action</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">retry</span></td>
+                <td>Retry configuration for failed steps</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-steps:
-  - id: log-hi-message
-    action: log
-    config:
-      message: "hi"</code></pre>
+        <div class="section" id="actions">
+          <h2>Built-in Actions</h2>
+
+          <h3>transform</h3>
+          <p>Create a value from a template string.</p>
+          <div class="card">
+            <pre><code>- id: message
+  action: transform
+  with:
+    template: "Hello, {{ input.name }}!"</code></pre>
+          </div>
+
+          <h3>log</h3>
+          <p>Log a message to the workflow output.</p>
+          <div class="card">
+            <pre><code>- id: log-result
+  action: log
+  with:
+    message: "Processing complete: {{ steps.process.result }}"</code></pre>
+          </div>
+
+          <h3>http.request</h3>
+          <p>Make an HTTP request.</p>
+          <div class="card">
+            <pre><code>- id: fetch-data
+  action: http.request
+  with:
+    url: "https://api.example.com/data"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ env.API_TOKEN }}"</code></pre>
+          </div>
+
+          <h3>ai.agent</h3>
+          <p>Execute an AI agent task. See <a href="agents.html">AI Agents</a> for details.</p>
+          <div class="card">
+            <pre><code>- id: analyze
+  action: ai.agent
+  with:
+    task: "Analyze this data and provide insights"</code></pre>
+          </div>
+
+          <h3>json.parse</h3>
+          <p>Parse a JSON string into an object.</p>
+          <div class="card">
+            <pre><code>- id: parse-response
+  action: json.parse
+  with:
+    input: "{{ steps.fetch.body }}"</code></pre>
+          </div>
+
+          <h3>json.stringify</h3>
+          <p>Convert an object to a JSON string.</p>
+          <div class="card">
+            <pre><code>- id: serialize
+  action: json.stringify
+  with:
+    input: "{{ steps.data }}"
+    pretty: true</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="dependencies">
+          <h2>Dependencies</h2>
+          <p>Use <span class="inline-code">needs</span> to control step execution order.</p>
+
+          <div class="card">
+            <pre><code>steps:
+  - id: fetch
+    action: http.request
+    with:
+      url: "https://api.example.com/data"
+
+  - id: parse
+    action: json.parse
+    needs: [fetch]              # Runs after 'fetch' completes
+    with:
+      input: "{{ steps.fetch.body }}"
+
+  - id: process
+    action: ai.agent
+    needs: [parse]              # Runs after 'parse' completes
+    with:
+      task: "Analyze: {{ steps.parse }}"
+
+  - id: notify
+    action: slack.post
+    needs: [process]            # Runs after 'process' completes
+    with:
+      channel: "#results"
+      text: "{{ steps.process.response }}"</code></pre>
+          </div>
+
+          <h3>Parallel Execution</h3>
+          <p>Steps without dependencies or with the same dependencies run in parallel.</p>
+          <div class="card">
+            <pre><code>steps:
+  - id: fetch-users
+    action: http.request
+    with:
+      url: "/api/users"
+
+  - id: fetch-orders
+    action: http.request
+    with:
+      url: "/api/orders"
+
+  # Both fetch steps run in parallel
+  # This step waits for both
+  - id: combine
+    action: transform
+    needs: [fetch-users, fetch-orders]
+    with:
+      template: "Users: {{ steps.fetch-users.body }}, Orders: {{ steps.fetch-orders.body }}"</code></pre>
           </div>
         </div>
 
         <div class="section" id="interpolation">
-          <h2>Interpolation</h2>
-          <p>These template variables were used in verified runs:</p>
-          <div class="grid">
-            <div class="card">
-              <h3>Run timestamp</h3>
-              <p><span class="inline-code">{{ currentISODate }}</span> resolves to the current time.</p>
-            </div>
-            <div class="card">
-              <h3>Step output</h3>
-              <p><span class="inline-code">{{ steps.greeting }}</span> resolves to the output from the <span class="inline-code">greeting</span> step.</p>
-            </div>
+          <h2>Variable Interpolation</h2>
+          <p>Use <span class="inline-code">{{ }}</span> syntax to reference dynamic values.</p>
+
+          <h3>Available Variables</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">{{ trigger.* }}</span></td>
+                <td>Data from the trigger event</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ steps.stepId }}</span></td>
+                <td>Output from a previous step</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ steps.stepId.field }}</span></td>
+                <td>Specific field from step output</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ input.* }}</span></td>
+                <td>Input data passed to the workflow</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ env.VAR_NAME }}</span></td>
+                <td>Environment variable</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ currentISODate }}</span></td>
+                <td>Current timestamp in ISO format</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <div class="card">
+            <pre><code># Access trigger data
+message: "New PR: {{ trigger.pullRequest.title }}"
+
+# Access step output
+body: "{{ steps.analyze.response }}"
+
+# Access nested fields
+author: "{{ trigger.issue.user.login }}"
+
+# Environment variables
+token: "{{ env.GITHUB_TOKEN }}"
+
+# Combine values
+url: "https://api.example.com/{{ trigger.repo }}/issues/{{ trigger.number }}"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="conditionals">
+          <h2>Conditional Execution</h2>
+          <p>Use <span class="inline-code">if</span> to conditionally execute steps.</p>
+
+          <div class="card">
+            <pre><code>steps:
+  - id: check-label
+    action: transform
+    with:
+      template: "{{ trigger.action }}"
+
+  # Only run if PR was opened
+  - id: review
+    action: ai.agent
+    if: "{{ trigger.action == 'opened' }}"
+    with:
+      task: "Review this PR"
+
+  # Only run if labeled with 'urgent'
+  - id: alert
+    action: slack.post
+    if: "{{ 'urgent' in trigger.issue.labels }}"
+    with:
+      channel: "#urgent"
+      text: "Urgent issue: {{ trigger.issue.title }}"</code></pre>
           </div>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="container">Workflow examples were verified on 2026-02-02.</div>
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
     </footer>
 
     <script src="script.js"></script>

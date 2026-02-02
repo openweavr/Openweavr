@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - Integrations</title>
+    <meta name="description" content="Connect Weavr to GitHub, Telegram, Slack, Discord, Linear, and more." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="integrations.html" aria-current="page">Integrations</a>
+          <a href="agents.html">AI Agents</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>Integrations</h3>
+        <a class="active" href="#github">GitHub</a>
+        <a href="#telegram">Telegram</a>
+        <a href="#slack">Slack</a>
+        <a href="#discord">Discord</a>
+        <a href="#linear">Linear</a>
+        <a href="#http">HTTP / Webhooks</a>
+        <a href="#email">Email</a>
+        <a href="#cron">Cron Schedules</a>
+      </aside>
+
+      <section class="content">
+        <div class="section" id="github">
+          <h2>GitHub</h2>
+          <p>React to repository events and interact with issues, PRs, and comments.</p>
+
+          <h3>Triggers</h3>
+          <p>GitHub triggers support two modes: <strong>polling</strong> (default, uses <span class="inline-code">gh</span> CLI) and <strong>webhook</strong> (requires public URL).</p>
+
+          <div class="card">
+            <pre><code># Push trigger - react to commits
+trigger:
+  type: github.push
+  with:
+    repo: owner/repo
+    branch: main           # Optional: filter by branch
+    mode: polling          # Default - uses gh CLI locally
+    pollInterval: 60       # Poll every 60 seconds
+
+# Pull request trigger
+trigger:
+  type: github.pull_request
+  with:
+    repo: owner/repo
+    events: [opened, synchronize]
+
+# Issue triggers
+trigger:
+  type: github.issue.opened
+  with:
+    repo: owner/repo
+
+trigger:
+  type: github.issue.labeled
+  with:
+    repo: owner/repo
+    label: bug             # Optional: filter by label</code></pre>
+          </div>
+
+          <h3>Actions</h3>
+          <div class="card">
+            <pre><code># Create an issue
+- id: create-issue
+  action: github.create_issue
+  with:
+    repo: owner/repo
+    title: "New issue from workflow"
+    body: "Created by Weavr"
+    labels: [automated, triage]
+
+# Add a comment
+- id: comment
+  action: github.create_comment
+  with:
+    repo: owner/repo
+    issue_number: "{{ trigger.issue.number }}"
+    body: "Thanks for reporting!"
+
+# Create a pull request
+- id: create-pr
+  action: github.create_pr
+  with:
+    repo: owner/repo
+    title: "Automated changes"
+    head: feature-branch
+    base: main</code></pre>
+          </div>
+
+          <div class="callout">
+            <strong>Local development:</strong> Polling mode uses the <span class="inline-code">gh</span> CLI, so you need to have it installed and authenticated (<span class="inline-code">gh auth login</span>).
+          </div>
+        </div>
+
+        <div class="section" id="telegram">
+          <h2>Telegram</h2>
+          <p>Send messages and receive updates from Telegram bots.</p>
+
+          <h3>Setup</h3>
+          <ol>
+            <li>Create a bot via <a href="https://t.me/BotFather" target="_blank">@BotFather</a></li>
+            <li>Set <span class="inline-code">TELEGRAM_BOT_TOKEN</span> environment variable or add to config</li>
+          </ol>
+
+          <h3>Trigger</h3>
+          <div class="card">
+            <pre><code>trigger:
+  type: telegram.message
+  with:
+    chatId: 123456789      # Optional: filter by chat
+    chatType: private      # Optional: private, group, supergroup, channel</code></pre>
+          </div>
+
+          <h3>Actions</h3>
+          <div class="card">
+            <pre><code># Send a message
+- id: notify
+  action: telegram.send
+  with:
+    chatId: "{{ trigger.chatId }}"
+    text: "Hello from Weavr!"
+    parseMode: HTML        # Optional: HTML, Markdown, MarkdownV2
+
+# Send a photo
+- id: send-photo
+  action: telegram.sendPhoto
+  with:
+    chatId: 123456789
+    photo: "https://example.com/image.png"
+    caption: "Check this out"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="slack">
+          <h2>Slack</h2>
+          <p>Post messages to Slack channels and respond to events.</p>
+
+          <h3>Setup</h3>
+          <p>Set <span class="inline-code">SLACK_BOT_TOKEN</span> or <span class="inline-code">SLACK_WEBHOOK_URL</span>.</p>
+
+          <h3>Actions</h3>
+          <div class="card">
+            <pre><code># Post to channel
+- id: notify
+  action: slack.post
+  with:
+    channel: "#general"
+    text: "Deployment complete!"
+
+# Post with blocks
+- id: rich-message
+  action: slack.post
+  with:
+    channel: "#alerts"
+    blocks:
+      - type: section
+        text:
+          type: mrkdwn
+          text: "*Alert:* Service degradation detected"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="discord">
+          <h2>Discord</h2>
+          <p>Send messages to Discord channels via webhooks.</p>
+
+          <div class="card">
+            <pre><code>- id: notify
+  action: discord.send
+  with:
+    webhookUrl: "{{ env.DISCORD_WEBHOOK }}"
+    content: "Build completed successfully!"
+    username: "Weavr Bot"</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="linear">
+          <h2>Linear</h2>
+          <p>Create and manage Linear issues from workflows.</p>
+
+          <h3>Setup</h3>
+          <p>Set <span class="inline-code">LINEAR_API_KEY</span> environment variable.</p>
+
+          <div class="card">
+            <pre><code># Create an issue
+- id: create-issue
+  action: linear.create_issue
+  with:
+    teamId: "TEAM-123"
+    title: "Bug from production"
+    description: "{{ trigger.error.message }}"
+    priority: 2            # 0=none, 1=urgent, 2=high, 3=medium, 4=low</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="http">
+          <h2>HTTP / Webhooks</h2>
+          <p>Make HTTP requests and receive webhook events.</p>
+
+          <h3>Webhook Trigger</h3>
+          <div class="card">
+            <pre><code>trigger:
+  type: http.webhook
+  with:
+    path: /my-webhook      # Available at /webhook/my-webhook</code></pre>
+          </div>
+
+          <h3>HTTP Request Action</h3>
+          <div class="card">
+            <pre><code>- id: api-call
+  action: http.request
+  with:
+    url: "https://api.example.com/data"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ env.API_TOKEN }}"
+      Content-Type: application/json
+    body:
+      key: value</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="email">
+          <h2>Email</h2>
+          <p>Send emails via SMTP.</p>
+
+          <h3>Setup</h3>
+          <p>Configure SMTP in <span class="inline-code">~/.weavr/config.yaml</span>:</p>
+          <div class="card">
+            <pre><code>email:
+  smtp:
+    host: smtp.example.com
+    port: 587
+    secure: true
+    auth:
+      user: your-email@example.com
+      pass: your-password</code></pre>
+          </div>
+
+          <h3>Send Email</h3>
+          <div class="card">
+            <pre><code>- id: send-email
+  action: email.send
+  with:
+    to: recipient@example.com
+    subject: "Workflow Complete"
+    body: "Your workflow finished successfully."</code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="cron">
+          <h2>Cron Schedules</h2>
+          <p>Run workflows on a schedule.</p>
+
+          <div class="card">
+            <pre><code>trigger:
+  type: cron.schedule
+  with:
+    expression: "0 9 * * *"    # Every day at 9 AM
+    timezone: America/New_York # Optional, defaults to system timezone
+
+# Common patterns:
+# "*/15 * * * *"   - Every 15 minutes
+# "0 * * * *"      - Every hour
+# "0 9 * * 1-5"    - 9 AM on weekdays
+# "0 0 1 * *"      - First day of each month</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
