@@ -12,6 +12,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
+<p align="center">
+  <img src="./assets/dashboard-screenshot.png" alt="Openweavr Dashboard" width="800" />
+</p>
+
 ---
 
 Weavr connects AI agents with your developer tools—GitHub, Linear, Notion, Slack, databases, CI/CD, and more. Think Zapier/n8n, but with native AI agent support and full data sovereignty.

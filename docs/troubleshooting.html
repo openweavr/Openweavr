@@ -56,8 +56,13 @@
 
           <h3>Build failures</h3>
           <p><strong>Error:</strong> Build fails with TypeScript or bundler errors</p>
-          <div class="card">
-            <pre><code># Clean and rebuild
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Clean and rebuild</span>
 rm -rf node_modules dist
 npm install
 npm run build
@@ -70,12 +75,17 @@ npm run build:web</code></pre>
 
           <h3>Config file not found</h3>
           <p><strong>Error:</strong> Weavr can't find configuration</p>
-          <div class="card">
-            <pre><code># Create config directory and file
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Create config directory and file</span>
 mkdir -p ~/.weavr
 touch ~/.weavr/config.yaml
 
-# Or run onboard to create it
+<span class="comment"># Or run onboard to create it</span>
 node weavr.mjs onboard</code></pre>
           </div>
 
@@ -95,8 +105,13 @@ node weavr.mjs onboard</code></pre>
           <div class="callout">
             <strong>Cause:</strong> Running in a non-interactive environment (CI, scripts, etc.)
           </div>
-          <div class="card">
-            <pre><code># Use non-interactive mode
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Use non-interactive mode</span>
 node weavr.mjs onboard --non-interactive --ai-provider anthropic
 node weavr.mjs create --non-interactive --name my-workflow --trigger manual
 node weavr.mjs ask "Create a workflow" --non-interactive --output workflow.yaml</code></pre>
@@ -115,13 +130,18 @@ node weavr.mjs ask "Create a workflow" --non-interactive --output workflow.yaml<
 
           <h3>Port already in use</h3>
           <p><strong>Error:</strong> <span class="inline-code">EADDRINUSE: address already in use</span></p>
-          <div class="card">
-            <pre><code># Use a different port
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Use a different port</span>
 node weavr.mjs serve --port 8080
 
-# Or find and kill the process using the port
+<span class="comment"># Or find and kill the process using the port</span>
 lsof -i :3847
-kill -9 <PID></code></pre>
+kill -9 &lt;PID&gt;</code></pre>
           </div>
 
           <h3>Permission denied (EPERM)</h3>
@@ -133,11 +153,16 @@ kill -9 <PID></code></pre>
 
           <h3>Web UI not loading</h3>
           <p><strong>Cause:</strong> Web UI hasn't been built</p>
-          <div class="card">
-            <pre><code># Build the web UI
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Build the web UI</span>
 npm run build:web
 
-# Then start the server
+<span class="comment"># Then start the server</span>
 node weavr.mjs serve</code></pre>
           </div>
         </div>
@@ -172,13 +197,18 @@ node weavr.mjs serve</code></pre>
 
           <h3>No API key configured</h3>
           <p><strong>Error:</strong> <span class="inline-code">Anthropic API key not configured</span></p>
-          <div class="card">
-            <pre><code># Set via environment variable
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Set via environment variable</span>
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Or add to config file
-# ~/.weavr/config.yaml
-anthropicKey: sk-ant-...</code></pre>
+<span class="comment"># Or add to config file</span>
+<span class="comment"># ~/.weavr/config.yaml</span>
+<span class="keyword">anthropicKey:</span> <span class="string">sk-ant-...</span></code></pre>
           </div>
 
           <h3>Rate limit exceeded</h3>
@@ -190,10 +220,15 @@ anthropicKey: sk-ant-...</code></pre>
 
           <h3>Web search not working</h3>
           <p><strong>Error:</strong> <span class="inline-code">Web search API key not configured</span></p>
-          <div class="card">
-            <pre><code># Set a search API key
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Set a search API key</span>
 export BRAVE_API_KEY=your-key
-# or
+<span class="comment"># or</span>
 export TAVILY_API_KEY=your-key</code></pre>
           </div>
         </div>
@@ -211,11 +246,16 @@ export TAVILY_API_KEY=your-key</code></pre>
 
           <h3>GitHub: Not authenticated</h3>
           <p><strong>Error:</strong> <span class="inline-code">gh CLI not authenticated</span></p>
-          <div class="card">
-            <pre><code># Authenticate with GitHub
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Authenticate with GitHub</span>
 gh auth login
 
-# Verify authentication
+<span class="comment"># Verify authentication</span>
 gh auth status</code></pre>
           </div>
 
