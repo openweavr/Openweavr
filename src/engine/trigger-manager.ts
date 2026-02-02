@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
-import type { Workflow } from '../types/index.js';
+import type { Workflow, WorkflowRun } from '../types/index.js';
 import { parser } from './parser.js';
 
 export interface TriggerSubscription {
+  id: string;
   workflowName: string;
   triggerType: string;
   config: Record<string, unknown>;
@@ -17,7 +18,18 @@ export interface TriggerSubscription {
 export interface TriggerManagerEvents {
   onWorkflowTriggered?: (workflowName: string, runId: string) => void;
   onWorkflowCompleted?: (workflowName: string, runId: string, status: 'success' | 'failed') => void;
-  onExecuteWorkflow?: (workflow: Workflow, triggerData: unknown, runId: string) => Promise<void>;
+  onExecuteWorkflow?: (
+    workflow: Workflow,
+    triggerData: unknown,
+    runId: string,
+    workflowContent?: string
+  ) => Promise<WorkflowRun | void>;
+  onEnqueueWorkflow?: (
+    workflowName: string,
+    workflowContent: string,
+    triggerData: unknown,
+    runId: string
+  ) => Promise<void>;
 }
 
 // Track connection status by service type
@@ -43,7 +55,8 @@ export class TriggerManager {
     workflowName: string,
     triggerType: string,
     config: Record<string, unknown>,
-    yamlContent: string
+    yamlContent: string,
+    subscriptionId?: string
   ): Promise<boolean> {
     const trigger = this.registry.getTrigger(triggerType);
     if (!trigger?.setup) {
@@ -56,6 +69,8 @@ export class TriggerManager {
 
     // Update service status to connecting
     this.serviceStatus.set(serviceName, { status: 'connecting' });
+
+    const id = subscriptionId ?? workflowName;
 
     // Create emit function that will be called when trigger fires
     const emit = async (data: unknown) => {
@@ -76,7 +91,8 @@ export class TriggerManager {
       const cleanup = await trigger.setup(config, emit);
 
       // Store the subscription
-      this.subscriptions.set(workflowName, {
+      this.subscriptions.set(id, {
+        id,
         workflowName,
         triggerType,
         config,
@@ -94,7 +110,8 @@ export class TriggerManager {
       console.error(`[trigger-manager] Failed to setup trigger ${triggerType}:`, errorMsg);
 
       // Store failed subscription for status tracking
-      this.subscriptions.set(workflowName, {
+      this.subscriptions.set(id, {
+        id,
         workflowName,
         triggerType,
         config,
@@ -113,29 +130,35 @@ export class TriggerManager {
   /**
    * Stop a trigger for a workflow
    */
-  stopTrigger(workflowName: string): boolean {
-    const subscription = this.subscriptions.get(workflowName);
-    if (!subscription) {
+  stopTrigger(workflowNameOrId: string): boolean {
+    const subscriptions = Array.from(this.subscriptions.values()).filter(
+      (sub) => sub.id === workflowNameOrId || sub.workflowName === workflowNameOrId
+    );
+
+    if (subscriptions.length === 0) {
       return false;
     }
 
-    try {
-      subscription.cleanup();
-    } catch (err) {
-      console.error(`[trigger-manager] Error during cleanup for ${workflowName}:`, err);
+    for (const subscription of subscriptions) {
+      try {
+        subscription.cleanup();
+      } catch (err) {
+        console.error(`[trigger-manager] Error during cleanup for ${subscription.workflowName}:`, err);
+      }
+
+      this.subscriptions.delete(subscription.id);
+      console.log(`[trigger-manager] Trigger stopped: ${subscription.workflowName}`);
     }
 
-    this.subscriptions.delete(workflowName);
-    console.log(`[trigger-manager] Trigger stopped: ${workflowName}`);
+    for (const subscription of subscriptions) {
+      const serviceName = subscription.triggerType.split('.')[0];
+      const hasOtherSubscriptions = Array.from(this.subscriptions.values()).some(
+        sub => sub.triggerType.startsWith(serviceName + '.')
+      );
 
-    // Check if any other workflows use this service
-    const serviceName = subscription.triggerType.split('.')[0];
-    const hasOtherSubscriptions = Array.from(this.subscriptions.values()).some(
-      sub => sub.triggerType.startsWith(serviceName + '.')
-    );
-
-    if (!hasOtherSubscriptions) {
-      this.serviceStatus.set(serviceName, { status: 'disconnected' });
+      if (!hasOtherSubscriptions) {
+        this.serviceStatus.set(serviceName, { status: 'disconnected' });
+      }
     }
 
     return true;
@@ -279,12 +302,15 @@ export class TriggerManager {
     this.events.onWorkflowTriggered?.(workflowName, runId);
 
     try {
-      const workflow = parser.parse(yamlContent);
-
-      if (this.events.onExecuteWorkflow) {
-        await this.events.onExecuteWorkflow(workflow, triggerData, runId);
+      if (this.events.onEnqueueWorkflow) {
+        await this.events.onEnqueueWorkflow(workflowName, yamlContent, triggerData, runId);
       } else {
-        console.warn(`[trigger-manager] No executor configured for workflow: ${workflowName}`);
+        const workflow = parser.parse(yamlContent);
+        if (this.events.onExecuteWorkflow) {
+          await this.events.onExecuteWorkflow(workflow, triggerData, runId, yamlContent);
+        } else {
+          console.warn(`[trigger-manager] No executor configured for workflow: ${workflowName}`);
+        }
       }
     } catch (err) {
       console.error(`[trigger-manager] Execution failed for ${workflowName}:`, err);
