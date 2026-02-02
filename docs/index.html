@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Docs - Overview</title>
+    <meta name="description" content="Professional documentation for Weavr CLI and web app usage." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="index.html" aria-current="page">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero fade">
+        <h1>Weavr usage docs built from verified runs</h1>
+        <p>
+          This documentation covers the CLI and web app paths I personally ran
+          on February 2, 2026. Each command shown in the guides was executed
+          before it was documented.
+        </p>
+        <div class="hero-badges">
+          <span class="badge">Verified 2026-02-02</span>
+          <span class="badge">Node.js 22+</span>
+          <span class="badge">Weavr v0.1.0</span>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Start here</h2>
+        <p>Install dependencies, build the backend, then build the web UI.</p>
+        <div class="card fade" style="--delay: 0.1s;">
+          <pre><code>npm install
+npm run build
+npm run build:web</code></pre>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Documentation map</h2>
+        <div class="grid">
+          <a class="card fade" style="--delay: 0.1s;" href="getting-started.html">
+            <h3>Getting Started</h3>
+            <p>Install, build, and understand the runtime paths.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.2s;" href="cli.html">
+            <h3>CLI</h3>
+            <p>Non-interactive setup, workflow creation, and execution.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.3s;" href="web-app.html">
+            <h3>Web App</h3>
+            <p>Start the gateway, verify UI, and use the REST endpoints.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.4s;" href="workflows.html">
+            <h3>Workflows</h3>
+            <p>Workflow YAML structure and verified examples.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.5s;" href="troubleshooting.html">
+            <h3>Troubleshooting</h3>
+            <p>Known issues observed during verification runs.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">Docs generated in <span class="inline-code">docs/</span> for future hosting.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

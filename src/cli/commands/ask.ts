@@ -6,12 +6,21 @@ import { loadConfig, WORKFLOWS_DIR, ensureConfigDir } from '../../config/index.j
 import { createProvider, WorkflowGenerator, type AIProvider } from '../../agent/index.js';
 import { AnthropicProvider } from '../../agent/providers/anthropic.js';
 import { OpenAIProvider } from '../../agent/providers/openai.js';
+import { isInteractive } from '../utils/tty.js';
 
-export async function askCommand(prompt: string): Promise<void> {
+interface AskOptions {
+  nonInteractive?: boolean;
+  save?: boolean;
+  saveAs?: string;
+  output?: string;
+}
+
+export async function askCommand(prompt: string, options: AskOptions = {}): Promise<void> {
   console.log(chalk.cyan('\n🤖 Weavr AI\n'));
 
   const config = await loadConfig();
   let provider = createProvider(config);
+  const interactive = !options.nonInteractive && isInteractive();
 
   if (!provider) {
     console.log(chalk.yellow('⚠ No AI provider configured.\n'));
@@ -37,10 +46,39 @@ export async function askCommand(prompt: string): Promise<void> {
     console.log(chalk.dim(`Using ${provider.name} provider\n`));
   }
 
-  await generateWorkflow(provider, prompt);
+  await generateWorkflow(provider, prompt, options, interactive);
 }
 
-async function generateWorkflow(provider: AIProvider, prompt: string): Promise<void> {
+async function generateWorkflow(
+  provider: AIProvider,
+  prompt: string,
+  options: AskOptions,
+  interactive: boolean
+): Promise<void> {
+  if (!interactive) {
+    console.log(chalk.dim('Generating workflow...'));
+    const generator = new WorkflowGenerator({ provider });
+    const { workflow, yaml } = await generator.generate(prompt);
+
+    console.log(chalk.dim('─'.repeat(50)));
+    console.log(chalk.cyan(yaml));
+    console.log(chalk.dim('─'.repeat(50)));
+
+    if (options.output) {
+      await writeFile(options.output, yaml, 'utf-8');
+      console.log(chalk.green(`✓ Wrote ${options.output}`));
+      return;
+    }
+
+    if (options.save || options.saveAs) {
+      const targetName = options.saveAs ?? workflow.name;
+      await saveWorkflowNonInteractive(targetName, yaml);
+      return;
+    }
+
+    return;
+  }
+
   const s = p.spinner();
   s.start('Generating workflow...');
 
@@ -128,6 +166,24 @@ async function saveWorkflow(name: string, yaml: string): Promise<void> {
 
   console.log(chalk.green(`\n✓ Saved to ${filePath}`));
   console.log(chalk.dim(`\nRun it with: weavr run ${filename}\n`));
+}
+
+async function saveWorkflowNonInteractive(name: string, yaml: string): Promise<void> {
+  if (!name) {
+    console.error(chalk.red('Missing workflow name for save.'));
+    process.exit(1);
+  }
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    console.error(chalk.red('Filename must be lowercase letters, numbers, and hyphens only.'));
+    process.exit(1);
+  }
+
+  await ensureConfigDir();
+  const filePath = join(WORKFLOWS_DIR, `${name}.yaml`);
+  await writeFile(filePath, yaml, 'utf-8');
+
+  console.log(chalk.green(`✓ Saved to ${filePath}`));
+  console.log(chalk.dim(`Run it with: weavr run ${name}`));
 }
 
 async function refineWorkflow(

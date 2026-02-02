@@ -34,7 +34,15 @@ program
 program
   .command('onboard')
   .description('Interactive setup wizard')
-  .action(onboardCommand);
+  .option('--port <port>', 'Gateway server port')
+  .option('--host <host>', 'Gateway server host')
+  .option('--ai-provider <provider>', 'none | anthropic | openai | ollama')
+  .option('--openai-auth <method>', 'oauth | apikey')
+  .option('--api-key <key>', 'AI provider API key')
+  .option('--brave-api-key <key>', 'Brave Search API key')
+  .option('--skip-web-search', 'Skip configuring web search')
+  .option('--non-interactive', 'Disable prompts and use flags/defaults')
+  .action((options) => onboardCommand(options));
 
 program
   .command('doctor')
@@ -56,14 +64,24 @@ program
 program
   .command('create')
   .description('Create a new workflow interactively')
-  .action(createCommand);
+  .option('--name <name>', 'Workflow name (for non-interactive)')
+  .option('--description <description>', 'Workflow description')
+  .option('--trigger <type>', 'webhook | cron | manual | github')
+  .option('--cron <expression>', 'Cron expression for cron trigger')
+  .option('--github-event <event>', 'GitHub event name for github trigger')
+  .option('--non-interactive', 'Disable prompts and use flags/defaults')
+  .action((options) => createCommand(options));
 
 program
   .command('ask <prompt...>')
   .description('Generate a workflow from natural language')
-  .action(async (promptParts: string[]) => {
+  .option('--save', 'Save generated workflow with suggested name')
+  .option('--save-as <name>', 'Save generated workflow under a custom name')
+  .option('--output <file>', 'Write generated YAML to a file')
+  .option('--non-interactive', 'Disable prompts and use flags/defaults')
+  .action(async (promptParts: string[], options) => {
     const prompt = promptParts.join(' ');
-    await askCommand(prompt);
+    await askCommand(prompt, options);
   });
 
 program.parse();
