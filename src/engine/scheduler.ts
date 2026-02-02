@@ -114,7 +114,8 @@ export class TriggerScheduler {
 
       // Set up cron triggers
       if (triggerType === 'cron.schedule') {
-        const expression = triggerConfig.expression as string;
+        // Accept both 'expression' and 'cron' as the cron expression field
+        const expression = (triggerConfig.expression ?? triggerConfig.cron) as string;
         const timezone = triggerConfig.timezone as string | undefined;
 
         if (expression) {
