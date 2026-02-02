@@ -196,6 +196,8 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         throw err;
       }
     },
+  }, {
+    storePath: config.scheduler?.dbPath,
   });
 
   // Load and start all scheduled workflows

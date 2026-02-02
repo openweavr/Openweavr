@@ -163,6 +163,9 @@ export interface WeavrConfig {
   workflowsDir: string;
   pluginsDir: string;
   logsDir: string;
+  scheduler?: {
+    dbPath?: string; // Path to scheduler SQLite DB (default: ~/.weavr/scheduler.db)
+  };
   ai?: {
     provider?: 'anthropic' | 'openai' | 'ollama';
     model?: string;

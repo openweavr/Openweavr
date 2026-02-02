@@ -141,6 +141,9 @@ export interface WeavrConfig {
     cliProvider?: 'claude' | 'ollama' | 'llm' | 'auto';
     cliModel?: string;
   };
+  scheduler?: {
+    dbPath?: string;
+  };
   mcp?: {
     servers?: Record<string, MCPServerConfig>;
   };

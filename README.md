@@ -157,7 +157,15 @@ AI agents need a search API to browse the web. Get a free Brave Search API key:
 ├── config.yaml        # Global configuration
 ├── workflows/         # Your workflow definitions
 ├── plugins/           # Installed plugins
-└── logs/              # Execution logs
+├── logs/              # Execution logs
+└── scheduler.db       # Scheduler queue/state (configurable)
+```
+
+You can override the scheduler database location in `~/.weavr/config.yaml`:
+
+```yaml
+scheduler:
+  dbPath: /path/to/scheduler.db
 ```
 
 ## 🔌 Creating Plugins
