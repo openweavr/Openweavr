@@ -124,6 +124,18 @@ The agent system prompt is in `src/plugins/builtin/ai/index.ts` around line 1115
 - `defaultSystem` - Default agent instructions
 - `finalSystemPrompt` - Combined prompt sent to LLM
 
+## Documentation
+
+**IMPORTANT**: When making significant changes, update the documentation in `docs/`:
+
+- **New features or integrations** → Update relevant page (integrations.html, agents.html, etc.)
+- **CLI changes** → Update cli.html
+- **Configuration changes** → Update getting-started.html
+- **Workflow syntax changes** → Update workflows.html
+- **Bug fixes for common issues** → Update troubleshooting.html
+
+The docs are static HTML files in `docs/` - edit them directly. Keep examples accurate and tested.
+
 ## Troubleshooting
 
 - **Web search failing**: Requires `BRAVE_API_KEY` environment variable

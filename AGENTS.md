@@ -2,6 +2,8 @@
 
 This document provides detailed information about the AI agent implementation in Weavr.
 
+> **Note**: When making changes to the AI agent, update the public documentation in `docs/agents.html` to keep it in sync. This includes new tools, configuration options, or behavior changes.
+
 ## Overview
 
 The AI agent is implemented in `src/plugins/builtin/ai/index.ts` and provides autonomous task execution with tool use capabilities.
@@ -187,6 +189,44 @@ mcp:
       command: "npx"
       args: ["-y", "@some/mcp-server"]
 ```
+
+### Git MCP Server
+
+For local git operations (commits, branches, diffs, etc.), configure the Git MCP server:
+
+```yaml
+mcp:
+  servers:
+    git:
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-git"]
+```
+
+This gives the AI agent access to tools like:
+- `git_log` - View commit history
+- `git_diff` - See changes between commits
+- `git_status` - Check repository status
+- `git_commit` - Create commits
+- `git_branch` - Manage branches
+- `git_checkout` - Switch branches
+
+**Example workflow using git tools:**
+
+```yaml
+name: code-review
+trigger:
+  type: manual
+steps:
+  - id: review
+    action: ai.agent
+    with:
+      task: |
+        Review the recent commits and summarize the changes.
+        List any potential issues or improvements.
+      tools: "git"
+```
+
+**Note**: The Git MCP server operates on local repositories. For GitHub-specific operations (issues, PRs, webhooks), use the `github` plugin actions.
 
 ## Error Handling
 
