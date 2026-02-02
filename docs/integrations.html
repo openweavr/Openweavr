@@ -52,111 +52,131 @@
           <h3>Triggers</h3>
           <p>GitHub triggers support two modes: <strong>polling</strong> (default, uses <span class="inline-code">gh</span> CLI) and <strong>webhook</strong> (requires public URL).</p>
 
-          <div class="card">
-            <pre><code># Push trigger - react to commits
-trigger:
-  type: github.push
-  with:
-    repo: owner/repo
-    branch: main           # Optional: filter by branch
-    mode: polling          # Default - uses gh CLI locally
-    pollInterval: 60       # Poll every 60 seconds
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Push trigger - react to commits</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">github.push</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">branch:</span> <span class="string">main</span>           <span class="comment"># Optional: filter by branch</span>
+    <span class="keyword">mode:</span> <span class="string">polling</span>          <span class="comment"># Default - uses gh CLI locally</span>
+    <span class="keyword">pollInterval:</span> <span class="number">60</span>       <span class="comment"># Poll every 60 seconds</span>
 
-# Pull request trigger
-trigger:
-  type: github.pull_request
-  with:
-    repo: owner/repo
-    events: [opened, synchronize]
+<span class="comment"># Pull request trigger</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">github.pull_request</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">events:</span> <span class="string">[opened, synchronize]</span>
 
-# Issue triggers
-trigger:
-  type: github.issue.opened
-  with:
-    repo: owner/repo
+<span class="comment"># Issue triggers</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">github.issue.opened</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
 
-trigger:
-  type: github.issue.labeled
-  with:
-    repo: owner/repo
-    label: bug             # Optional: filter by label</code></pre>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">github.issue.labeled</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">label:</span> <span class="string">bug</span>             <span class="comment"># Optional: filter by label</span></code></pre>
           </div>
 
           <h3>Trigger Data</h3>
           <p>GitHub triggers provide rich data you can use in your workflow steps:</p>
 
           <h4>Pull Request Trigger Data</h4>
-          <div class="card">
-            <pre><code># Convenience fields (top-level)
-{{ trigger.title }}        # PR title
-{{ trigger.body }}         # PR description
-{{ trigger.author }}       # PR author username
-{{ trigger.url }}          # PR URL
-{{ trigger.number }}       # PR number
-{{ trigger.action }}       # Event action (opened, synchronize, closed)
-{{ trigger.repository }}   # Repository name (owner/repo)
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Convenience fields (top-level)</span>
+{{ trigger.title }}        <span class="comment"># PR title</span>
+{{ trigger.body }}         <span class="comment"># PR description</span>
+{{ trigger.author }}       <span class="comment"># PR author username</span>
+{{ trigger.url }}          <span class="comment"># PR URL</span>
+{{ trigger.number }}       <span class="comment"># PR number</span>
+{{ trigger.action }}       <span class="comment"># Event action (opened, synchronize, closed)</span>
+{{ trigger.repository }}   <span class="comment"># Repository name (owner/repo)</span>
 
-# Files changed
-{{ trigger.fileNames }}    # Array of changed file paths
-{{ trigger.files }}        # Array of file objects with details
+<span class="comment"># Files changed</span>
+{{ trigger.fileNames }}    <span class="comment"># Array of changed file paths</span>
+{{ trigger.files }}        <span class="comment"># Array of file objects with details</span>
 
-# Full PR object
+<span class="comment"># Full PR object</span>
 {{ trigger.pullRequest.title }}
 {{ trigger.pullRequest.body }}
 {{ trigger.pullRequest.state }}
-{{ trigger.pullRequest.head.ref }}   # Source branch
-{{ trigger.pullRequest.base.ref }}   # Target branch
-{{ trigger.pullRequest.additions }}  # Lines added
-{{ trigger.pullRequest.deletions }}  # Lines deleted
-{{ trigger.pullRequest.labels }}     # Array of label names
-{{ trigger.pullRequest.draft }}      # Is draft PR</code></pre>
+{{ trigger.pullRequest.head.ref }}   <span class="comment"># Source branch</span>
+{{ trigger.pullRequest.base.ref }}   <span class="comment"># Target branch</span>
+{{ trigger.pullRequest.additions }}  <span class="comment"># Lines added</span>
+{{ trigger.pullRequest.deletions }}  <span class="comment"># Lines deleted</span>
+{{ trigger.pullRequest.labels }}     <span class="comment"># Array of label names</span>
+{{ trigger.pullRequest.draft }}      <span class="comment"># Is draft PR</span></code></pre>
           </div>
 
           <h4>Issue Trigger Data</h4>
-          <div class="card">
-            <pre><code># Convenience fields (top-level)
-{{ trigger.title }}        # Issue title
-{{ trigger.body }}         # Issue body
-{{ trigger.author }}       # Issue author username
-{{ trigger.url }}          # Issue URL
-{{ trigger.number }}       # Issue number
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Convenience fields (top-level)</span>
+{{ trigger.title }}        <span class="comment"># Issue title</span>
+{{ trigger.body }}         <span class="comment"># Issue body</span>
+{{ trigger.author }}       <span class="comment"># Issue author username</span>
+{{ trigger.url }}          <span class="comment"># Issue URL</span>
+{{ trigger.number }}       <span class="comment"># Issue number</span>
 
-# Full issue object
+<span class="comment"># Full issue object</span>
 {{ trigger.issue.title }}
 {{ trigger.issue.body }}
 {{ trigger.issue.state }}
-{{ trigger.issue.labels }}     # Array of label names
-{{ trigger.issue.assignees }}  # Array of assignee usernames
-{{ trigger.issue.comments }}   # Comment count</code></pre>
+{{ trigger.issue.labels }}     <span class="comment"># Array of label names</span>
+{{ trigger.issue.assignees }}  <span class="comment"># Array of assignee usernames</span>
+{{ trigger.issue.comments }}   <span class="comment"># Comment count</span></code></pre>
           </div>
 
           <h3>Actions</h3>
-          <div class="card">
-            <pre><code># Create an issue
-- id: create-issue
-  action: github.create_issue
-  with:
-    repo: owner/repo
-    title: "New issue from workflow"
-    body: "Created by Weavr"
-    labels: [automated, triage]
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Create an issue</span>
+- <span class="keyword">id:</span> <span class="string">create-issue</span>
+  <span class="keyword">action:</span> <span class="string">github.create_issue</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">title:</span> <span class="string">"New issue from workflow"</span>
+    <span class="keyword">body:</span> <span class="string">"Created by Weavr"</span>
+    <span class="keyword">labels:</span> <span class="string">[automated, triage]</span>
 
-# Add a comment
-- id: comment
-  action: github.create_comment
-  with:
-    repo: owner/repo
-    issue_number: "{{ trigger.issue.number }}"
-    body: "Thanks for reporting!"
+<span class="comment"># Add a comment</span>
+- <span class="keyword">id:</span> <span class="string">comment</span>
+  <span class="keyword">action:</span> <span class="string">github.create_comment</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">issue_number:</span> <span class="string">"{{ trigger.issue.number }}"</span>
+    <span class="keyword">body:</span> <span class="string">"Thanks for reporting!"</span>
 
-# Create a pull request
-- id: create-pr
-  action: github.create_pr
-  with:
-    repo: owner/repo
-    title: "Automated changes"
-    head: feature-branch
-    base: main</code></pre>
+<span class="comment"># Create a pull request</span>
+- <span class="keyword">id:</span> <span class="string">create-pr</span>
+  <span class="keyword">action:</span> <span class="string">github.create_pr</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">owner/repo</span>
+    <span class="keyword">title:</span> <span class="string">"Automated changes"</span>
+    <span class="keyword">head:</span> <span class="string">feature-branch</span>
+    <span class="keyword">base:</span> <span class="string">main</span></code></pre>
           </div>
 
           <div class="callout">
@@ -175,31 +195,41 @@ trigger:
           </ol>
 
           <h3>Trigger</h3>
-          <div class="card">
-            <pre><code>trigger:
-  type: telegram.message
-  with:
-    chatId: 123456789      # Optional: filter by chat
-    chatType: private      # Optional: private, group, supergroup, channel</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">telegram.message</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">chatId:</span> <span class="number">123456789</span>      <span class="comment"># Optional: filter by chat</span>
+    <span class="keyword">chatType:</span> <span class="string">private</span>      <span class="comment"># Optional: private, group, supergroup, channel</span></code></pre>
           </div>
 
           <h3>Actions</h3>
-          <div class="card">
-            <pre><code># Send a message
-- id: notify
-  action: telegram.send
-  with:
-    chatId: "{{ trigger.chatId }}"
-    text: "Hello from Weavr!"
-    parseMode: HTML        # Optional: HTML, Markdown, MarkdownV2
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Send a message</span>
+- <span class="keyword">id:</span> <span class="string">notify</span>
+  <span class="keyword">action:</span> <span class="string">telegram.send</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">chatId:</span> <span class="string">"{{ trigger.chatId }}"</span>
+    <span class="keyword">text:</span> <span class="string">"Hello from Weavr!"</span>
+    <span class="keyword">parseMode:</span> <span class="string">HTML</span>        <span class="comment"># Optional: HTML, Markdown, MarkdownV2</span>
 
-# Send a photo
-- id: send-photo
-  action: telegram.sendPhoto
-  with:
-    chatId: 123456789
-    photo: "https://example.com/image.png"
-    caption: "Check this out"</code></pre>
+<span class="comment"># Send a photo</span>
+- <span class="keyword">id:</span> <span class="string">send-photo</span>
+  <span class="keyword">action:</span> <span class="string">telegram.sendPhoto</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">chatId:</span> <span class="number">123456789</span>
+    <span class="keyword">photo:</span> <span class="string">"https://example.com/image.png"</span>
+    <span class="keyword">caption:</span> <span class="string">"Check this out"</span></code></pre>
           </div>
         </div>
 
@@ -211,24 +241,29 @@ trigger:
           <p>Set <span class="inline-code">SLACK_BOT_TOKEN</span> or <span class="inline-code">SLACK_WEBHOOK_URL</span>.</p>
 
           <h3>Actions</h3>
-          <div class="card">
-            <pre><code># Post to channel
-- id: notify
-  action: slack.post
-  with:
-    channel: "#general"
-    text: "Deployment complete!"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Post to channel</span>
+- <span class="keyword">id:</span> <span class="string">notify</span>
+  <span class="keyword">action:</span> <span class="string">slack.post</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">channel:</span> <span class="string">"#general"</span>
+    <span class="keyword">text:</span> <span class="string">"Deployment complete!"</span>
 
-# Post with blocks
-- id: rich-message
-  action: slack.post
-  with:
-    channel: "#alerts"
-    blocks:
-      - type: section
-        text:
-          type: mrkdwn
-          text: "*Alert:* Service degradation detected"</code></pre>
+<span class="comment"># Post with blocks</span>
+- <span class="keyword">id:</span> <span class="string">rich-message</span>
+  <span class="keyword">action:</span> <span class="string">slack.post</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">channel:</span> <span class="string">"#alerts"</span>
+    <span class="keyword">blocks:</span>
+      - <span class="keyword">type:</span> <span class="string">section</span>
+        <span class="keyword">text:</span>
+          <span class="keyword">type:</span> <span class="string">mrkdwn</span>
+          <span class="keyword">text:</span> <span class="string">"*Alert:* Service degradation detected"</span></code></pre>
           </div>
         </div>
 
@@ -236,13 +271,18 @@ trigger:
           <h2>Discord</h2>
           <p>Send messages to Discord channels via webhooks.</p>
 
-          <div class="card">
-            <pre><code>- id: notify
-  action: discord.send
-  with:
-    webhookUrl: "{{ env.DISCORD_WEBHOOK }}"
-    content: "Build completed successfully!"
-    username: "Weavr Bot"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">notify</span>
+  <span class="keyword">action:</span> <span class="string">discord.send</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">webhookUrl:</span> <span class="string">"{{ env.DISCORD_WEBHOOK }}"</span>
+    <span class="keyword">content:</span> <span class="string">"Build completed successfully!"</span>
+    <span class="keyword">username:</span> <span class="string">"Weavr Bot"</span></code></pre>
           </div>
         </div>
 
@@ -253,15 +293,20 @@ trigger:
           <h3>Setup</h3>
           <p>Set <span class="inline-code">LINEAR_API_KEY</span> environment variable.</p>
 
-          <div class="card">
-            <pre><code># Create an issue
-- id: create-issue
-  action: linear.create_issue
-  with:
-    teamId: "TEAM-123"
-    title: "Bug from production"
-    description: "{{ trigger.error.message }}"
-    priority: 2            # 0=none, 1=urgent, 2=high, 3=medium, 4=low</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Create an issue</span>
+- <span class="keyword">id:</span> <span class="string">create-issue</span>
+  <span class="keyword">action:</span> <span class="string">linear.create_issue</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">teamId:</span> <span class="string">"TEAM-123"</span>
+    <span class="keyword">title:</span> <span class="string">"Bug from production"</span>
+    <span class="keyword">description:</span> <span class="string">"{{ trigger.error.message }}"</span>
+    <span class="keyword">priority:</span> <span class="number">2</span>            <span class="comment"># 0=none, 1=urgent, 2=high, 3=medium, 4=low</span></code></pre>
           </div>
         </div>
 
@@ -270,25 +315,35 @@ trigger:
           <p>Make HTTP requests and receive webhook events.</p>
 
           <h3>Webhook Trigger</h3>
-          <div class="card">
-            <pre><code>trigger:
-  type: http.webhook
-  with:
-    path: /my-webhook      # Available at /webhook/my-webhook</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">http.webhook</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">path:</span> <span class="string">/my-webhook</span>      <span class="comment"># Available at /webhook/my-webhook</span></code></pre>
           </div>
 
           <h3>HTTP Request Action</h3>
-          <div class="card">
-            <pre><code>- id: api-call
-  action: http.request
-  with:
-    url: "https://api.example.com/data"
-    method: POST
-    headers:
-      Authorization: "Bearer {{ env.API_TOKEN }}"
-      Content-Type: application/json
-    body:
-      key: value</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">api-call</span>
+  <span class="keyword">action:</span> <span class="string">http.request</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">url:</span> <span class="string">"https://api.example.com/data"</span>
+    <span class="keyword">method:</span> <span class="string">POST</span>
+    <span class="keyword">headers:</span>
+      <span class="keyword">Authorization:</span> <span class="string">"Bearer {{ env.API_TOKEN }}"</span>
+      <span class="keyword">Content-Type:</span> <span class="string">application/json</span>
+    <span class="keyword">body:</span>
+      <span class="keyword">key:</span> <span class="string">value</span></code></pre>
           </div>
         </div>
 
@@ -298,25 +353,35 @@ trigger:
 
           <h3>Setup</h3>
           <p>Configure SMTP in <span class="inline-code">~/.weavr/config.yaml</span>:</p>
-          <div class="card">
-            <pre><code>email:
-  smtp:
-    host: smtp.example.com
-    port: 587
-    secure: true
-    auth:
-      user: your-email@example.com
-      pass: your-password</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">email:</span>
+  <span class="keyword">smtp:</span>
+    <span class="keyword">host:</span> <span class="string">smtp.example.com</span>
+    <span class="keyword">port:</span> <span class="number">587</span>
+    <span class="keyword">secure:</span> <span class="keyword">true</span>
+    <span class="keyword">auth:</span>
+      <span class="keyword">user:</span> <span class="string">your-email@example.com</span>
+      <span class="keyword">pass:</span> <span class="string">your-password</span></code></pre>
           </div>
 
           <h3>Send Email</h3>
-          <div class="card">
-            <pre><code>- id: send-email
-  action: email.send
-  with:
-    to: recipient@example.com
-    subject: "Workflow Complete"
-    body: "Your workflow finished successfully."</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">send-email</span>
+  <span class="keyword">action:</span> <span class="string">email.send</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">to:</span> <span class="string">recipient@example.com</span>
+    <span class="keyword">subject:</span> <span class="string">"Workflow Complete"</span>
+    <span class="keyword">body:</span> <span class="string">"Your workflow finished successfully."</span></code></pre>
           </div>
         </div>
 
@@ -324,18 +389,23 @@ trigger:
           <h2>Cron Schedules</h2>
           <p>Run workflows on a schedule.</p>
 
-          <div class="card">
-            <pre><code>trigger:
-  type: cron.schedule
-  with:
-    expression: "0 9 * * *"    # Every day at 9 AM
-    timezone: America/New_York # Optional, defaults to system timezone
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">cron.schedule</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">expression:</span> <span class="string">"0 9 * * *"</span>    <span class="comment"># Every day at 9 AM</span>
+    <span class="keyword">timezone:</span> <span class="string">America/New_York</span> <span class="comment"># Optional, defaults to system timezone</span>
 
-# Common patterns:
-# "*/15 * * * *"   - Every 15 minutes
-# "0 * * * *"      - Every hour
-# "0 9 * * 1-5"    - 9 AM on weekdays
-# "0 0 1 * *"      - First day of each month</code></pre>
+<span class="comment"># Common patterns:</span>
+<span class="comment"># "*/15 * * * *"   - Every 15 minutes</span>
+<span class="comment"># "0 * * * *"      - Every hour</span>
+<span class="comment"># "0 9 * * 1-5"    - 9 AM on weekdays</span>
+<span class="comment"># "0 0 1 * *"      - First day of each month</span></code></pre>
           </div>
         </div>
       </section>

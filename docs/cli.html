@@ -169,7 +169,12 @@ node weavr.mjs run my-workflow --verbose</code></pre>
           <h2>create</h2>
           <p>Create a new workflow from a template.</p>
 
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs create [options]</code></pre>
           </div>
 
@@ -202,11 +207,16 @@ node weavr.mjs run my-workflow --verbose</code></pre>
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Interactive mode
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Interactive mode</span>
 node weavr.mjs create
 
-# Non-interactive
+<span class="comment"># Non-interactive</span>
 node weavr.mjs create --non-interactive \
   --name my-workflow \
   --description "Process daily reports" \
@@ -218,8 +228,13 @@ node weavr.mjs create --non-interactive \
           <h2>ask</h2>
           <p>Generate a workflow using AI from a natural language description.</p>
 
-          <div class="card">
-            <pre><code>node weavr.mjs ask "<description>" [options]</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>node weavr.mjs ask "&lt;description&gt;" [options]</code></pre>
           </div>
 
           <h3>Options</h3>
@@ -243,11 +258,16 @@ node weavr.mjs create --non-interactive \
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Generate and review interactively
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Generate and review interactively</span>
 node weavr.mjs ask "Create a workflow that backs up my database daily"
 
-# Generate and save directly
+<span class="comment"># Generate and save directly</span>
 node weavr.mjs ask "Monitor a URL and alert on errors" \
   --non-interactive \
   --output ~/.weavr/workflows/url-monitor.yaml</code></pre>
@@ -262,7 +282,12 @@ node weavr.mjs ask "Monitor a URL and alert on errors" \
           <h2>onboard</h2>
           <p>Initial setup and configuration wizard.</p>
 
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs onboard [options]</code></pre>
           </div>
 
@@ -291,11 +316,16 @@ node weavr.mjs ask "Monitor a URL and alert on errors" \
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Interactive setup
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Interactive setup</span>
 node weavr.mjs onboard
 
-# Non-interactive for CI/scripts
+<span class="comment"># Non-interactive for CI/scripts</span>
 node weavr.mjs onboard --non-interactive --ai-provider anthropic</code></pre>
           </div>
         </div>
@@ -304,7 +334,12 @@ node weavr.mjs onboard --non-interactive --ai-provider anthropic</code></pre>
           <h2>doctor</h2>
           <p>Check your Weavr installation and configuration.</p>
 
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs doctor</code></pre>
           </div>
 

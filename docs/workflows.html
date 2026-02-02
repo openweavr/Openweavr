@@ -240,42 +240,62 @@
 
           <h3>http.request</h3>
           <p>Make an HTTP request.</p>
-          <div class="card">
-            <pre><code>- id: fetch-data
-  action: http.request
-  with:
-    url: "https://api.example.com/data"
-    method: GET
-    headers:
-      Authorization: "Bearer {{ env.API_TOKEN }}"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">fetch-data</span>
+  <span class="keyword">action:</span> <span class="string">http.request</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">url:</span> <span class="string">"https://api.example.com/data"</span>
+    <span class="keyword">method:</span> <span class="string">GET</span>
+    <span class="keyword">headers:</span>
+      <span class="keyword">Authorization:</span> <span class="string">"Bearer {{ env.API_TOKEN }}"</span></code></pre>
           </div>
 
           <h3>ai.agent</h3>
           <p>Execute an AI agent task. See <a href="agents.html">AI Agents</a> for details.</p>
-          <div class="card">
-            <pre><code>- id: analyze
-  action: ai.agent
-  with:
-    task: "Analyze this data and provide insights"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">analyze</span>
+  <span class="keyword">action:</span> <span class="string">ai.agent</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">task:</span> <span class="string">"Analyze this data and provide insights"</span></code></pre>
           </div>
 
           <h3>json.parse</h3>
           <p>Parse a JSON string into an object.</p>
-          <div class="card">
-            <pre><code>- id: parse-response
-  action: json.parse
-  with:
-    input: "{{ steps.fetch.body }}"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">parse-response</span>
+  <span class="keyword">action:</span> <span class="string">json.parse</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">input:</span> <span class="string">"{{ steps.fetch.body }}"</span></code></pre>
           </div>
 
           <h3>json.stringify</h3>
           <p>Convert an object to a JSON string.</p>
-          <div class="card">
-            <pre><code>- id: serialize
-  action: json.stringify
-  with:
-    input: "{{ steps.data }}"
-    pretty: true</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">serialize</span>
+  <span class="keyword">action:</span> <span class="string">json.stringify</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">input:</span> <span class="string">"{{ steps.data }}"</span>
+    <span class="keyword">pretty:</span> <span class="keyword">true</span></code></pre>
           </div>
         </div>
 
@@ -283,54 +303,64 @@
           <h2>Dependencies</h2>
           <p>Use <span class="inline-code">needs</span> to control step execution order.</p>
 
-          <div class="card">
-            <pre><code>steps:
-  - id: fetch
-    action: http.request
-    with:
-      url: "https://api.example.com/data"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">fetch</span>
+    <span class="keyword">action:</span> <span class="string">http.request</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">url:</span> <span class="string">"https://api.example.com/data"</span>
 
-  - id: parse
-    action: json.parse
-    needs: [fetch]              # Runs after 'fetch' completes
-    with:
-      input: "{{ steps.fetch.body }}"
+  - <span class="keyword">id:</span> <span class="string">parse</span>
+    <span class="keyword">action:</span> <span class="string">json.parse</span>
+    <span class="keyword">needs:</span> <span class="string">[fetch]</span>              <span class="comment"># Runs after 'fetch' completes</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">input:</span> <span class="string">"{{ steps.fetch.body }}"</span>
 
-  - id: process
-    action: ai.agent
-    needs: [parse]              # Runs after 'parse' completes
-    with:
-      task: "Analyze: {{ steps.parse }}"
+  - <span class="keyword">id:</span> <span class="string">process</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">needs:</span> <span class="string">[parse]</span>              <span class="comment"># Runs after 'parse' completes</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> <span class="string">"Analyze: {{ steps.parse }}"</span>
 
-  - id: notify
-    action: slack.post
-    needs: [process]            # Runs after 'process' completes
-    with:
-      channel: "#results"
-      text: "{{ steps.process.response }}"</code></pre>
+  - <span class="keyword">id:</span> <span class="string">notify</span>
+    <span class="keyword">action:</span> <span class="string">slack.post</span>
+    <span class="keyword">needs:</span> <span class="string">[process]</span>            <span class="comment"># Runs after 'process' completes</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">channel:</span> <span class="string">"#results"</span>
+      <span class="keyword">text:</span> <span class="string">"{{ steps.process.response }}"</span></code></pre>
           </div>
 
           <h3>Parallel Execution</h3>
           <p>Steps without dependencies or with the same dependencies run in parallel.</p>
-          <div class="card">
-            <pre><code>steps:
-  - id: fetch-users
-    action: http.request
-    with:
-      url: "/api/users"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">fetch-users</span>
+    <span class="keyword">action:</span> <span class="string">http.request</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">url:</span> <span class="string">"/api/users"</span>
 
-  - id: fetch-orders
-    action: http.request
-    with:
-      url: "/api/orders"
+  - <span class="keyword">id:</span> <span class="string">fetch-orders</span>
+    <span class="keyword">action:</span> <span class="string">http.request</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">url:</span> <span class="string">"/api/orders"</span>
 
-  # Both fetch steps run in parallel
-  # This step waits for both
-  - id: combine
-    action: transform
-    needs: [fetch-users, fetch-orders]
-    with:
-      template: "Users: {{ steps.fetch-users.body }}, Orders: {{ steps.fetch-orders.body }}"</code></pre>
+  <span class="comment"># Both fetch steps run in parallel</span>
+  <span class="comment"># This step waits for both</span>
+  - <span class="keyword">id:</span> <span class="string">combine</span>
+    <span class="keyword">action:</span> <span class="string">transform</span>
+    <span class="keyword">needs:</span> <span class="string">[fetch-users, fetch-orders]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">template:</span> <span class="string">"Users: {{ steps.fetch-users.body }}, Orders: {{ steps.fetch-orders.body }}"</span></code></pre>
           </div>
         </div>
 
@@ -375,21 +405,26 @@
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Access trigger data
-message: "New PR: {{ trigger.pullRequest.title }}"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Access trigger data</span>
+<span class="keyword">message:</span> <span class="string">"New PR: {{ trigger.pullRequest.title }}"</span>
 
-# Access step output
-body: "{{ steps.analyze.response }}"
+<span class="comment"># Access step output</span>
+<span class="keyword">body:</span> <span class="string">"{{ steps.analyze.response }}"</span>
 
-# Access nested fields
-author: "{{ trigger.issue.user.login }}"
+<span class="comment"># Access nested fields</span>
+<span class="keyword">author:</span> <span class="string">"{{ trigger.issue.user.login }}"</span>
 
-# Environment variables
-token: "{{ env.GITHUB_TOKEN }}"
+<span class="comment"># Environment variables</span>
+<span class="keyword">token:</span> <span class="string">"{{ env.GITHUB_TOKEN }}"</span>
 
-# Combine values
-url: "https://api.example.com/{{ trigger.repo }}/issues/{{ trigger.number }}"</code></pre>
+<span class="comment"># Combine values</span>
+<span class="keyword">url:</span> <span class="string">"https://api.example.com/{{ trigger.repo }}/issues/{{ trigger.number }}"</span></code></pre>
           </div>
         </div>
 
@@ -397,27 +432,32 @@ url: "https://api.example.com/{{ trigger.repo }}/issues/{{ trigger.number }}"</c
           <h2>Conditional Execution</h2>
           <p>Use <span class="inline-code">if</span> to conditionally execute steps.</p>
 
-          <div class="card">
-            <pre><code>steps:
-  - id: check-label
-    action: transform
-    with:
-      template: "{{ trigger.action }}"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">check-label</span>
+    <span class="keyword">action:</span> <span class="string">transform</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">template:</span> <span class="string">"{{ trigger.action }}"</span>
 
-  # Only run if PR was opened
-  - id: review
-    action: ai.agent
-    if: "{{ trigger.action == 'opened' }}"
-    with:
-      task: "Review this PR"
+  <span class="comment"># Only run if PR was opened</span>
+  - <span class="keyword">id:</span> <span class="string">review</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">if:</span> <span class="string">"{{ trigger.action == 'opened' }}"</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> <span class="string">"Review this PR"</span>
 
-  # Only run if labeled with 'urgent'
-  - id: alert
-    action: slack.post
-    if: "{{ 'urgent' in trigger.issue.labels }}"
-    with:
-      channel: "#urgent"
-      text: "Urgent issue: {{ trigger.issue.title }}"</code></pre>
+  <span class="comment"># Only run if labeled with 'urgent'</span>
+  - <span class="keyword">id:</span> <span class="string">alert</span>
+    <span class="keyword">action:</span> <span class="string">slack.post</span>
+    <span class="keyword">if:</span> <span class="string">"{{ 'urgent' in trigger.issue.labels }}"</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">channel:</span> <span class="string">"#urgent"</span>
+      <span class="keyword">text:</span> <span class="string">"Urgent issue: {{ trigger.issue.title }}"</span></code></pre>
           </div>
         </div>
       </section>

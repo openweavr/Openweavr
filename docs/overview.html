@@ -31,24 +31,34 @@
       </div>
     </header>
 
-    <main class="container">
-      <section class="hero fade">
-        <h1>Self-hosted workflow automation with AI agents</h1>
-        <p>
-          Weavr is an open-source workflow automation platform that combines the power of
-          traditional automation tools with native AI agent capabilities. Run it on your
-          own infrastructure with full data sovereignty.
-        </p>
-        <div class="hero-badges">
-          <span class="badge">Open Source</span>
-          <span class="badge">Self-Hosted</span>
-          <span class="badge">AI-Native</span>
-          <span class="badge">Node.js 22+</span>
-        </div>
-      </section>
+    <main class="container page">
+      <aside class="sidebar">
+        <h3>Overview</h3>
+        <a class="active" href="#intro">Introduction</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="#features">Key Features</a>
+        <a href="#docs">Documentation</a>
+        <a href="#example">Example Workflow</a>
+      </aside>
 
-      <section class="section">
-        <h2>Quick Start</h2>
+      <section class="content">
+        <div class="section" id="intro">
+          <h2>Self-hosted workflow automation with AI agents</h2>
+          <p>
+            Weavr is an open-source workflow automation platform that combines the power of
+            traditional automation tools with native AI agent capabilities. Run it on your
+            own infrastructure with full data sovereignty.
+          </p>
+          <div class="hero-badges" style="margin-bottom: 24px;">
+            <span class="badge">Open Source</span>
+            <span class="badge">Self-Hosted</span>
+            <span class="badge">AI-Native</span>
+            <span class="badge">Node.js 22+</span>
+          </div>
+        </div>
+
+        <div class="section" id="quickstart">
+          <h2>Quick Start</h2>
         <p>Get up and running in under a minute.</p>
         <div class="code-block fade" style="--delay: 0.1s;">
           <div class="code-header">
@@ -68,13 +78,13 @@ npm run build:web
 <span class="comment"># Start the server</span>
 node weavr.mjs serve</code></pre>
         </div>
-        <p style="margin-top: 16px; color: var(--muted);">
-          Open <span class="inline-code">http://localhost:3847</span> to access the web interface.
-        </p>
-      </section>
+          <p style="margin-top: 16px; color: var(--muted);">
+            Open <span class="inline-code">http://localhost:3847</span> to access the web interface.
+          </p>
+        </div>
 
-      <section class="section">
-        <h2>Key Features</h2>
+        <div class="section" id="features">
+          <h2>Key Features</h2>
         <div class="grid">
           <div class="card fade" style="--delay: 0.1s;">
             <h3>AI Agents</h3>
@@ -93,11 +103,11 @@ node weavr.mjs serve</code></pre>
             <p>Self-host on your infrastructure. Your data never leaves your servers.</p>
           </div>
         </div>
-      </section>
+        </div>
 
-      <section class="section">
-        <h2>Documentation</h2>
-        <div class="grid">
+        <div class="section" id="docs">
+          <h2>Documentation</h2>
+          <div class="grid">
           <a class="card fade" style="--delay: 0.1s;" href="getting-started.html">
             <h3>Getting Started</h3>
             <p>Installation, configuration, and your first workflow.</p>
@@ -122,29 +132,29 @@ node weavr.mjs serve</code></pre>
             <h3>AI Agents</h3>
             <p>Configure and use AI agents with tools, web search, and MCP.</p>
           </a>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Example Workflow</h2>
-        <p>Build workflows visually or write YAML directly — both produce the same result.</p>
-
-        <div class="workflow-showcase fade" style="--delay: 0.1s;">
-          <div class="workflow-visual">
-            <img src="assets/workflow-builder-screenshot.png" alt="Visual Workflow Builder" class="screenshot" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
-            <p style="text-align: center; color: var(--muted); margin-top: 12px; font-size: 14px;">Visual workflow builder with drag-and-drop steps</p>
           </div>
         </div>
 
-        <h3 style="margin-top: 32px;">YAML Definition</h3>
-        <p>The same workflow as YAML — schedule an AI research agent that sends daily market briefings to Telegram.</p>
-        <div class="code-block fade" style="--delay: 0.15s;">
-          <div class="code-header">
-            <div class="code-dot red"></div>
-            <div class="code-dot yellow"></div>
-            <div class="code-dot green"></div>
+        <div class="section" id="example">
+          <h2>Example Workflow</h2>
+          <p>Build workflows visually or write YAML directly — both produce the same result.</p>
+
+          <div class="workflow-showcase fade" style="--delay: 0.1s;">
+            <div class="workflow-visual">
+              <img src="assets/workflow-builder-screenshot.png" alt="Visual Workflow Builder" class="screenshot" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
+              <p style="text-align: center; color: var(--muted); margin-top: 12px; font-size: 14px;">Visual workflow builder with drag-and-drop steps</p>
+            </div>
           </div>
-          <pre><code><span class="keyword">name:</span> <span class="string">daily-market-research-telegram</span>
+
+          <h3 style="margin-top: 32px;">YAML Definition</h3>
+          <p>The same workflow as YAML — schedule an AI research agent that sends daily market briefings to Telegram.</p>
+          <div class="code-block fade" style="--delay: 0.15s;">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">name:</span> <span class="string">daily-market-research-telegram</span>
 
 <span class="keyword">trigger:</span>
   <span class="keyword">type:</span> <span class="string">cron.schedule</span>
@@ -169,6 +179,7 @@ node weavr.mjs serve</code></pre>
     <span class="keyword">with:</span>
       <span class="keyword">chatId:</span> <span class="string">"YOUR_CHAT_ID"</span>
       <span class="keyword">text:</span> <span class="string">"{{ steps.summarize.result }}"</span></code></pre>
+        </div>
         </div>
       </section>
     </main>

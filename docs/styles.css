@@ -282,6 +282,11 @@ a:hover {
 
 .section {
   margin-bottom: 56px;
+  scroll-margin-top: 100px; /* Account for sticky header */
+}
+
+.section[id] {
+  scroll-margin-top: 100px;
 }
 
 .section:last-child {

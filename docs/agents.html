@@ -179,14 +179,19 @@
           </table>
 
           <h3>Enabling/Disabling Tools</h3>
-          <div class="card">
-            <pre><code>- id: safe-agent
-  action: ai.agent
-  with:
-    task: "Analyze this code"
-    tools:
-      - read_file        # Only allow file reading
-      - http_request     # And HTTP requests</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">safe-agent</span>
+  <span class="keyword">action:</span> <span class="string">ai.agent</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">task:</span> <span class="string">"Analyze this code"</span>
+    <span class="keyword">tools:</span>
+      - <span class="string">read_file</span>        <span class="comment"># Only allow file reading</span>
+      - <span class="string">http_request</span>     <span class="comment"># And HTTP requests</span></code></pre>
           </div>
         </div>
 
@@ -194,19 +199,29 @@
           <h2>Web Search</h2>
           <p>Enable web search by setting a search API key:</p>
 
-          <div class="card">
-            <pre><code># In environment
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># In environment</span>
 export BRAVE_API_KEY=your-key
-# or
+<span class="comment"># or</span>
 export TAVILY_API_KEY=your-key</code></pre>
           </div>
 
           <p>Then agents can search the web:</p>
-          <div class="card">
-            <pre><code>- id: research
-  action: ai.agent
-  with:
-    task: |
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">research</span>
+  <span class="keyword">action:</span> <span class="string">ai.agent</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">task:</span> |
       Research the latest developments in {{ topic }}
       and provide a summary with sources.</code></pre>
           </div>
@@ -219,24 +234,29 @@ export TAVILY_API_KEY=your-key</code></pre>
             Configure MCP servers in your config:
           </p>
 
-          <div class="card">
-            <pre><code># ~/.weavr/config.yaml
-mcpServers:
-  filesystem:
-    command: npx
-    args: [-y, "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># ~/.weavr/config.yaml</span>
+<span class="keyword">mcpServers:</span>
+  <span class="keyword">filesystem:</span>
+    <span class="keyword">command:</span> <span class="string">npx</span>
+    <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]</span>
 
-  postgres:
-    command: npx
-    args: [-y, "@modelcontextprotocol/server-postgres"]
-    env:
-      DATABASE_URL: postgresql://user:pass@localhost/db
+  <span class="keyword">postgres:</span>
+    <span class="keyword">command:</span> <span class="string">npx</span>
+    <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-postgres"]</span>
+    <span class="keyword">env:</span>
+      <span class="keyword">DATABASE_URL:</span> <span class="string">postgresql://user:pass@localhost/db</span>
 
-  github:
-    command: npx
-    args: [-y, "@modelcontextprotocol/server-github"]
-    env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "{{ env.GITHUB_TOKEN }}"</code></pre>
+  <span class="keyword">github:</span>
+    <span class="keyword">command:</span> <span class="string">npx</span>
+    <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-github"]</span>
+    <span class="keyword">env:</span>
+      <span class="keyword">GITHUB_PERSONAL_ACCESS_TOKEN:</span> <span class="string">"{{ env.GITHUB_TOKEN }}"</span></code></pre>
           </div>
 
           <p>Tools from MCP servers are automatically available to agents.</p>
@@ -246,17 +266,27 @@ mcpServers:
           <h2>LLM Providers</h2>
 
           <h3>Anthropic Claude</h3>
-          <div class="card">
-            <pre><code>model: claude-sonnet-4-20250514      # Recommended
-model: claude-opus-4-20250514        # Most capable
-model: claude-haiku-3-5-20241022     # Fastest</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">model:</span> <span class="string">claude-sonnet-4-20250514</span>      <span class="comment"># Recommended</span>
+<span class="keyword">model:</span> <span class="string">claude-opus-4-20250514</span>        <span class="comment"># Most capable</span>
+<span class="keyword">model:</span> <span class="string">claude-haiku-3-5-20241022</span>     <span class="comment"># Fastest</span></code></pre>
           </div>
 
           <h3>OpenAI</h3>
-          <div class="card">
-            <pre><code>model: gpt-4o                        # Recommended
-model: gpt-4o-mini                   # Faster/cheaper
-model: o1                            # Reasoning model</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">model:</span> <span class="string">gpt-4o</span>                        <span class="comment"># Recommended</span>
+<span class="keyword">model:</span> <span class="string">gpt-4o-mini</span>                   <span class="comment"># Faster/cheaper</span>
+<span class="keyword">model:</span> <span class="string">o1</span>                            <span class="comment"># Reasoning model</span></code></pre>
           </div>
         </div>
 
@@ -264,27 +294,32 @@ model: o1                            # Reasoning model</code></pre>
           <h2>Examples</h2>
 
           <h3>Code Review Agent</h3>
-          <div class="card">
-            <pre><code>name: pr-review
-trigger:
-  type: github.pull_request
-  with:
-    repo: your-org/repo
-    events: [opened, synchronize]
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">name:</span> <span class="string">pr-review</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">github.pull_request</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">repo:</span> <span class="string">your-org/repo</span>
+    <span class="keyword">events:</span> <span class="string">[opened, synchronize]</span>
 
-steps:
-  - id: get-diff
-    action: http.request
-    with:
-      url: "{{ trigger.pullRequest.url }}.diff"
-      headers:
-        Accept: text/plain
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">get-diff</span>
+    <span class="keyword">action:</span> <span class="string">http.request</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">url:</span> <span class="string">"{{ trigger.pullRequest.url }}.diff"</span>
+      <span class="keyword">headers:</span>
+        <span class="keyword">Accept:</span> <span class="string">text/plain</span>
 
-  - id: review
-    action: ai.agent
-    needs: [get-diff]
-    with:
-      task: |
+  - <span class="keyword">id:</span> <span class="string">review</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">needs:</span> <span class="string">[get-diff]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> |
         Review this pull request diff and provide feedback:
 
         {{ steps.get-diff.body }}
@@ -295,26 +330,31 @@ steps:
         - Code style
         - Performance concerns
 
-  - id: comment
-    action: github.create_comment
-    needs: [review]
-    with:
-      repo: your-org/repo
-      issue_number: "{{ trigger.number }}"
-      body: "{{ steps.review.response }}"</code></pre>
+  - <span class="keyword">id:</span> <span class="string">comment</span>
+    <span class="keyword">action:</span> <span class="string">github.create_comment</span>
+    <span class="keyword">needs:</span> <span class="string">[review]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">repo:</span> <span class="string">your-org/repo</span>
+      <span class="keyword">issue_number:</span> <span class="string">"{{ trigger.number }}"</span>
+      <span class="keyword">body:</span> <span class="string">"{{ steps.review.response }}"</span></code></pre>
           </div>
 
           <h3>Research Assistant</h3>
-          <div class="card">
-            <pre><code>name: research-topic
-trigger:
-  type: telegram.message
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">name:</span> <span class="string">research-topic</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">telegram.message</span>
 
-steps:
-  - id: research
-    action: ai.agent
-    with:
-      task: |
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">research</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> |
         Research the following topic and provide a comprehensive summary:
 
         {{ trigger.text }}
@@ -324,27 +364,32 @@ steps:
         - Recent developments
         - Relevant sources
 
-  - id: respond
-    action: telegram.send
-    needs: [research]
-    with:
-      chatId: "{{ trigger.chatId }}"
-      text: "{{ steps.research.response }}"</code></pre>
+  - <span class="keyword">id:</span> <span class="string">respond</span>
+    <span class="keyword">action:</span> <span class="string">telegram.send</span>
+    <span class="keyword">needs:</span> <span class="string">[research]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">chatId:</span> <span class="string">"{{ trigger.chatId }}"</span>
+      <span class="keyword">text:</span> <span class="string">"{{ steps.research.response }}"</span></code></pre>
           </div>
 
           <h3>Daily Digest</h3>
-          <div class="card">
-            <pre><code>name: daily-digest
-trigger:
-  type: cron.schedule
-  with:
-    expression: "0 8 * * *"
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">name:</span> <span class="string">daily-digest</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">cron.schedule</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">expression:</span> <span class="string">"0 8 * * *"</span>
 
-steps:
-  - id: gather
-    action: ai.agent
-    with:
-      task: |
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">gather</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> |
         Create a morning briefing with:
         1. Top tech news from Hacker News
         2. Weather for San Francisco
@@ -352,12 +397,12 @@ steps:
 
         Keep it concise and actionable.
 
-  - id: send
-    action: slack.post
-    needs: [gather]
-    with:
-      channel: "#daily-digest"
-      text: "{{ steps.gather.response }}"</code></pre>
+  - <span class="keyword">id:</span> <span class="string">send</span>
+    <span class="keyword">action:</span> <span class="string">slack.post</span>
+    <span class="keyword">needs:</span> <span class="string">[gather]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">channel:</span> <span class="string">"#daily-digest"</span>
+      <span class="keyword">text:</span> <span class="string">"{{ steps.gather.response }}"</span></code></pre>
           </div>
         </div>
       </section>
