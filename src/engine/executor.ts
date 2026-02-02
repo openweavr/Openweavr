@@ -2,6 +2,20 @@ import { randomUUID } from 'node:crypto';
 import type { Workflow, Step, WorkflowRun, StepResult, ActionContext } from '../types/index.js';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
 
+// Import AI tracking context functions
+let setTrackingContext: ((ctx: { model?: string; workflowName?: string; runId?: string }) => void) | null = null;
+let clearTrackingContext: (() => void) | null = null;
+
+// Dynamically import AI module to set tracking context
+import('../plugins/builtin/ai/index.js')
+  .then((aiModule) => {
+    setTrackingContext = aiModule.setTrackingContext;
+    clearTrackingContext = aiModule.clearTrackingContext;
+  })
+  .catch(() => {
+    // AI plugin not available, tracking context won't be set
+  });
+
 export interface ExecutorOptions {
   registry: PluginRegistry;
   onStepStart?: (runId: string, stepId: string) => void;
@@ -29,6 +43,11 @@ export class WorkflowExecutor {
 
     this.runs.set(runId, run);
 
+    // Set AI tracking context for token usage
+    if (setTrackingContext) {
+      setTrackingContext({ workflowName: workflow.name, runId });
+    }
+
     // Initialize all steps as pending
     for (const step of workflow.steps) {
       run.steps.set(step.id, {
@@ -50,6 +69,11 @@ export class WorkflowExecutor {
       run.status = 'failed';
       run.error = err instanceof Error ? err.message : String(err);
       run.completedAt = new Date();
+    } finally {
+      // Clear AI tracking context
+      if (clearTrackingContext) {
+        clearTrackingContext();
+      }
     }
 
     this.options.onRunComplete?.(run);

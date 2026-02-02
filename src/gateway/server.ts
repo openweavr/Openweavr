@@ -127,6 +127,9 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         } else {
           addRunLog(run.id, 'error', `Workflow failed: ${run.error}`);
         }
+
+        // Persist to SQLite (will be done after scheduler is created)
+        persistCompletedRun(historyEntry);
       }
       broadcast('runs', {
         type: 'workflow.completed',
@@ -204,6 +207,54 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   scheduler.loadAndScheduleAll().catch(err => {
     console.error('[gateway] Failed to load scheduled workflows:', err);
   });
+
+  // Cleanup old data on startup (keep 30 days)
+  try {
+    const cleanup = scheduler.store.cleanupOldData(30);
+    if (cleanup.runsDeleted > 0 || cleanup.tokenEntriesDeleted > 0) {
+      console.log(`[gateway] Cleaned up ${cleanup.runsDeleted} old runs and ${cleanup.tokenEntriesDeleted} token entries`);
+    }
+  } catch (err) {
+    console.error('[gateway] Failed to cleanup old data:', err);
+  }
+
+  // Set up token tracker for AI plugin
+  import('../plugins/builtin/ai/index.js').then(({ setTokenTracker }) => {
+    setTokenTracker(scheduler.store);
+  }).catch(err => {
+    console.error('[gateway] Failed to set up token tracker:', err);
+  });
+
+  // Helper to persist completed runs to SQLite
+  const persistCompletedRun = (entry: typeof runHistory[0]) => {
+    if (entry.status === 'running') return; // Only persist completed runs
+    try {
+      scheduler.store.saveCompletedRun({
+        id: entry.id,
+        workflowName: entry.workflow,
+        status: entry.status as 'success' | 'failed',
+        startedAt: new Date(entry.startedAt).getTime(),
+        completedAt: entry.completedAt ? new Date(entry.completedAt).getTime() : Date.now(),
+        duration: entry.duration ?? 0,
+        error: entry.error,
+        logs: entry.logs.map(log => ({
+          timestamp: new Date(log.timestamp).getTime(),
+          level: log.level,
+          stepId: log.stepId,
+          message: log.message,
+        })),
+        steps: entry.steps.map(step => ({
+          stepId: step.id,
+          status: step.status,
+          duration: step.duration,
+          error: step.error,
+          output: step.output,
+        })),
+      });
+    } catch (err) {
+      console.error('[gateway] Failed to persist run:', err);
+    }
+  };
 
   // API routes
   app.get('/api/workflows', async (c) => {
@@ -457,33 +508,94 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   });
 
   app.get('/api/runs', (c) => {
-    return c.json({
-      runs: runHistory.map(r => ({
+    const page = parseInt(c.req.query('page') ?? '1', 10);
+    const limit = parseInt(c.req.query('limit') ?? '20', 10);
+    const days = c.req.query('days') ? parseInt(c.req.query('days')!, 10) : undefined;
+    const status = c.req.query('status') as 'success' | 'failed' | undefined;
+    const workflowName = c.req.query('workflow') ?? undefined;
+
+    // Get persisted runs from SQLite
+    const result = scheduler.store.getRunHistory({ page, limit, days, status, workflowName });
+
+    // Merge with in-memory running runs
+    const runningRuns = runHistory
+      .filter(r => r.status === 'running')
+      .map(r => ({
         id: r.id,
         workflow: r.workflow,
         status: r.status,
         startedAt: r.startedAt,
         completedAt: r.completedAt,
         duration: r.duration,
-      }))
+      }));
+
+    const persistedRuns = result.runs.map(r => ({
+      id: r.id,
+      workflow: r.workflowName,
+      status: r.status,
+      startedAt: new Date(r.startedAt).toISOString(),
+      completedAt: new Date(r.completedAt).toISOString(),
+      duration: r.duration,
+    }));
+
+    // Combine: running runs first, then persisted runs
+    const allRuns = page === 1 ? [...runningRuns, ...persistedRuns] : persistedRuns;
+
+    return c.json({
+      runs: allRuns,
+      total: result.total + (page === 1 ? runningRuns.length : 0),
+      page: result.page,
+      totalPages: result.totalPages,
     });
   });
 
   app.get('/api/runs/:id', (c) => {
     const id = c.req.param('id');
-    const run = runHistory.find(r => r.id === id);
-    if (!run) {
-      return c.json({ error: 'Run not found' }, 404);
+
+    // First check in-memory for running runs
+    const memoryRun = runHistory.find(r => r.id === id);
+    if (memoryRun) {
+      return c.json(memoryRun);
     }
-    return c.json(run);
+
+    // Then check SQLite for completed runs
+    const persistedRun = scheduler.store.getRunById(id);
+    if (persistedRun) {
+      return c.json({
+        id: persistedRun.id,
+        workflow: persistedRun.workflowName,
+        status: persistedRun.status,
+        startedAt: new Date(persistedRun.startedAt).toISOString(),
+        completedAt: new Date(persistedRun.completedAt).toISOString(),
+        duration: persistedRun.duration,
+        error: persistedRun.error,
+        logs: persistedRun.logs.map(log => ({
+          timestamp: new Date(log.timestamp).toISOString(),
+          level: log.level,
+          stepId: log.stepId,
+          message: log.message,
+        })),
+        steps: persistedRun.steps.map(step => ({
+          id: step.stepId,
+          status: step.status,
+          duration: step.duration,
+          error: step.error,
+          output: step.output,
+        })),
+      });
+    }
+
+    return c.json({ error: 'Run not found' }, 404);
   });
 
   // Dashboard stats endpoint
   app.get('/api/stats', async (c) => {
     try {
-      // Get AI usage stats
-      const { getUsageStats, getGlobalAIConfig } = await import('../plugins/builtin/ai/index.js');
-      const usage = getUsageStats();
+      const days = c.req.query('days') ? parseInt(c.req.query('days')!, 10) : undefined;
+
+      // Get AI usage stats from SQLite (with date filter)
+      const { getGlobalAIConfig } = await import('../plugins/builtin/ai/index.js');
+      const usage = scheduler.store.getTokenUsage({ days });
       const aiConfig = getGlobalAIConfig();
 
       // Build safe AI config info (no secrets)
@@ -501,26 +613,35 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
       const pausedWorkflows = new Set(scheduled.filter(w => w.status === 'paused').map(w => w.name)).size;
       const totalWorkflows = new Set(scheduled.map(w => w.name)).size;
 
-      // Calculate success rate from run history
-      const completedRuns = runHistory.filter(r => r.status !== 'running');
-      const successfulRuns = completedRuns.filter(r => r.status === 'success');
-      const successRate = completedRuns.length > 0
-        ? Math.round((successfulRuns.length / completedRuns.length) * 100)
+      // Calculate success rate from persistent run history
+      const runStats = scheduler.store.getRunHistory({ days, limit: 1000 });
+      const successfulRuns = runStats.runs.filter(r => r.status === 'success');
+      const successRate = runStats.total > 0
+        ? Math.round((successfulRuns.length / runStats.total) * 100)
         : 100;
+
+      // Count active (running) runs from in-memory
+      const activeRuns = runHistory.filter(r => r.status === 'running').length;
 
       return c.json({
         ai,
-        usage,
+        usage: {
+          totalInputTokens: usage.totalInputTokens,
+          totalOutputTokens: usage.totalOutputTokens,
+          totalRequests: usage.totalRequests,
+          lastUpdated: new Date().toISOString(),
+        },
         workflows: {
           active: activeWorkflows,
           paused: pausedWorkflows,
           total: totalWorkflows,
         },
         runs: {
-          total: runHistory.length,
+          total: runStats.total + activeRuns,
           successRate,
-          active: runHistory.filter(r => r.status === 'running').length,
+          active: activeRuns,
         },
+        days, // Include the date range in response
       });
     } catch (err) {
       return c.json({ error: `Failed to get stats: ${String(err)}` }, 500);

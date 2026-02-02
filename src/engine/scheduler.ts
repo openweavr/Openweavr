@@ -68,7 +68,7 @@ export class TriggerScheduler {
   private executor: WorkflowExecutor;
   private events: SchedulerEvents;
   private triggerManager: TriggerManager;
-  private store: SchedulerStore;
+  public readonly store: SchedulerStore;
   private activeRuns = new Set<string>();
   private pollIntervalId?: NodeJS.Timeout;
   private maxConcurrency: number;
