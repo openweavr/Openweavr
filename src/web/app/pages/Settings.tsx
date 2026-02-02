@@ -14,6 +14,7 @@ interface Config {
     port: number;
     host: string;
   };
+  timezone?: string;
   ai?: {
     provider?: string;
     model?: string;
@@ -66,6 +67,27 @@ export function Settings() {
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappConnecting, setWhatsappConnecting] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  // Timezone - detect system default
+  const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Common timezones grouped by region
+  const timezones = [
+    { group: 'Americas', zones: [
+      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
+      'America/Toronto', 'America/Vancouver', 'America/Mexico_City', 'America/Sao_Paulo',
+    ]},
+    { group: 'Europe', zones: [
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Amsterdam',
+      'Europe/Rome', 'Europe/Madrid', 'Europe/Moscow', 'Europe/Zurich',
+    ]},
+    { group: 'Asia/Pacific', zones: [
+      'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Singapore',
+      'Asia/Seoul', 'Asia/Kolkata', 'Asia/Dubai', 'Australia/Sydney',
+      'Australia/Melbourne', 'Pacific/Auckland',
+    ]},
+  ];
 
   useEffect(() => {
     fetch('/api/config')
@@ -368,6 +390,38 @@ export function Settings() {
                     )
                   }
                 />
+              </div>
+
+              <div>
+                <label className="label">
+                  Timezone
+                  {!config?.timezone && (
+                    <span style={{ color: 'var(--text-muted)', marginLeft: '8px', fontSize: '12px' }}>
+                      (using system: {systemTimezone})
+                    </span>
+                  )}
+                </label>
+                <select
+                  className="input"
+                  value={config?.timezone ?? ''}
+                  onChange={(e) =>
+                    setConfig((prev) =>
+                      prev ? { ...prev, timezone: e.target.value || undefined } : null
+                    )
+                  }
+                >
+                  <option value="">System default ({systemTimezone})</option>
+                  {timezones.map(({ group, zones }) => (
+                    <optgroup key={group} label={group}>
+                      {zones.map((tz) => (
+                        <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Used for scheduled workflows (cron). Individual workflows can override this.
+                </p>
               </div>
             </div>
           </div>

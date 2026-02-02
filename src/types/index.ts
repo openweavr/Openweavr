@@ -159,6 +159,7 @@ export interface WeavrConfig {
     port: number;
     host: string;
   };
+  timezone?: string; // IANA timezone (e.g., 'America/Los_Angeles')
   workflowsDir: string;
   pluginsDir: string;
   logsDir: string;

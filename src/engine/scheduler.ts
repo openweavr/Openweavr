@@ -1,13 +1,30 @@
 import { Cron } from 'croner';
 import { readdir, readFile } from 'node:fs/promises';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { randomUUID } from 'node:crypto';
-import type { Workflow } from '../types/index.js';
+import type { Workflow, WeavrConfig } from '../types/index.js';
 import { parser } from './parser.js';
 import { WorkflowExecutor } from './executor.js';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
 import { TriggerManager } from './trigger-manager.js';
+
+// Get global timezone from config or system default
+function getGlobalTimezone(): string {
+  try {
+    const configPath = join(homedir(), '.weavr', 'config.yaml');
+    if (!existsSync(configPath)) {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+    const content = readFileSync(configPath, 'utf-8');
+    const config = parseYaml(content) as WeavrConfig;
+    return config.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+}
 
 export interface ScheduledWorkflow {
   name: string;
@@ -116,7 +133,8 @@ export class TriggerScheduler {
       if (triggerType === 'cron.schedule') {
         // Accept both 'expression' and 'cron' as the cron expression field
         const expression = (triggerConfig.expression ?? triggerConfig.cron) as string;
-        const timezone = triggerConfig.timezone as string | undefined;
+        // Use workflow timezone, fall back to global config, then system default
+        const timezone = (triggerConfig.timezone as string) ?? getGlobalTimezone();
 
         if (expression) {
           const cronJob = new Cron(expression, { timezone }, async () => {
@@ -126,7 +144,7 @@ export class TriggerScheduler {
           scheduled.cronJob = cronJob;
           scheduled.nextRun = cronJob.nextRun()?.toISOString();
 
-          console.log(`[scheduler] Cron scheduled: ${name} (${expression}) - next: ${scheduled.nextRun}`);
+          console.log(`[scheduler] Cron scheduled: ${name} (${expression}) timezone: ${timezone} - next: ${scheduled.nextRun}`);
         }
       }
       // Set up custom triggers via TriggerManager (messaging, etc.)
