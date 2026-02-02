@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
+type StatsDateRange = 7 | 30;
+
 interface DashboardStats {
   ai: {
     provider: string;
@@ -25,6 +27,7 @@ interface DashboardStats {
     successRate: number;
     active: number;
   };
+  days?: number;
 }
 
 interface ActiveWorkflow {
@@ -58,13 +61,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [workflows, setWorkflows] = useState<ActiveWorkflow[]>([]);
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [runningWorkflow, setRunningWorkflow] = useState<string | null>(null);
+  const [statsDateRange, setStatsDateRange] = useState<StatsDateRange>(7);
 
   const fetchData = useCallback(async () => {
     try {
       const [statsRes, workflowsRes, runsRes] = await Promise.all([
-        fetch('/api/stats'),
+        fetch(`/api/stats?days=${statsDateRange}`),
         fetch('/api/workflows'),
-        fetch('/api/runs'),
+        fetch('/api/runs?limit=5'),
       ]);
 
       if (statsRes.ok) {
@@ -84,7 +88,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
     }
-  }, []);
+  }, [statsDateRange]);
 
   useEffect(() => {
     fetchData();
@@ -253,6 +257,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="dashboard-card-header">
             <span className="dashboard-card-icon">📊</span>
             <span className="dashboard-card-title">Token Usage</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+              {([7, 30] as StatsDateRange[]).map((d) => (
+                <button
+                  key={d}
+                  className={`btn btn-sm ${statsDateRange === d ? 'btn-secondary' : 'btn-ghost'}`}
+                  onClick={() => setStatsDateRange(d)}
+                  style={{ padding: '2px 8px', fontSize: '11px' }}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
           </div>
           <div className="dashboard-card-content">
             <div className="usage-stats">

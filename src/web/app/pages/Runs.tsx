@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface LogEntry {
@@ -33,41 +33,70 @@ interface RunsProps {
   onClearFilter?: () => void;
 }
 
+type DateFilter = 7 | 30 | 0; // 0 = all time
+
 export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilter>(7);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [runDetails, setRunDetails] = useState<Record<string, Run>>({});
   const { messages } = useWebSocket();
+  const limit = 20;
+
+  const fetchRuns = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', page.toString());
+      params.set('limit', limit.toString());
+      if (dateFilter > 0) {
+        params.set('days', dateFilter.toString());
+      }
+      if (filter !== 'all') {
+        params.set('status', filter === 'success' ? 'success' : 'failed');
+      }
+      if (workflowFilter) {
+        params.set('workflow', workflowFilter);
+      }
+
+      const res = await fetch(`/api/runs?${params.toString()}`);
+      const data = await res.json();
+      setRuns(data.runs ?? []);
+      setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 1);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, dateFilter, filter, workflowFilter]);
 
   useEffect(() => {
-    fetch('/api/runs')
-      .then((res) => res.json())
-      .then((data) => {
-        setRuns(data.runs ?? []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
+    fetchRuns();
+  }, [fetchRuns]);
 
   // Listen for real-time updates
   useEffect(() => {
     for (const message of messages) {
       if (message.type === 'workflow.started') {
         const payload = message.payload as { runId: string; workflow: string };
-        setRuns((prev) => [
-          {
-            id: payload.runId,
-            workflow: payload.workflow,
-            status: 'running',
-            startedAt: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        // Only add if on page 1
+        if (page === 1) {
+          setRuns((prev) => [
+            {
+              id: payload.runId,
+              workflow: payload.workflow,
+              status: 'running',
+              startedAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+        }
       } else if (message.type === 'workflow.completed') {
         const payload = message.payload as { runId: string; status: string };
         setRuns((prev) =>
@@ -87,7 +116,7 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
         }
       }
     }
-  }, [messages, expandedRun]);
+  }, [messages, expandedRun, page]);
 
   const fetchRunDetails = async (runId: string) => {
     try {
@@ -110,13 +139,10 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
     }
   };
 
+  // Filtering is now done server-side, but we still filter running status client-side
   const filteredRuns = runs.filter((run) => {
-    // Apply workflow filter first
-    if (workflowFilter && run.workflow !== workflowFilter) return false;
-    // Then apply status filter
-    if (filter === 'all') return true;
-    if (filter === 'success') return run.status === 'success' || run.status === 'completed';
-    return run.status === filter;
+    if (filter === 'running') return run.status === 'running';
+    return true;
   });
 
   const formatDuration = (ms?: number) => {
@@ -157,18 +183,13 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
   };
 
   const refreshRuns = () => {
-    setLoading(true);
-    fetch('/api/runs')
-      .then((res) => res.json())
-      .then((data) => {
-        setRuns(data.runs ?? []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetchRuns();
   };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [dateFilter, filter, workflowFilter]);
 
   return (
     <div>
@@ -185,11 +206,24 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
           <p className="page-subtitle">
             {workflowFilter
               ? `Showing runs for ${workflowFilter} workflow`
-              : 'View and monitor workflow executions'
+              : `View and monitor workflow executions (${total} total)`
             }
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Date filters */}
+          <div style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
+            {([7, 30, 0] as DateFilter[]).map((d) => (
+              <button
+                key={d}
+                className={`btn btn-sm ${dateFilter === d ? 'btn-secondary' : 'btn-ghost'}`}
+                onClick={() => setDateFilter(d)}
+              >
+                {d === 0 ? 'All Time' : `${d} Days`}
+              </button>
+            ))}
+          </div>
+
           {workflowFilter && onClearFilter && (
             <button
               className="btn btn-ghost"
@@ -199,6 +233,8 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
               ✕ Clear Filter
             </button>
           )}
+
+          {/* Status filters */}
           {['all', 'success', 'running', 'failed'].map((f) => (
             <button
               key={f}
@@ -428,6 +464,36 @@ export function Runs({ workflowFilter, onClearFilter }: RunsProps) {
               </div>
             );
           })}
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '12px',
+              marginTop: '20px',
+              padding: '16px',
+            }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                ← Previous
+              </button>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

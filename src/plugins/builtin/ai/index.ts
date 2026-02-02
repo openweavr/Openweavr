@@ -10,7 +10,7 @@ import { getGlobalMCPManager } from '../../loader.js';
 import { refreshAccessToken, isTokenExpired, type OAuthTokens } from '../../../auth/openai-oauth.js';
 const execAsync = promisify(exec);
 
-// Token usage tracking
+// Token usage tracking - now persisted to SQLite
 interface UsageStats {
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -18,6 +18,22 @@ interface UsageStats {
   lastUpdated: string;
 }
 
+// Interface for the scheduler store to avoid circular dependency
+interface TokenTracker {
+  trackTokenUsage(entry: {
+    timestamp: number;
+    inputTokens: number;
+    outputTokens: number;
+    model?: string;
+    workflowName?: string;
+    runId?: string;
+  }): void;
+}
+
+// Store reference for persisting token usage (set by server.ts)
+let tokenTracker: TokenTracker | null = null;
+
+// In-memory stats for quick access (fallback)
 let usageStats: UsageStats = {
   totalInputTokens: 0,
   totalOutputTokens: 0,
@@ -25,7 +41,25 @@ let usageStats: UsageStats = {
   lastUpdated: new Date().toISOString(),
 };
 
-// Export for API access
+// Current context for tracking (set during workflow execution)
+let currentTrackingContext: { model?: string; workflowName?: string; runId?: string } = {};
+
+// Set the token tracker (called from server.ts)
+export function setTokenTracker(tracker: TokenTracker | null): void {
+  tokenTracker = tracker;
+}
+
+// Set tracking context (called during workflow execution)
+export function setTrackingContext(context: { model?: string; workflowName?: string; runId?: string }): void {
+  currentTrackingContext = context;
+}
+
+// Clear tracking context
+export function clearTrackingContext(): void {
+  currentTrackingContext = {};
+}
+
+// Export for API access (note: stats endpoint now uses SQLite directly)
 export function getUsageStats(): UsageStats {
   return { ...usageStats };
 }
@@ -35,11 +69,28 @@ export { type AIConfig };
 export { getGlobalAIConfig };
 
 // Helper to track usage from API responses (exported for use by other modules)
-export function trackUsage(inputTokens: number, outputTokens: number): void {
+export function trackUsage(inputTokens: number, outputTokens: number, model?: string): void {
+  // Update in-memory stats
   usageStats.totalInputTokens += inputTokens;
   usageStats.totalOutputTokens += outputTokens;
   usageStats.totalRequests += 1;
   usageStats.lastUpdated = new Date().toISOString();
+
+  // Persist to SQLite if tracker is available
+  if (tokenTracker) {
+    try {
+      tokenTracker.trackTokenUsage({
+        timestamp: Date.now(),
+        inputTokens,
+        outputTokens,
+        model: model ?? currentTrackingContext.model,
+        workflowName: currentTrackingContext.workflowName,
+        runId: currentTrackingContext.runId,
+      });
+    } catch (err) {
+      console.error('[ai] Failed to persist token usage:', err);
+    }
+  }
 }
 
 // Helper to sleep for a given duration
