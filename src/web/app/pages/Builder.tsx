@@ -13,10 +13,12 @@ export function Builder({ workflowName, onNavigate }: BuilderProps) {
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [initialYaml, setInitialYaml] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!workflowName);
+  const [originalName, setOriginalName] = useState<string | null>(null);
 
   useEffect(() => {
     if (workflowName) {
       setLoading(true);
+      setOriginalName(workflowName);
       fetch(`/api/workflows/${workflowName}`)
         .then((res) => res.json())
         .then((data) => {
@@ -31,6 +33,7 @@ export function Builder({ workflowName, onNavigate }: BuilderProps) {
         });
     } else {
       setInitialYaml(null);
+      setOriginalName(null);
       setLoading(false);
     }
   }, [workflowName]);
@@ -40,16 +43,18 @@ export function Builder({ workflowName, onNavigate }: BuilderProps) {
     setSaveMessage(null);
 
     try {
+      // Pass originalName so server can handle rename (delete old file)
       const response = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, yaml }),
+        body: JSON.stringify({ name, yaml, originalName }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setSaveMessage({ type: 'success', text: `Workflow "${data.name}" saved successfully!` });
+        setOriginalName(data.name); // Update original name after successful save
         setTimeout(() => setSaveMessage(null), 3000);
       } else {
         setSaveMessage({ type: 'error', text: data.error ?? 'Failed to save workflow' });
@@ -78,6 +83,7 @@ export function Builder({ workflowName, onNavigate }: BuilderProps) {
         onSave={handleSave}
         saving={saving}
         initialYaml={initialYaml}
+        initialName={workflowName}
         onBack={() => onNavigate('workflows')}
       />
 

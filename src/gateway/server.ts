@@ -4,7 +4,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import type { Server } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
-import { writeFile, mkdir, readdir, readFile, access, unlink } from 'node:fs/promises';
+import { writeFile, mkdir, readdir, readFile, access, unlink, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -289,7 +289,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   app.post('/api/workflows', async (c) => {
     try {
       const body = await c.req.json();
-      const { name, yaml } = body as { name?: string; yaml?: string };
+      const { name, yaml, originalName } = body as { name?: string; yaml?: string; originalName?: string };
 
       if (!name || !yaml) {
         return c.json({ error: 'Missing name or yaml' }, 400);
@@ -302,13 +302,30 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
       await mkdir(workflowsDir, { recursive: true });
       await writeFile(filePath, yaml, 'utf-8');
 
-      // Reschedule if workflow was already scheduled
+      // Handle rename: delete old file if name changed
+      if (originalName && originalName !== safeName) {
+        const safeOriginalName = originalName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+        if (safeOriginalName !== safeName) {
+          const oldFilePath = join(workflowsDir, `${safeOriginalName}.yaml`);
+          try {
+            await unlink(oldFilePath);
+            console.log(`[workflows] Renamed: ${safeOriginalName} -> ${safeName}`);
+            // Unschedule old workflow
+            scheduler.unscheduleWorkflow(safeOriginalName);
+          } catch {
+            // Old file may not exist, ignore
+          }
+        }
+      }
+
+      // Reschedule workflow
       const existingSchedule = scheduler.getWorkflowSchedule(safeName);
       if (existingSchedule) {
         console.log(`[scheduler] Rescheduling ${safeName} after edit...`);
         scheduler.unscheduleWorkflow(safeName);
-        await scheduler.scheduleWorkflow(safeName, yaml);
       }
+      // Schedule the new/updated workflow
+      await scheduler.scheduleWorkflow(safeName, yaml);
 
       broadcast('workflows', {
         type: 'workflow.saved',
@@ -326,9 +343,15 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     const body = await c.req.json().catch(() => ({}));
 
     // Load workflow file
-    const filePath = join(workflowsDir, `${name}.yaml`);
+    const yamlPath = join(workflowsDir, `${name}.yaml`);
+    const ymlPath = join(workflowsDir, `${name}.yml`);
+    const filePath = (await stat(yamlPath).then(() => yamlPath).catch(() => null))
+      ?? (await stat(ymlPath).then(() => ymlPath).catch(() => null));
     let content: string;
     try {
+      if (!filePath) {
+        throw new Error('Workflow not found');
+      }
       content = await readFile(filePath, 'utf-8');
     } catch {
       return c.json({ error: `Workflow not found: ${name}` }, 404);

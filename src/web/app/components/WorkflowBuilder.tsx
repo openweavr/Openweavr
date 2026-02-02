@@ -21,6 +21,7 @@ interface WorkflowBuilderProps {
   onSave?: (yaml: string, name: string) => void;
   saving?: boolean;
   initialYaml?: string | null;
+  initialName?: string | null;
   onBack?: () => void;
 }
 
@@ -1472,8 +1473,8 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
   return { nodes, edges, name };
 }
 
-export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: WorkflowBuilderProps) {
-  const [name, setName] = useState('my-workflow');
+export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBack }: WorkflowBuilderProps) {
+  const [name, setName] = useState(initialName ?? 'my-workflow');
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node<StepData> | null>(null);
