@@ -1210,8 +1210,14 @@ Output ONLY the YAML code block, no additional text.`;
           return c.json({ error: `OpenAI API error: ${err.error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+        const data = await response.json() as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
         yamlContent = data.choices?.[0]?.message?.content ?? '';
+
+        // Track token usage
+        if (data.usage) {
+          const { trackUsage } = await import('../plugins/builtin/ai/index.js');
+          trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+        }
       } else if (aiConfig.provider === 'anthropic') {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -1233,8 +1239,14 @@ Output ONLY the YAML code block, no additional text.`;
           return c.json({ error: `Anthropic API error: ${err.error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json() as { content?: { text?: string }[] };
+        const data = await response.json() as { content?: { text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number } };
         yamlContent = data.content?.[0]?.text ?? '';
+
+        // Track token usage
+        if (data.usage) {
+          const { trackUsage } = await import('../plugins/builtin/ai/index.js');
+          trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+        }
       } else if (aiConfig.provider === 'ollama') {
         const response = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
@@ -2116,8 +2128,14 @@ steps:
           return c.json({ error: `API error: ${(err as Record<string, Record<string, string>>).error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json() as { content?: Array<{ text?: string }> };
+        const data = await response.json() as { content?: Array<{ text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
         yamlContent = data.content?.[0]?.text ?? '';
+
+        // Track token usage
+        if (data.usage) {
+          const { trackUsage } = await import('../plugins/builtin/ai/index.js');
+          trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
+        }
       } else if (aiConfig.provider === 'openai') {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -2140,8 +2158,14 @@ steps:
           return c.json({ error: `API error: ${(err as Record<string, Record<string, string>>).error?.message ?? response.statusText}` }, 500);
         }
 
-        const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+        const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
         yamlContent = data.choices?.[0]?.message?.content ?? '';
+
+        // Track token usage
+        if (data.usage) {
+          const { trackUsage } = await import('../plugins/builtin/ai/index.js');
+          trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
+        }
       } else {
         return c.json({ error: 'Unsupported AI provider for workflow generation' }, 400);
       }

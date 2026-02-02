@@ -59,12 +59,23 @@
 
         <div class="section" id="dashboard">
           <h2>Dashboard</h2>
-          <p>The dashboard provides an overview of your Weavr instance:</p>
+          <p>The dashboard provides a comprehensive overview of your Weavr instance:</p>
+
+          <img src="assets/dashboard-screenshot.png" alt="Weavr Dashboard" class="screenshot" style="width: 100%; border-radius: 8px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
+
+          <h3>Key Features</h3>
           <ul>
-            <li><strong>Workflow count</strong> - Total number of registered workflows</li>
-            <li><strong>Recent runs</strong> - Latest workflow executions and their status</li>
-            <li><strong>Configuration status</strong> - API keys and integration health</li>
+            <li><strong>AI Model</strong> - Shows your configured AI provider, model, and authentication status</li>
+            <li><strong>Token Usage</strong> - Tracks input/output tokens and API requests across all AI operations</li>
+            <li><strong>Workflows</strong> - Displays active, paused, and total workflow counts with success rate</li>
+            <li><strong>Active Workflows</strong> - Lists deployed workflows with status, triggers, and quick actions (Run Now, Pause, Resume)</li>
+            <li><strong>Recent Runs</strong> - Shows latest workflow executions with status and duration</li>
+            <li><strong>Quick Actions</strong> - One-click access to create workflows, view all workflows, or access settings</li>
           </ul>
+
+          <div class="callout">
+            <strong>Real-time updates:</strong> The dashboard automatically refreshes when workflows run, showing live status via WebSocket connection.
+          </div>
         </div>
 
         <div class="section" id="workflows">
@@ -152,6 +163,11 @@
                 <td><span class="inline-code">GET</span></td>
                 <td>/api/config/status</td>
                 <td>Check configuration status</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">GET</span></td>
+                <td>/api/stats</td>
+                <td>Get dashboard stats (AI config, token usage, workflow counts)</td>
               </tr>
             </tbody>
           </table>
