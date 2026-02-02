@@ -13,21 +13,15 @@ Weavr is a self-hosted workflow automation platform with native AI agent support
 
 ## Build & Development
 
-**IMPORTANT**: Always run BOTH builds after making changes:
-- `npm run build` - Backend/server code
-- `npm run build:web` - Web UI (React/Vite)
-
-Never forget to rebuild the web UI when modifying files in `src/web/`.
-
 ```bash
 # Install dependencies
 npm install
 
-# Build everything (backend + web)
-npm run build && npm run build:web
-
-# Build backend only
+# Build everything (backend + web UI)
 npm run build
+
+# Build backend only (faster, for non-web changes)
+npm run build:backend
 
 # Build web UI only
 npm run build:web
@@ -38,6 +32,8 @@ npm test
 # Start the server
 node weavr.mjs serve
 ```
+
+**Note**: `npm run build` now builds both backend and web UI in one command.
 
 ## Project Structure
 

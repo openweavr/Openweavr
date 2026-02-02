@@ -19,7 +19,8 @@
   "scripts": {
     "dev": "tsx watch src/cli/program.ts",
     "dev:web": "vite --config src/web/vite.config.ts",
-    "build": "tsdown src/index.ts src/cli/program.ts src/plugins/sdk/index.ts --format esm --dts",
+    "build": "npm run build:backend && npm run build:web",
+    "build:backend": "tsdown src/index.ts src/cli/program.ts src/plugins/sdk/index.ts --format esm --dts",
     "build:web": "vite build --config src/web/vite.config.ts",
     "start": "node dist/cli/program.js",
     "serve": "tsx src/cli/program.ts serve",
