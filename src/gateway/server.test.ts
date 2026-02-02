@@ -46,13 +46,16 @@ describe('Gateway Server', () => {
     it('should validate workflow ID format', () => {
       const validIds = ['my-workflow', 'workflow_123', 'test'];
       const invalidIds = ['', ' ', '../etc', 'a'.repeat(256)];
+      const validPattern = /^[a-zA-Z0-9_-]+$/;
 
       validIds.forEach((id) => {
-        expect(/^[a-zA-Z0-9_-]+$/.test(id)).toBe(true);
+        expect(validPattern.test(id)).toBe(true);
       });
 
       invalidIds.forEach((id) => {
-        expect(id.length === 0 || id.includes('..') || id.length > 255).toBe(true);
+        // Invalid IDs should fail at least one validation check
+        const isInvalid = !validPattern.test(id) || id.length > 255;
+        expect(isInvalid).toBe(true);
       });
     });
 

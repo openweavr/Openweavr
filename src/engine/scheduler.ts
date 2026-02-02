@@ -279,6 +279,65 @@ export class TriggerScheduler {
     return { triggered, runIds };
   }
 
+  // For GitHub webhook events - called from the GitHub webhook handler
+  async triggerGitHubEvent(triggerType: string, data: Record<string, unknown>): Promise<{ triggered: string[]; runIds: string[] }> {
+    const triggered: string[] = [];
+    const runIds: string[] = [];
+
+    for (const [name, scheduled] of this.scheduledWorkflows) {
+      if (scheduled.status !== 'active') continue;
+      if (scheduled.triggerType !== triggerType) continue;
+
+      // Check if the repo matches (if configured in trigger config)
+      const configRepo = scheduled.triggerConfig.repo as string | undefined;
+      const eventRepo = data.repository as string;
+      if (configRepo && eventRepo && configRepo !== eventRepo) {
+        continue;
+      }
+
+      // Check branch filter for push events
+      if (triggerType === 'github.push') {
+        const configBranch = scheduled.triggerConfig.branch as string | undefined;
+        const eventBranch = data.branch as string;
+        if (configBranch && eventBranch && configBranch !== eventBranch) {
+          continue;
+        }
+      }
+
+      // Check action filter for pull_request events
+      if (triggerType === 'github.pull_request') {
+        const configEvents = scheduled.triggerConfig.events as string[] | undefined;
+        const eventAction = data.action as string;
+        if (configEvents && configEvents.length > 0 && !configEvents.includes(eventAction)) {
+          continue;
+        }
+      }
+
+      try {
+        const content = await readFile(join(this.workflowsDir, `${name}.yaml`), 'utf-8');
+        const runId = randomUUID();
+        triggered.push(name);
+        runIds.push(runId);
+
+        this.events.onWorkflowTriggered?.(name, runId);
+        console.log(`[scheduler] GitHub event triggered workflow: ${name} (run: ${runId})`);
+
+        const workflow = parser.parse(content);
+        // Execute async - don't wait
+        const executePromise = this.events.onExecuteWorkflow
+          ? this.events.onExecuteWorkflow(workflow, { type: 'github', triggerType, ...data }, runId)
+          : this.executor.execute(workflow, { type: 'github', triggerType, ...data }, runId);
+        executePromise.catch(err => {
+          console.error(`[scheduler] GitHub event execution failed for ${name}:`, err);
+        });
+      } catch (err) {
+        console.error(`[scheduler] Failed to trigger GitHub event for ${name}:`, err);
+      }
+    }
+
+    return { triggered, runIds };
+  }
+
   stopAll(): void {
     for (const [_name, scheduled] of this.scheduledWorkflows) {
       if (scheduled.cronJob) {

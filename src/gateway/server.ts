@@ -25,6 +25,7 @@ import {
   getOAuthCallbackPort,
   type PendingOAuthState,
 } from '../auth/openai-oauth.js';
+import { verifyWebhookSignature, parseWebhookEvent } from '../plugins/builtin/github/index.js';
 import { createServer as createHttpServer } from 'node:http';
 
 export interface GatewayServer {
@@ -1060,7 +1061,7 @@ steps:
 
 ## RULES
 
-1. Always include a trigger (cron.schedule for scheduled tasks, http.webhook for API triggers)
+1. Always include a trigger (cron.schedule for scheduled, http.webhook for generic webhooks, github.* for GitHub events)
 2. Use descriptive kebab-case step IDs (fetch-news, summarize-content, send-notification)
 3. Use "needs" array to specify step dependencies
 4. Use the CORRECT output field from the tables above (not generic .data)
@@ -1108,6 +1109,30 @@ steps:
       channel: "#news"
       text: "{{ steps.summarize.summary }}"
 \`\`\`
+
+## EXAMPLE 2 (GitHub trigger)
+
+User: "When a PR is opened in my repo, post to Slack with the PR title"
+
+\`\`\`yaml
+name: pr-notification
+description: Notify Slack when a pull request is opened
+
+trigger:
+  type: github.pull_request
+  with:
+    repo: "owner/repo"
+    events: ["opened"]
+
+steps:
+  - id: notify-slack
+    action: slack.post
+    with:
+      channel: "#dev"
+      text: "New PR: {{ trigger.pullRequest.title }} by {{ trigger.pullRequest.author }}"
+\`\`\`
+
+Note: GitHub triggers require setting up a webhook in GitHub pointing to \`http://your-server:3847/webhook/github\`
 
 Output ONLY the YAML code block, no additional text.`;
 
@@ -2225,6 +2250,69 @@ steps:
       services,
       envHints,
       activeSubscriptions: triggerManager.getSubscriptions().length,
+    });
+  });
+
+  // GitHub webhook receiver - handles GitHub-specific webhook events
+  app.post('/webhook/github', async (c) => {
+    const rawBody = await c.req.text();
+    const headers = Object.fromEntries(c.req.raw.headers);
+
+    // Get GitHub webhook secret from config or environment
+    const webhookSecret = config.githubWebhookSecret ?? process.env.GITHUB_WEBHOOK_SECRET;
+
+    // Verify signature if secret is configured
+    if (webhookSecret) {
+      const signature = headers['x-hub-signature-256'] as string;
+      if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
+        console.log('[github] Webhook signature verification failed');
+        return c.json({ error: 'Invalid signature' }, 401);
+      }
+    }
+
+    // Parse the payload
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
+
+    // Get the event type from X-GitHub-Event header
+    const eventType = headers['x-github-event'] as string;
+    if (!eventType) {
+      return c.json({ error: 'Missing X-GitHub-Event header' }, 400);
+    }
+
+    // Handle ping event (sent when webhook is first configured)
+    if (eventType === 'ping') {
+      console.log('[github] Received ping event - webhook configured successfully');
+      return c.json({ received: true, message: 'Pong! Webhook configured successfully.' });
+    }
+
+    // Parse the webhook event into trigger data
+    const parsed = parseWebhookEvent(eventType, body);
+    if (!parsed) {
+      console.log(`[github] Unsupported event type: ${eventType}`);
+      return c.json({ received: true, message: `Event type ${eventType} not supported` });
+    }
+
+    console.log(`[github] Received ${eventType} event -> ${parsed.triggerType}`);
+
+    broadcast('webhooks', {
+      type: 'webhook.received',
+      payload: { source: 'github', eventType, triggerType: parsed.triggerType, data: parsed.data },
+    });
+
+    // Trigger any workflows listening for this GitHub event
+    const { triggered, runIds } = await scheduler.triggerGitHubEvent(parsed.triggerType, parsed.data);
+
+    return c.json({
+      received: true,
+      eventType,
+      triggerType: parsed.triggerType,
+      triggered,
+      runIds,
     });
   });
 

@@ -144,7 +144,7 @@ describe('GitHub Plugin', () => {
       const result = await action!.execute(ctx);
 
       expect(mockFetch).toHaveBeenCalled();
-      expect(result.data).toMatchObject({
+      expect(result).toMatchObject({
         number: 100,
         title: 'Add new feature',
       });
@@ -171,7 +171,7 @@ describe('GitHub Plugin', () => {
       const result = await action!.execute(ctx);
 
       expect(mockFetch).toHaveBeenCalled();
-      expect(result.data).toHaveLength(2);
+      expect(result).toHaveLength(2);
     });
   });
 

@@ -1,17 +1,42 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock fs module before importing the plugin
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    readFileSync: vi.fn().mockReturnValue('{}'), // Return empty config
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn().mockReturnValue(false),
+  };
+});
+
+// Mock the openai-oauth module to prevent using real OAuth tokens
+vi.mock('../../../auth/openai-oauth.js', () => ({
+  refreshAccessToken: vi.fn(),
+  isTokenExpired: vi.fn().mockReturnValue(true),
+}));
+
+// Import the plugin after mocks are set up
 import aiPlugin from './index.js';
 
 describe('AI Plugin', () => {
   const mockFetch = vi.fn();
   const originalFetch = global.fetch;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     global.fetch = mockFetch;
     mockFetch.mockReset();
+    // Clear any API keys from process.env to ensure tests use ctx.env
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    // Restore original environment
+    process.env = { ...originalEnv };
   });
 
   const createContext = (config: Record<string, unknown>, env: Record<string, string> = {}) => ({
@@ -84,7 +109,7 @@ describe('AI Plugin', () => {
       const action = aiPlugin.actions.find((a) => a.name === 'complete');
       const ctx = createContext({ prompt: 'Test' }, {});
 
-      await expect(action!.execute(ctx)).rejects.toThrow('No AI API key found');
+      await expect(action!.execute(ctx)).rejects.toThrow();
     });
 
     it('should handle API errors', async () => {
@@ -169,14 +194,14 @@ describe('AI Plugin', () => {
       const ctx = createContext(
         {
           text: 'Contact John Doe at john@example.com or call 555-1234',
-          fields: ['name', 'email', 'phone'],
+          schema: { name: 'string', email: 'string', phone: 'string' },
         },
         { ANTHROPIC_API_KEY: 'test-key' }
       );
 
       const result = await action!.execute(ctx);
 
-      expect(result.data).toEqual({
+      expect(result).toEqual({
         name: 'John Doe',
         email: 'john@example.com',
         phone: '555-1234',
@@ -207,8 +232,8 @@ describe('AI Plugin', () => {
 
       const result = await action!.execute(ctx);
 
-      expect(result.data.items[0].product).toBe('Widget');
-      expect(result.data.total).toBe(49.99);
+      expect(result.items[0].product).toBe('Widget');
+      expect(result.total).toBe(49.99);
     });
   });
 

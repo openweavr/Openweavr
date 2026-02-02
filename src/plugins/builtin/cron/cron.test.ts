@@ -62,11 +62,12 @@ describe('Cron Plugin', () => {
       // Set a known time
       vi.setSystemTime(new Date('2024-01-15T10:00:00Z'));
 
-      const ctx = createContext({ expression: '0 12 * * *' }); // Every day at noon
+      const ctx = createContext({ expression: '0 12 * * *', timezone: 'UTC' }); // Every day at noon UTC
       const result = await action!.execute(ctx);
 
-      expect(result.next).toBeDefined();
-      expect(new Date(result.next).getHours()).toBe(12);
+      expect(result.nextRuns).toBeDefined();
+      expect(result.nextRuns.length).toBeGreaterThan(0);
+      expect(new Date(result.nextRuns[0]).getUTCHours()).toBe(12);
     });
 
     it('should handle minutely cron', async () => {
@@ -77,7 +78,8 @@ describe('Cron Plugin', () => {
       const ctx = createContext({ expression: '* * * * *' }); // Every minute
       const result = await action!.execute(ctx);
 
-      expect(result.next).toBeDefined();
+      expect(result.nextRuns).toBeDefined();
+      expect(result.nextRuns.length).toBeGreaterThan(0);
     });
 
     it('should return multiple next times', async () => {
@@ -88,9 +90,8 @@ describe('Cron Plugin', () => {
       const ctx = createContext({ expression: '0 * * * *', count: 3 }); // Every hour
       const result = await action!.execute(ctx);
 
-      if (Array.isArray(result.next)) {
-        expect(result.next).toHaveLength(3);
-      }
+      expect(result.nextRuns).toBeDefined();
+      expect(result.nextRuns.length).toBeGreaterThanOrEqual(3);
     });
   });
 

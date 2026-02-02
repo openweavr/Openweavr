@@ -136,7 +136,7 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
           before,
           after: head,
           repository: event.repo.name,
-          pusher: { name: event.actor.login },
+          pusher: { name: event.actor?.login ?? 'unknown' },
           commits: commits.map(c => ({
             id: c.sha,
             message: c.message,
@@ -163,9 +163,11 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
         html_url: string;
         head: { ref: string; sha: string };
         base: { ref: string; sha: string };
-        user: { login: string };
-      };
+        user?: { login: string };
+      } | undefined;
       const action = payload.action as string;
+
+      if (!pr) return null;
 
       return {
         triggerType: 'github.pull_request',
@@ -181,7 +183,7 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
             url: pr.html_url,
             head: pr.head,
             base: pr.base,
-            author: pr.user.login,
+            author: pr.user?.login ?? 'unknown',
           },
           repository: event.repo.name,
         },
@@ -196,11 +198,13 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
         body: string | null;
         state: string;
         html_url: string;
-        user: { login: string };
+        user?: { login: string };
         labels: Array<{ name: string }>;
-      };
+      } | undefined;
       const action = payload.action as string;
       const label = payload.label as { name: string } | undefined;
+
+      if (!issue) return null;
 
       const baseTriggerData = {
         action,
@@ -211,8 +215,8 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
           body: issue.body,
           state: issue.state,
           url: issue.html_url,
-          author: issue.user.login,
-          labels: issue.labels.map(l => l.name),
+          author: issue.user?.login ?? 'unknown',
+          labels: issue.labels?.map(l => l.name) ?? [],
         },
         repository: event.repo.name,
       };
@@ -452,6 +456,7 @@ export function parseWebhookEvent(eventType: string, payload: unknown): {
 
     case 'pull_request': {
       const event = payload as GitHubPullRequestEvent;
+      if (!event.pull_request) return null;
       return {
         triggerType: 'github.pull_request',
         data: {
@@ -466,7 +471,7 @@ export function parseWebhookEvent(eventType: string, payload: unknown): {
             url: event.pull_request.html_url,
             head: event.pull_request.head,
             base: event.pull_request.base,
-            author: event.pull_request.user.login,
+            author: event.pull_request.user?.login ?? 'unknown',
           },
           repository: event.repository.full_name,
         },
@@ -475,6 +480,7 @@ export function parseWebhookEvent(eventType: string, payload: unknown): {
 
     case 'issues': {
       const event = payload as GitHubIssueEvent;
+      if (!event.issue) return null;
       const baseTriggerData = {
         action: event.action,
         issue: {
@@ -484,8 +490,8 @@ export function parseWebhookEvent(eventType: string, payload: unknown): {
           body: event.issue.body,
           state: event.issue.state,
           url: event.issue.html_url,
-          author: event.issue.user.login,
-          labels: event.issue.labels.map(l => l.name),
+          author: event.issue.user?.login ?? 'unknown',
+          labels: event.issue.labels?.map(l => l.name) ?? [],
         },
         repository: event.repository.full_name,
       };

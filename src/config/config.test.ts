@@ -146,7 +146,7 @@ SLACK_TOKEN=xoxb-test
       const secret = 'ghp_abc123xyz789';
       const masked = secret.slice(0, 4) + '****' + secret.slice(-4);
 
-      expect(masked).toBe('ghp_****9789');
+      expect(masked).toBe('ghp_****z789');
       expect(masked).not.toContain('abc123xyz');
     });
 

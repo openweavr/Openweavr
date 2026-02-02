@@ -81,11 +81,12 @@ export default definePlugin({
       name: 'wait',
       description: 'Wait for a specified duration',
       async execute(ctx) {
+        const ms = (ctx.config.ms as number) ?? 0;
         const seconds = (ctx.config.seconds as number) ?? 0;
         const minutes = (ctx.config.minutes as number) ?? 0;
         const hours = (ctx.config.hours as number) ?? 0;
 
-        const totalMs = (seconds + minutes * 60 + hours * 3600) * 1000;
+        const totalMs = ms + (seconds + minutes * 60 + hours * 3600) * 1000;
 
         ctx.log(`Waiting for ${totalMs}ms...`);
         await new Promise((resolve) => setTimeout(resolve, totalMs));

@@ -571,11 +571,12 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
-      { name: 'events', label: 'Events', type: 'select', options: [
+      { name: 'events', label: 'Events', type: 'multiselect', options: [
         { value: 'opened', label: 'Opened' },
         { value: 'closed', label: 'Closed' },
+        { value: 'synchronize', label: 'Updated (synchronize)' },
         { value: 'merged', label: 'Merged' },
-      ], default: 'opened' },
+      ], default: ['opened'] },
     ],
   },
   {
@@ -1577,10 +1578,13 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: Workflo
           if (key === 'schedule') continue;
           if (value !== '' && value !== undefined && value !== null) {
             // Handle different value types
-            if (typeof value === 'string') {
+            if (Array.isArray(value)) {
+              // Arrays (e.g., events: [opened, closed])
+              yaml += `    ${key}: [${value.join(', ')}]\n`;
+            } else if (typeof value === 'string') {
               yaml += `    ${key}: "${value}"\n`;
             } else if (typeof value === 'object') {
-              // Skip objects (like the schedule field)
+              // Skip non-array objects (like the schedule field)
               continue;
             } else {
               yaml += `    ${key}: ${value}\n`;
@@ -1617,7 +1621,13 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, onBack }: Workflo
         if (configEntries.length > 0) {
           yaml += '    with:\n';
           for (const [key, value] of configEntries) {
-            yaml += `      ${key}: ${typeof value === 'string' ? `"${value}"` : value}\n`;
+            if (Array.isArray(value)) {
+              yaml += `      ${key}: [${value.join(', ')}]\n`;
+            } else if (typeof value === 'string') {
+              yaml += `      ${key}: "${value}"\n`;
+            } else {
+              yaml += `      ${key}: ${value}\n`;
+            }
           }
         }
       }

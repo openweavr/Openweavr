@@ -74,3 +74,6 @@ export class WorkflowParser {
 }
 
 export const parser = new WorkflowParser();
+
+// Named export for convenience
+export const parseWorkflow = parser.parse.bind(parser);

@@ -183,6 +183,8 @@ export interface WeavrConfig {
     whatsapp?: WhatsAppConfig;
     imessage?: iMessageConfig;
   };
+  // GitHub webhook secret for signature verification
+  githubWebhookSecret?: string;
 }
 
 export const DEFAULT_CONFIG: WeavrConfig = {

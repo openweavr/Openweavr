@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkflowExecutor } from './executor.js';
 import { parseWorkflow } from './parser.js';
+import { PluginRegistry } from '../plugins/sdk/registry.js';
+import type { WeavrPlugin } from '../plugins/sdk/types.js';
 
 describe('Workflow Engine Integration', () => {
+  let registry: PluginRegistry;
   let executor: WorkflowExecutor;
 
   beforeEach(() => {
-    executor = new WorkflowExecutor();
+    registry = new PluginRegistry();
+    executor = new WorkflowExecutor({ registry });
   });
+
+  const registerMockPlugin = (plugin: WeavrPlugin) => {
+    registry.register(plugin);
+  };
 
   describe('End-to-end workflow execution', () => {
     it('should execute a simple single-step workflow', async () => {
@@ -22,22 +30,11 @@ steps:
       message: "Hello, World!"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
-        name: 'log',
-        version: '1.0.0',
-        description: 'Test logging',
-        actions: [{
-          name: 'log',
-          description: 'Log a message',
-          execute: vi.fn().mockResolvedValue({ logged: true }),
-        }],
-      };
-
-      executor.registerPlugin(mockPlugin);
+      // 'log' is a built-in action, no plugin needed
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
-      expect(result.steps.log.status).toBe('completed');
+      expect(result.steps.get('log')?.status).toBe('completed');
     });
 
     it('should execute multi-step workflow with dependencies', async () => {
@@ -62,7 +59,7 @@ steps:
       result: "{{ steps.process.result }}"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -85,11 +82,11 @@ steps:
         ],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
-      expect(Object.keys(result.steps)).toHaveLength(3);
+      expect(result.steps.size).toBe(3);
     });
 
     it('should execute parallel steps when no dependencies', async () => {
@@ -113,7 +110,7 @@ steps:
 `;
       const workflow = parseWorkflow(yaml);
       const executionOrder: number[] = [];
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -127,7 +124,7 @@ steps:
         }],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
@@ -158,7 +155,7 @@ steps:
       message: "Condition failed"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -176,7 +173,7 @@ steps:
         ],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
@@ -194,7 +191,7 @@ steps:
       error: "Intentional failure"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -205,12 +202,12 @@ steps:
         }],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('failed');
-      expect(result.steps.will_fail.status).toBe('failed');
-      expect(result.steps.will_fail.error).toContain('Intentional failure');
+      expect(result.steps.get('will_fail')?.status).toBe('failed');
+      expect(result.steps.get('will_fail')?.error).toContain('Intentional failure');
     });
 
     it('should retry failed steps', async () => {
@@ -229,7 +226,7 @@ steps:
 `;
       const workflow = parseWorkflow(yaml);
       let attempts = 0;
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -246,7 +243,7 @@ steps:
         }],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
@@ -266,7 +263,7 @@ steps:
       delay: 5000
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -280,7 +277,7 @@ steps:
         }],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
 
       // Use a shorter timeout for the test
       const result = await Promise.race([
@@ -310,7 +307,7 @@ steps:
       value: "{{ steps.get_data.result.name }}"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -330,7 +327,7 @@ steps:
         ],
       };
 
-      executor.registerPlugin(mockPlugin);
+      registerMockPlugin(mockPlugin);
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
@@ -347,23 +344,12 @@ env:
   MY_VAR: "{{ env.TEST_VAR }}"
 steps:
   - id: use_env
-    action: test.log
+    action: log
     with:
-      value: "{{ env.MY_VAR }}"
+      message: "{{ env.MY_VAR }}"
 `;
       const workflow = parseWorkflow(yaml);
-      const mockPlugin = {
-        name: 'test',
-        version: '1.0.0',
-        description: 'Test plugin',
-        actions: [{
-          name: 'log',
-          description: 'Log value',
-          execute: vi.fn().mockResolvedValue({ logged: true }),
-        }],
-      };
-
-      executor.registerPlugin(mockPlugin);
+      // 'log' is a built-in action
       const result = await executor.execute(workflow);
 
       expect(result.status).toBe('completed');
@@ -386,7 +372,7 @@ steps:
 `;
       const workflow = parseWorkflow(yaml);
       const events: Array<{ type: string; payload: unknown }> = [];
-      const mockPlugin = {
+      const mockPlugin: WeavrPlugin = {
         name: 'test',
         version: '1.0.0',
         description: 'Test plugin',
@@ -397,11 +383,16 @@ steps:
         }],
       };
 
-      executor.registerPlugin(mockPlugin);
-      executor.on('step.started', (payload) => events.push({ type: 'step.started', payload }));
-      executor.on('step.completed', (payload) => events.push({ type: 'step.completed', payload }));
+      registerMockPlugin(mockPlugin);
 
-      await executor.execute(workflow);
+      // Create a new executor with event callbacks
+      const eventExecutor = new WorkflowExecutor({
+        registry,
+        onStepStart: (runId, stepId) => events.push({ type: 'step.started', payload: { runId, stepId } }),
+        onStepComplete: (runId, stepId, result) => events.push({ type: 'step.completed', payload: { runId, stepId, result } }),
+      });
+
+      await eventExecutor.execute(workflow);
 
       expect(events.length).toBeGreaterThan(0);
     });
