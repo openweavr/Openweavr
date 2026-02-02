@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="index.html">
@@ -45,22 +48,27 @@
           <h2>Workflow Structure</h2>
           <p>Workflows are defined in YAML files with the following structure:</p>
 
-          <div class="card">
-            <pre><code>name: workflow-name
-description: What this workflow does
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">name:</span> <span class="string">workflow-name</span>
+<span class="keyword">description:</span> <span class="string">What this workflow does</span>
 
-# Optional: Trigger that starts the workflow
-trigger:
-  type: trigger.type
-  with:
-    key: value
+<span class="comment"># Optional: Trigger that starts the workflow</span>
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">trigger.type</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">key:</span> <span class="string">value</span>
 
-# Required: Steps to execute
-steps:
-  - id: step-id
-    action: action.name
-    with:
-      key: value</code></pre>
+<span class="comment"># Required: Steps to execute</span>
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">step-id</span>
+    <span class="keyword">action:</span> <span class="string">action.name</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">key:</span> <span class="string">value</span></code></pre>
           </div>
 
           <h3>Fields</h3>
@@ -144,17 +152,22 @@ steps:
           <h2>Steps</h2>
           <p>Steps are the individual units of work in a workflow.</p>
 
-          <div class="card">
-            <pre><code>steps:
-  - id: unique-step-id       # Required: Unique identifier
-    action: plugin.action    # Required: Action to execute
-    needs: [other-step-id]   # Optional: Dependencies
-    if: "{{ condition }}"    # Optional: Conditional execution
-    with:                    # Optional: Action parameters
-      key: value
-    retry:                   # Optional: Retry configuration
-      attempts: 3
-      delay: 1000</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">unique-step-id</span>       <span class="comment"># Required: Unique identifier</span>
+    <span class="keyword">action:</span> <span class="string">plugin.action</span>    <span class="comment"># Required: Action to execute</span>
+    <span class="keyword">needs:</span> <span class="string">[other-step-id]</span>   <span class="comment"># Optional: Dependencies</span>
+    <span class="keyword">if:</span> <span class="string">"{{ condition }}"</span>    <span class="comment"># Optional: Conditional execution</span>
+    <span class="keyword">with:</span>                    <span class="comment"># Optional: Action parameters</span>
+      <span class="keyword">key:</span> <span class="string">value</span>
+    <span class="keyword">retry:</span>                   <span class="comment"># Optional: Retry configuration</span>
+      <span class="keyword">attempts:</span> <span class="number">3</span>
+      <span class="keyword">delay:</span> <span class="number">1000</span></code></pre>
           </div>
 
           <h3>Step Fields</h3>
@@ -199,20 +212,30 @@ steps:
 
           <h3>transform</h3>
           <p>Create a value from a template string.</p>
-          <div class="card">
-            <pre><code>- id: message
-  action: transform
-  with:
-    template: "Hello, {{ input.name }}!"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">message</span>
+  <span class="keyword">action:</span> <span class="string">transform</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">template:</span> <span class="string">"Hello, {{ input.name }}!"</span></code></pre>
           </div>
 
           <h3>log</h3>
           <p>Log a message to the workflow output.</p>
-          <div class="card">
-            <pre><code>- id: log-result
-  action: log
-  with:
-    message: "Processing complete: {{ steps.process.result }}"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">log-result</span>
+  <span class="keyword">action:</span> <span class="string">log</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">message:</span> <span class="string">"Processing complete: {{ steps.process.result }}"</span></code></pre>
           </div>
 
           <h3>http.request</h3>

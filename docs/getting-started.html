@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="index.html">
@@ -57,7 +60,12 @@
         <div class="section" id="installation">
           <h2>Installation</h2>
           <p>Clone the repository and install dependencies:</p>
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>git clone https://github.com/openweavr/Openweavr.git
 cd Openweavr
 npm install</code></pre>
@@ -65,13 +73,23 @@ npm install</code></pre>
 
           <h3>Build</h3>
           <p>Build both the backend and web UI:</p>
-          <div class="card">
-            <pre><code>npm run build      # Build backend/CLI
-npm run build:web  # Build web UI</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>npm run build      <span class="comment"># Build backend/CLI</span>
+npm run build:web  <span class="comment"># Build web UI</span></code></pre>
           </div>
 
           <h3>Verify Installation</h3>
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs --version
 node weavr.mjs doctor</code></pre>
           </div>
@@ -83,30 +101,44 @@ node weavr.mjs doctor</code></pre>
 
           <h3>Initial Setup</h3>
           <p>Run the onboard command to create your configuration:</p>
-          <div class="card">
-            <pre><code># Interactive setup
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Interactive setup</span>
 node weavr.mjs onboard
 
-# Non-interactive (for scripts/CI)
+<span class="comment"># Non-interactive (for scripts/CI)</span>
 node weavr.mjs onboard --non-interactive --ai-provider anthropic</code></pre>
           </div>
 
           <h3>Manual Configuration</h3>
           <p>Or create the config file manually:</p>
-          <div class="card">
-            <pre><code># ~/.weavr/config.yaml
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># ~/.weavr/config.yaml</span>
 
-# LLM Provider (for AI agents)
-anthropicKey: sk-ant-...
-model: claude-sonnet-4-20250514
+<span class="comment"># LLM Provider (for AI agents)</span>
+<span class="keyword">anthropicKey:</span> <span class="string">sk-ant-...</span>
+<span class="keyword">model:</span> <span class="string">claude-sonnet-4-20250514</span>
 
-# Or use OpenAI
-# openaiKey: sk-...
-# model: gpt-4o
+<span class="comment"># Or use OpenAI</span>
+<span class="comment"># openaiKey: sk-...</span>
+<span class="comment"># model: gpt-4o</span>
 
-# Server settings (optional)
-port: 3847
-host: localhost</code></pre>
+<span class="comment"># Server settings (optional)</span>
+<span class="keyword">port:</span> <span class="number">3847</span>
+<span class="keyword">host:</span> <span class="string">localhost</span>
+
+<span class="comment"># Scheduler persistence (optional)</span>
+<span class="keyword">scheduler:</span>
+  <span class="keyword">dbPath:</span> <span class="string">/path/to/scheduler.db</span></code></pre>
           </div>
 
           <h3>Environment Variables</h3>
@@ -147,31 +179,41 @@ host: localhost</code></pre>
           <p>Create a simple workflow to verify everything works.</p>
 
           <h3>Create the Workflow</h3>
-          <div class="card">
-            <pre><code># Create workflow directory
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Create workflow directory</span>
 mkdir -p ~/.weavr/workflows
 
-# Create a simple workflow
+<span class="comment"># Create a simple workflow</span>
 cat > ~/.weavr/workflows/hello.yaml << 'EOF'
-name: hello-world
-description: A simple test workflow
+<span class="keyword">name:</span> <span class="string">hello-world</span>
+<span class="keyword">description:</span> <span class="string">A simple test workflow</span>
 
-steps:
-  - id: greet
-    action: transform
-    with:
-      template: "Hello from Weavr!"
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">greet</span>
+    <span class="keyword">action:</span> <span class="string">transform</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">template:</span> <span class="string">"Hello from Weavr!"</span>
 
-  - id: log
-    action: log
-    needs: [greet]
-    with:
-      message: "{{ steps.greet }}"
+  - <span class="keyword">id:</span> <span class="string">log</span>
+    <span class="keyword">action:</span> <span class="string">log</span>
+    <span class="keyword">needs:</span> <span class="string">[greet]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">message:</span> <span class="string">"{{ steps.greet }}"</span>
 EOF</code></pre>
           </div>
 
           <h3>Run the Workflow</h3>
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs run hello</code></pre>
           </div>
 

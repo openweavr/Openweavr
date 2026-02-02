@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="index.html">
@@ -70,17 +73,22 @@
           <h2>Configuration</h2>
           <p>Configure your AI provider in <span class="inline-code">~/.weavr/config.yaml</span>:</p>
 
-          <div class="card">
-            <pre><code># Anthropic (recommended)
-anthropicKey: sk-ant-...
-model: claude-sonnet-4-20250514
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Anthropic (recommended)</span>
+<span class="keyword">anthropicKey:</span> <span class="string">sk-ant-...</span>
+<span class="keyword">model:</span> <span class="string">claude-sonnet-4-20250514</span>
 
-# Or OpenAI
-openaiKey: sk-...
-model: gpt-4o
+<span class="comment"># Or OpenAI</span>
+<span class="keyword">openaiKey:</span> <span class="string">sk-...</span>
+<span class="keyword">model:</span> <span class="string">gpt-4o</span>
 
-# Web search (optional)
-# Set via environment: BRAVE_API_KEY or TAVILY_API_KEY</code></pre>
+<span class="comment"># Web search (optional)</span>
+<span class="comment"># Set via environment: BRAVE_API_KEY or TAVILY_API_KEY</span></code></pre>
           </div>
 
           <div class="callout">
@@ -93,31 +101,41 @@ model: gpt-4o
           <h2>Basic Usage</h2>
           <p>Use the <span class="inline-code">ai.agent</span> action in your workflow steps:</p>
 
-          <div class="card">
-            <pre><code>steps:
-  - id: analyze
-    action: ai.agent
-    with:
-      task: |
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">analyze</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> |
         Analyze this error log and suggest fixes:
         {{ trigger.error }}
 
-      # Optional: customize the agent
-      model: claude-sonnet-4-20250514
-      maxTokens: 4096
-      temperature: 0.7
-      system: "You are a helpful debugging assistant."</code></pre>
+      <span class="comment"># Optional: customize the agent</span>
+      <span class="keyword">model:</span> <span class="string">claude-sonnet-4-20250514</span>
+      <span class="keyword">maxTokens:</span> <span class="number">4096</span>
+      <span class="keyword">temperature:</span> <span class="number">0.7</span>
+      <span class="keyword">system:</span> <span class="string">"You are a helpful debugging assistant."</span></code></pre>
           </div>
 
           <h3>Accessing Results</h3>
           <p>The agent's response is available in subsequent steps:</p>
-          <div class="card">
-            <pre><code>- id: respond
-  action: slack.post
-  needs: [analyze]
-  with:
-    channel: "#alerts"
-    text: "{{ steps.analyze.response }}"</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>- <span class="keyword">id:</span> <span class="string">respond</span>
+  <span class="keyword">action:</span> <span class="string">slack.post</span>
+  <span class="keyword">needs:</span> <span class="string">[analyze]</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">channel:</span> <span class="string">"#alerts"</span>
+    <span class="keyword">text:</span> <span class="string">"{{ steps.analyze.response }}"</span></code></pre>
           </div>
         </div>
 

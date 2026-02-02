@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="index.html">
@@ -45,7 +48,12 @@
           <h2>serve</h2>
           <p>Start the Weavr server with the web UI and API.</p>
 
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs serve [options]</code></pre>
           </div>
 
@@ -73,14 +81,19 @@
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Start with defaults
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Start with defaults</span>
 node weavr.mjs serve
 
-# Custom port
+<span class="comment"># Custom port</span>
 node weavr.mjs serve --port 8080
 
-# Bind to all interfaces (for remote access)
+<span class="comment"># Bind to all interfaces (for remote access)</span>
 node weavr.mjs serve --host 0.0.0.0</code></pre>
           </div>
         </div>
@@ -89,8 +102,13 @@ node weavr.mjs serve --host 0.0.0.0</code></pre>
           <h2>run</h2>
           <p>Execute a workflow by name.</p>
 
-          <div class="card">
-            <pre><code>node weavr.mjs run <workflow-name> [options]</code></pre>
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code>node weavr.mjs run &lt;workflow-name&gt; [options]</code></pre>
           </div>
 
           <h3>Options</h3>
@@ -114,14 +132,19 @@ node weavr.mjs serve --host 0.0.0.0</code></pre>
           </table>
 
           <h3>Examples</h3>
-          <div class="card">
-            <pre><code># Run a workflow
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="comment"># Run a workflow</span>
 node weavr.mjs run hello-world
 
-# Run with input data
+<span class="comment"># Run with input data</span>
 node weavr.mjs run process-data -i '{"file": "data.csv"}'
 
-# Verbose output
+<span class="comment"># Verbose output</span>
 node weavr.mjs run my-workflow --verbose</code></pre>
           </div>
         </div>
@@ -130,7 +153,12 @@ node weavr.mjs run my-workflow --verbose</code></pre>
           <h2>list</h2>
           <p>List all available workflows.</p>
 
-          <div class="card">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
             <pre><code>node weavr.mjs list</code></pre>
           </div>
 
