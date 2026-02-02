@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weavr Documentation</title>
+    <meta name="description" content="Documentation for Weavr - self-hosted workflow automation with native AI agent support." />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/openweavr-logo-text.png" alt="Weavr" />
+        </a>
+        <button class="nav-toggle" data-nav-toggle>Menu</button>
+        <nav class="site-nav" data-site-nav>
+          <a href="overview.html" aria-current="page">Overview</a>
+          <a href="getting-started.html">Getting Started</a>
+          <a href="cli.html">CLI</a>
+          <a href="web-app.html">Web App</a>
+          <a href="workflows.html">Workflows</a>
+          <a href="integrations.html">Integrations</a>
+          <a href="agents.html">AI Agents</a>
+          <a href="troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero fade">
+        <h1>Self-hosted workflow automation with AI agents</h1>
+        <p>
+          Weavr is an open-source workflow automation platform that combines the power of
+          traditional automation tools with native AI agent capabilities. Run it on your
+          own infrastructure with full data sovereignty.
+        </p>
+        <div class="hero-badges">
+          <span class="badge">Open Source</span>
+          <span class="badge">Self-Hosted</span>
+          <span class="badge">AI-Native</span>
+          <span class="badge">Node.js 22+</span>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Quick Start</h2>
+        <p>Get up and running in under a minute.</p>
+        <div class="code-block fade" style="--delay: 0.1s;">
+          <div class="code-header">
+            <div class="code-dot red"></div>
+            <div class="code-dot yellow"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <pre><code><span class="comment"># Clone and install</span>
+git clone https://github.com/openweavr/Openweavr.git
+cd Openweavr
+npm install
+
+<span class="comment"># Build backend and web UI</span>
+npm run build
+npm run build:web
+
+<span class="comment"># Start the server</span>
+node weavr.mjs serve</code></pre>
+        </div>
+        <p style="margin-top: 16px; color: var(--muted);">
+          Open <span class="inline-code">http://localhost:3847</span> to access the web interface.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Key Features</h2>
+        <div class="grid">
+          <div class="card fade" style="--delay: 0.1s;">
+            <h3>AI Agents</h3>
+            <p>Build workflows powered by Claude, GPT, and other LLMs with tool use, web search, and memory.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.15s;">
+            <h3>Event-Driven Triggers</h3>
+            <p>React to GitHub events, cron schedules, webhooks, Telegram messages, and more.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.2s;">
+            <h3>MCP Support</h3>
+            <p>Extend agent capabilities with Model Context Protocol servers for filesystem, databases, and APIs.</p>
+          </div>
+          <div class="card fade" style="--delay: 0.25s;">
+            <h3>Full Control</h3>
+            <p>Self-host on your infrastructure. Your data never leaves your servers.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Documentation</h2>
+        <div class="grid">
+          <a class="card fade" style="--delay: 0.1s;" href="getting-started.html">
+            <h3>Getting Started</h3>
+            <p>Installation, configuration, and your first workflow.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.15s;" href="cli.html">
+            <h3>CLI Reference</h3>
+            <p>Command-line interface for workflow management and execution.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.2s;" href="web-app.html">
+            <h3>Web Interface</h3>
+            <p>Visual workflow management, execution monitoring, and chat.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.25s;" href="workflows.html">
+            <h3>Workflow Reference</h3>
+            <p>YAML syntax, actions, triggers, and variable interpolation.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.3s;" href="integrations.html">
+            <h3>Integrations</h3>
+            <p>GitHub, Telegram, Slack, Discord, Linear, and more.</p>
+          </a>
+          <a class="card fade" style="--delay: 0.35s;" href="agents.html">
+            <h3>AI Agents</h3>
+            <p>Configure and use AI agents with tools, web search, and MCP.</p>
+          </a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Example Workflow</h2>
+        <p>Build workflows visually or write YAML directly — both produce the same result.</p>
+
+        <div class="workflow-showcase fade" style="--delay: 0.1s;">
+          <div class="workflow-visual">
+            <img src="assets/workflow-builder-screenshot.png" alt="Visual Workflow Builder" class="screenshot" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
+            <p style="text-align: center; color: var(--muted); margin-top: 12px; font-size: 14px;">Visual workflow builder with drag-and-drop steps</p>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 32px;">YAML Definition</h3>
+        <p>The same workflow as YAML — schedule an AI research agent that sends daily market briefings to Telegram.</p>
+        <div class="code-block fade" style="--delay: 0.15s;">
+          <div class="code-header">
+            <div class="code-dot red"></div>
+            <div class="code-dot yellow"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <pre><code><span class="keyword">name:</span> <span class="string">daily-market-research-telegram</span>
+
+<span class="keyword">trigger:</span>
+  <span class="keyword">type:</span> <span class="string">cron.schedule</span>
+  <span class="keyword">with:</span>
+    <span class="keyword">cron:</span> <span class="string">"0 9 * * *"</span>
+
+<span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">research</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> <span class="string">"Research today's top market insights..."</span>
+
+  - <span class="keyword">id:</span> <span class="string">summarize</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">needs:</span> <span class="string">[research]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> <span class="string">"Create a concise summary from: {{ steps.research.result }}"</span>
+
+  - <span class="keyword">id:</span> <span class="string">send_to_telegram</span>
+    <span class="keyword">action:</span> <span class="string">telegram.send</span>
+    <span class="keyword">needs:</span> <span class="string">[summarize]</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">chatId:</span> <span class="string">"YOUR_CHAT_ID"</span>
+      <span class="keyword">text:</span> <span class="string">"{{ steps.summarize.result }}"</span></code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <a href="https://github.com/openweavr/Openweavr" target="_blank">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
