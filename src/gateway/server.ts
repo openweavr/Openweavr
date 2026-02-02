@@ -295,12 +295,45 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         return c.json({ error: 'Missing name or yaml' }, 400);
       }
 
+      // Validate and auto-format YAML
+      let parsedYaml: Record<string, unknown>;
+      try {
+        parsedYaml = parseYaml(yaml) as Record<string, unknown>;
+      } catch (parseErr) {
+        const error = parseErr as Error;
+        return c.json({
+          error: 'Invalid YAML syntax',
+          details: error.message,
+          validationError: true
+        }, 400);
+      }
+
+      // Validate required workflow structure
+      if (!parsedYaml.name && !parsedYaml.steps) {
+        return c.json({
+          error: 'Invalid workflow: must have "name" and "steps"',
+          validationError: true
+        }, 400);
+      }
+
+      // Ensure name in YAML matches filename
+      parsedYaml.name = name;
+
+      // Auto-format YAML with consistent style
+      const formattedYaml = stringifyYaml(parsedYaml, {
+        indent: 2,
+        lineWidth: 0, // Don't wrap lines
+        defaultKeyType: 'PLAIN',
+        defaultStringType: 'QUOTE_DOUBLE',
+        nullStr: '',
+      });
+
       // Sanitize name for filename
       const safeName = name.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
       const filePath = join(workflowsDir, `${safeName}.yaml`);
 
       await mkdir(workflowsDir, { recursive: true });
-      await writeFile(filePath, yaml, 'utf-8');
+      await writeFile(filePath, formattedYaml, 'utf-8');
 
       // Handle rename: delete old file if name changed
       if (originalName && originalName !== safeName) {
@@ -325,14 +358,14 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         scheduler.unscheduleWorkflow(safeName);
       }
       // Schedule the new/updated workflow
-      await scheduler.scheduleWorkflow(safeName, yaml);
+      await scheduler.scheduleWorkflow(safeName, formattedYaml);
 
       broadcast('workflows', {
         type: 'workflow.saved',
         payload: { name: safeName, path: filePath },
       });
 
-      return c.json({ success: true, name: safeName, path: filePath });
+      return c.json({ success: true, name: safeName, path: filePath, yaml: formattedYaml });
     } catch (err) {
       return c.json({ error: 'Failed to save workflow', details: String(err) }, 500);
     }
