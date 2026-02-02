@@ -34,8 +34,8 @@ export function getUsageStats(): UsageStats {
 export { type AIConfig };
 export { getGlobalAIConfig };
 
-// Helper to track usage from API responses
-function trackUsage(inputTokens: number, outputTokens: number): void {
+// Helper to track usage from API responses (exported for use by other modules)
+export function trackUsage(inputTokens: number, outputTokens: number): void {
   usageStats.totalInputTokens += inputTokens;
   usageStats.totalOutputTokens += outputTokens;
   usageStats.totalRequests += 1;
