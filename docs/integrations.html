@@ -78,6 +78,54 @@ trigger:
     label: bug             # Optional: filter by label</code></pre>
           </div>
 
+          <h3>Trigger Data</h3>
+          <p>GitHub triggers provide rich data you can use in your workflow steps:</p>
+
+          <h4>Pull Request Trigger Data</h4>
+          <div class="card">
+            <pre><code># Convenience fields (top-level)
+{{ trigger.title }}        # PR title
+{{ trigger.body }}         # PR description
+{{ trigger.author }}       # PR author username
+{{ trigger.url }}          # PR URL
+{{ trigger.number }}       # PR number
+{{ trigger.action }}       # Event action (opened, synchronize, closed)
+{{ trigger.repository }}   # Repository name (owner/repo)
+
+# Files changed
+{{ trigger.fileNames }}    # Array of changed file paths
+{{ trigger.files }}        # Array of file objects with details
+
+# Full PR object
+{{ trigger.pullRequest.title }}
+{{ trigger.pullRequest.body }}
+{{ trigger.pullRequest.state }}
+{{ trigger.pullRequest.head.ref }}   # Source branch
+{{ trigger.pullRequest.base.ref }}   # Target branch
+{{ trigger.pullRequest.additions }}  # Lines added
+{{ trigger.pullRequest.deletions }}  # Lines deleted
+{{ trigger.pullRequest.labels }}     # Array of label names
+{{ trigger.pullRequest.draft }}      # Is draft PR</code></pre>
+          </div>
+
+          <h4>Issue Trigger Data</h4>
+          <div class="card">
+            <pre><code># Convenience fields (top-level)
+{{ trigger.title }}        # Issue title
+{{ trigger.body }}         # Issue body
+{{ trigger.author }}       # Issue author username
+{{ trigger.url }}          # Issue URL
+{{ trigger.number }}       # Issue number
+
+# Full issue object
+{{ trigger.issue.title }}
+{{ trigger.issue.body }}
+{{ trigger.issue.state }}
+{{ trigger.issue.labels }}     # Array of label names
+{{ trigger.issue.assignees }}  # Array of assignee usernames
+{{ trigger.issue.comments }}   # Comment count</code></pre>
+          </div>
+
           <h3>Actions</h3>
           <div class="card">
             <pre><code># Create an issue

@@ -118,36 +118,75 @@ node weavr.mjs serve</code></pre>
 
       <section class="section">
         <h2>Example Workflow</h2>
-        <p>A simple AI-powered workflow that responds to GitHub issues.</p>
-        <div class="card fade" style="--delay: 0.1s;">
-          <pre><code>name: issue-responder
-description: Auto-respond to new GitHub issues with AI analysis
+        <p>Build workflows visually or write YAML directly — both produce the same result.</p>
+
+        <div class="workflow-showcase fade" style="--delay: 0.1s;">
+          <div class="workflow-visual">
+            <img src="assets/workflow-builder-screenshot.png" alt="Visual Workflow Builder" class="screenshot" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
+            <p style="text-align: center; color: var(--muted); margin-top: 12px; font-size: 14px;">Visual workflow builder with drag-and-drop steps</p>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 32px;">YAML Definition</h3>
+        <p>The same workflow as YAML — schedule an AI research agent that sends daily market briefings to Telegram.</p>
+        <div class="card fade" style="--delay: 0.15s;">
+          <pre><code>name: daily-market-research-telegram
 
 trigger:
-  type: github.issue.opened
+  type: cron.schedule
   with:
-    repo: your-org/your-repo
+    cron: "0 9 * * *"
 
 steps:
-  - id: analyze
+  - id: research
     action: ai.agent
     with:
-      task: |
-        Analyze this GitHub issue and provide a helpful initial response:
+      task: "Today's date is {{ currentDate }}.
 
-        Title: {{ trigger.issue.title }}
-        Body: {{ trigger.issue.body }}
+Research the most important market insights from the past 24 hours.
 
-        Be concise and helpful. If it's a bug, ask for reproduction steps.
-        If it's a feature request, acknowledge it and ask clarifying questions.
+Focus on:
+1) Macro market shifts (equities, rates, FX, commodities)
+2) Major corporate earnings or guidance updates
+3) Significant funding rounds, M&A activity, or IPO news
+4) Policy or regulatory updates impacting markets
 
-  - id: respond
-    action: github.create_comment
-    needs: [analyze]
+For each insight, capture:
+- Title
+- Date
+- Source
+- 2-3 sentence summary
+- Why it matters (1 sentence)
+
+Prioritize reputable sources and the last 24 hours.
+"
+  - id: summarize
+    action: ai.agent
+    needs: [research]
     with:
-      repo: your-org/your-repo
-      issue_number: "{{ trigger.issue.number }}"
-      body: "{{ steps.analyze.response }}"</code></pre>
+      task: "Create a concise daily market summary from this research:
+{{ steps.research.result }}
+
+Format:
+📅 Daily Market Briefing — {{ currentDate }}
+
+🔥 Top Insight
+[1 item, 2-3 sentences]
+
+📰 Key Headlines
+- [3-5 bullets, 1 sentence each]
+
+💡 Takeaway
+[1 sentence]
+
+Keep the total under 220 words.
+"
+  - id: send_to_telegram
+    action: telegram.send
+    needs: [summarize]
+    with:
+      chatId: "YOUR_CHAT_ID"
+      text: "{{ steps.summarize.result }}"</code></pre>
         </div>
       </section>
     </main>

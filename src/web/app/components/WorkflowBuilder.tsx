@@ -742,17 +742,93 @@ function getUpstreamSteps(
     });
 }
 
+// Get trigger variables based on trigger type
+function getTriggerVariables(triggerType?: string): Array<{ path: string; description: string }> {
+  const common = [
+    { path: 'trigger.type', description: 'Trigger type' },
+  ];
+
+  if (triggerType?.startsWith('github.pull_request')) {
+    return [
+      ...common,
+      { path: 'trigger.title', description: 'PR title' },
+      { path: 'trigger.body', description: 'PR description' },
+      { path: 'trigger.author', description: 'PR author username' },
+      { path: 'trigger.url', description: 'PR URL' },
+      { path: 'trigger.number', description: 'PR number' },
+      { path: 'trigger.action', description: 'Event action (opened, closed, etc.)' },
+      { path: 'trigger.repository', description: 'Repository name' },
+      { path: 'trigger.fileNames', description: 'Array of changed file paths' },
+      { path: 'trigger.pullRequest.head.ref', description: 'Source branch' },
+      { path: 'trigger.pullRequest.base.ref', description: 'Target branch' },
+      { path: 'trigger.pullRequest.additions', description: 'Lines added' },
+      { path: 'trigger.pullRequest.deletions', description: 'Lines deleted' },
+      { path: 'trigger.pullRequest.labels', description: 'PR labels' },
+    ];
+  }
+
+  if (triggerType?.startsWith('github.issue')) {
+    return [
+      ...common,
+      { path: 'trigger.title', description: 'Issue title' },
+      { path: 'trigger.body', description: 'Issue body' },
+      { path: 'trigger.author', description: 'Issue author username' },
+      { path: 'trigger.url', description: 'Issue URL' },
+      { path: 'trigger.number', description: 'Issue number' },
+      { path: 'trigger.action', description: 'Event action' },
+      { path: 'trigger.repository', description: 'Repository name' },
+      { path: 'trigger.issue.labels', description: 'Issue labels' },
+      { path: 'trigger.issue.assignees', description: 'Assignee usernames' },
+    ];
+  }
+
+  if (triggerType?.startsWith('github.push')) {
+    return [
+      ...common,
+      { path: 'trigger.branch', description: 'Branch name' },
+      { path: 'trigger.repository', description: 'Repository name' },
+      { path: 'trigger.commits', description: 'Array of commits' },
+      { path: 'trigger.headCommit.message', description: 'Latest commit message' },
+      { path: 'trigger.headCommit.author.name', description: 'Commit author' },
+    ];
+  }
+
+  if (triggerType?.startsWith('telegram') || triggerType?.startsWith('slack') || triggerType?.startsWith('discord')) {
+    return [
+      ...common,
+      { path: 'trigger.text', description: 'Message text' },
+      { path: 'trigger.from', description: 'Sender info' },
+      { path: 'trigger.chat', description: 'Chat/channel info' },
+    ];
+  }
+
+  if (triggerType?.startsWith('cron')) {
+    return [
+      ...common,
+      { path: 'trigger.expression', description: 'Cron expression' },
+    ];
+  }
+
+  // Generic fallback
+  return [
+    ...common,
+    { path: 'trigger.data', description: 'Trigger payload' },
+  ];
+}
+
 // Variable Suggestions Dropdown
 function VariableSuggestions({
   suggestions,
   onSelect,
   filterText,
   visible,
+  triggerType,
 }: {
   suggestions: Array<{ stepId: string; actionId: string; outputFields: OutputField[] }>;
   onSelect: (variable: string) => void;
   filterText: string;
   visible: boolean;
+  triggerType?: string;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -770,11 +846,14 @@ function VariableSuggestions({
       }
     }
 
-    // Add trigger variables
-    vars.push({ path: 'trigger.data', description: 'Trigger payload', category: 'trigger' });
+    // Add trigger variables based on trigger type
+    const triggerVars = getTriggerVariables(triggerType);
+    for (const tv of triggerVars) {
+      vars.push({ ...tv, category: 'trigger' });
+    }
 
     return vars;
-  }, [suggestions]);
+  }, [suggestions, triggerType]);
 
   // Filter by what user has typed
   const filtered = useMemo(() => {
@@ -877,6 +956,12 @@ function PropertyEditor({
 
   const upstreamSteps = useMemo(() => getUpstreamSteps(node.id, nodes, edges), [node.id, nodes, edges]);
 
+  // Get trigger type from nodes for variable suggestions
+  const triggerType = useMemo(() => {
+    const triggerNode = nodes.find(n => n.type === 'trigger');
+    return triggerNode?.data?.action;
+  }, [nodes]);
+
   useEffect(() => {
     setConfig(normalizeConfig(node.data.action, node.data.config));
     setStepId(node.data.stepId);
@@ -945,6 +1030,7 @@ function PropertyEditor({
               onSelect={(v) => handleSuggestionSelect(field.name, v, null)}
               filterText={filterText}
               visible={showSuggestions === field.name}
+              triggerType={triggerType}
             />
           </div>
         );
@@ -1105,6 +1191,7 @@ function PropertyEditor({
               onSelect={(v) => handleSuggestionSelect(field.name, v, null)}
               filterText={filterText}
               visible={showSuggestions === field.name}
+              triggerType={triggerType}
             />
           </div>
         );

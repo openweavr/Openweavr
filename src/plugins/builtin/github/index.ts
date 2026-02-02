@@ -108,12 +108,120 @@ async function fetchRepoEvents(repo: string): Promise<GitHubApiEvent[]> {
   }
 }
 
-// Map GitHub Events API event to trigger data format
-function mapGitHubApiEvent(event: GitHubApiEvent): {
+// Fetch full PR details using gh CLI
+async function fetchPRDetails(repo: string, prNumber: number): Promise<{
+  title: string;
+  body: string | null;
+  state: string;
+  url: string;
+  author: string;
+  head: { ref: string; sha: string };
+  base: { ref: string; sha: string };
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  mergeable: boolean | null;
+  draft: boolean;
+  labels: string[];
+} | null> {
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'api',
+      `repos/${repo}/pulls/${prNumber}`,
+    ]);
+    if (!stdout.trim()) return null;
+    const pr = JSON.parse(stdout);
+    return {
+      title: pr.title,
+      body: pr.body,
+      state: pr.state,
+      url: pr.html_url,
+      author: pr.user?.login ?? 'unknown',
+      head: { ref: pr.head?.ref, sha: pr.head?.sha },
+      base: { ref: pr.base?.ref, sha: pr.base?.sha },
+      additions: pr.additions ?? 0,
+      deletions: pr.deletions ?? 0,
+      changedFiles: pr.changed_files ?? 0,
+      mergeable: pr.mergeable,
+      draft: pr.draft ?? false,
+      labels: pr.labels?.map((l: { name: string }) => l.name) ?? [],
+    };
+  } catch (err) {
+    console.error(`[github] Failed to fetch PR details for ${repo}#${prNumber}:`, err);
+    return null;
+  }
+}
+
+// Fetch PR files changed using gh CLI
+async function fetchPRFiles(repo: string, prNumber: number): Promise<Array<{
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+}>> {
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'api',
+      `repos/${repo}/pulls/${prNumber}/files`,
+      '--jq', '.[0:100]',  // Limit to 100 files
+    ]);
+    if (!stdout.trim()) return [];
+    const files = JSON.parse(stdout);
+    return files.map((f: { filename: string; status: string; additions: number; deletions: number; changes: number }) => ({
+      filename: f.filename,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+      changes: f.changes,
+    }));
+  } catch (err) {
+    console.error(`[github] Failed to fetch PR files for ${repo}#${prNumber}:`, err);
+    return [];
+  }
+}
+
+// Fetch full issue details using gh CLI
+async function fetchIssueDetails(repo: string, issueNumber: number): Promise<{
+  title: string;
+  body: string | null;
+  state: string;
+  url: string;
+  author: string;
+  labels: string[];
+  assignees: string[];
+  comments: number;
+} | null> {
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'api',
+      `repos/${repo}/issues/${issueNumber}`,
+    ]);
+    if (!stdout.trim()) return null;
+    const issue = JSON.parse(stdout);
+    return {
+      title: issue.title,
+      body: issue.body,
+      state: issue.state,
+      url: issue.html_url,
+      author: issue.user?.login ?? 'unknown',
+      labels: issue.labels?.map((l: { name: string }) => l.name) ?? [],
+      assignees: issue.assignees?.map((a: { login: string }) => a.login) ?? [],
+      comments: issue.comments ?? 0,
+    };
+  } catch (err) {
+    console.error(`[github] Failed to fetch issue details for ${repo}#${issueNumber}:`, err);
+    return null;
+  }
+}
+
+// Map GitHub Events API event to trigger data format (with full details)
+async function mapGitHubApiEvent(event: GitHubApiEvent): Promise<{
   triggerType: string;
   data: Record<string, unknown>;
-} | null {
+} | null> {
   const payload = event.payload;
+  const repo = event.repo.name;
 
   switch (event.type) {
     case 'PushEvent': {
@@ -135,7 +243,7 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
           branch,
           before,
           after: head,
-          repository: event.repo.name,
+          repository: repo,
           pusher: { name: event.actor?.login ?? 'unknown' },
           commits: commits.map(c => ({
             id: c.sha,
@@ -154,71 +262,93 @@ function mapGitHubApiEvent(event: GitHubApiEvent): {
     }
 
     case 'PullRequestEvent': {
-      const pr = payload.pull_request as {
-        id: number;
+      const prPayload = payload.pull_request as {
         number: number;
-        title: string;
-        body: string | null;
-        state: string;
-        html_url: string;
-        head: { ref: string; sha: string };
-        base: { ref: string; sha: string };
-        user?: { login: string };
       } | undefined;
       const action = payload.action as string;
+      const prNumber = prPayload?.number ?? (payload.number as number);
 
-      if (!pr) return null;
+      if (!prNumber) return null;
+
+      // Fetch full PR details and files
+      const [prDetails, prFiles] = await Promise.all([
+        fetchPRDetails(repo, prNumber),
+        fetchPRFiles(repo, prNumber),
+      ]);
+
+      if (!prDetails) return null;
 
       return {
         triggerType: 'github.pull_request',
         data: {
           action,
-          number: pr.number,
+          number: prNumber,
+          // Top-level convenience fields for easy access
+          title: prDetails.title,
+          body: prDetails.body,
+          author: prDetails.author,
+          url: prDetails.url,
+          // Full PR details
           pullRequest: {
-            id: pr.id,
-            number: pr.number,
-            title: pr.title,
-            body: pr.body,
-            state: pr.state,
-            url: pr.html_url,
-            head: pr.head,
-            base: pr.base,
-            author: pr.user?.login ?? 'unknown',
+            number: prNumber,
+            title: prDetails.title,
+            body: prDetails.body,
+            state: prDetails.state,
+            url: prDetails.url,
+            author: prDetails.author,
+            head: prDetails.head,
+            base: prDetails.base,
+            additions: prDetails.additions,
+            deletions: prDetails.deletions,
+            changedFiles: prDetails.changedFiles,
+            mergeable: prDetails.mergeable,
+            draft: prDetails.draft,
+            labels: prDetails.labels,
           },
-          repository: event.repo.name,
+          // Files changed
+          files: prFiles,
+          fileNames: prFiles.map(f => f.filename),
+          repository: repo,
         },
       };
     }
 
     case 'IssuesEvent': {
-      const issue = payload.issue as {
-        id: number;
+      const issuePayload = payload.issue as {
         number: number;
-        title: string;
-        body: string | null;
-        state: string;
-        html_url: string;
-        user?: { login: string };
-        labels: Array<{ name: string }>;
       } | undefined;
       const action = payload.action as string;
       const label = payload.label as { name: string } | undefined;
+      const issueNumber = issuePayload?.number;
 
-      if (!issue) return null;
+      if (!issueNumber) return null;
+
+      // Fetch full issue details
+      const issueDetails = await fetchIssueDetails(repo, issueNumber);
+
+      if (!issueDetails) return null;
 
       const baseTriggerData = {
         action,
+        number: issueNumber,
+        // Top-level convenience fields
+        title: issueDetails.title,
+        body: issueDetails.body,
+        author: issueDetails.author,
+        url: issueDetails.url,
+        // Full issue details
         issue: {
-          id: issue.id,
-          number: issue.number,
-          title: issue.title,
-          body: issue.body,
-          state: issue.state,
-          url: issue.html_url,
-          author: issue.user?.login ?? 'unknown',
-          labels: issue.labels?.map(l => l.name) ?? [],
+          number: issueNumber,
+          title: issueDetails.title,
+          body: issueDetails.body,
+          state: issueDetails.state,
+          url: issueDetails.url,
+          author: issueDetails.author,
+          labels: issueDetails.labels,
+          assignees: issueDetails.assignees,
+          comments: issueDetails.comments,
         },
-        repository: event.repo.name,
+        repository: repo,
       };
 
       // Map action to specific trigger type
@@ -279,7 +409,7 @@ async function pollLoop(): Promise<void> {
 
     // Process oldest first
     for (const event of newEvents.reverse()) {
-      const mapped = mapGitHubApiEvent(event);
+      const mapped = await mapGitHubApiEvent(event);
       if (!mapped) continue;
 
       // Notify matching handlers
