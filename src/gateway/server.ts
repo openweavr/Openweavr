@@ -182,7 +182,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     // Use server's executor for proper history tracking
     onExecuteWorkflow: async (workflow, triggerData, runId) => {
       try {
-        await executor.execute(workflow, triggerData, runId);
+        return await executor.execute(workflow, triggerData, runId);
       } catch (err) {
         console.error(`[scheduler] Execution error for ${workflow.name}:`, err);
         // Ensure the history entry is updated even if something unexpected happens
@@ -193,6 +193,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           entry.completedAt = new Date().toISOString();
           addRunLog(runId, 'error', `Unexpected error: ${entry.error}`);
         }
+        throw err;
       }
     },
   });
@@ -211,7 +212,12 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
 
       // Get all scheduled workflows
       const scheduled = scheduler.getScheduledWorkflows();
-      const scheduleMap = new Map(scheduled.map(s => [s.name, s]));
+      const scheduleMap = new Map<string, typeof scheduled>();
+      for (const entry of scheduled) {
+        const list = scheduleMap.get(entry.name) ?? [];
+        list.push(entry);
+        scheduleMap.set(entry.name, list);
+      }
 
       const workflows = await Promise.all(yamlFiles.map(async (file) => {
         const content = await readFile(join(workflowsDir, file), 'utf-8');
@@ -222,7 +228,16 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         const triggerTypeMatch = content.match(/trigger:\s*\n\s*type:\s*(.+)$/m);
 
         const workflowName = nameMatch?.[1]?.trim() ?? file.replace(/\.ya?ml$/, '');
-        const schedule = scheduleMap.get(workflowName);
+        const schedules = scheduleMap.get(workflowName) ?? [];
+        const activeSchedules = schedules.filter(s => s.status === 'active');
+        const nextRun = activeSchedules
+          .map(s => s.nextRun)
+          .filter(Boolean)
+          .sort()[0];
+        const lastRunEntry = schedules
+          .filter(s => s.lastRun)
+          .sort((a, b) => (a.lastRun ?? '').localeCompare(b.lastRun ?? ''))
+          .at(-1);
 
         return {
           name: workflowName,
@@ -231,11 +246,11 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           stepCount: stepMatches.length,
           triggerType: triggerTypeMatch?.[1]?.trim(),
           // Schedule info
-          scheduled: !!schedule,
-          scheduleStatus: schedule?.status ?? 'inactive',
-          nextRun: schedule?.nextRun,
-          lastRun: schedule?.lastRun,
-          lastStatus: schedule?.lastStatus,
+          scheduled: schedules.length > 0,
+          scheduleStatus: schedules.length === 0 ? 'inactive' : activeSchedules.length > 0 ? 'active' : 'paused',
+          nextRun,
+          lastRun: lastRunEntry?.lastRun,
+          lastStatus: lastRunEntry?.lastStatus,
         };
       }));
 
@@ -358,7 +373,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         scheduler.unscheduleWorkflow(safeName);
       }
       // Schedule the new/updated workflow
-      await scheduler.scheduleWorkflow(safeName, formattedYaml);
+      await scheduler.scheduleWorkflow(safeName, formattedYaml, filePath);
 
       broadcast('workflows', {
         type: 'workflow.saved',
@@ -480,8 +495,9 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
 
       // Get workflow stats from scheduler
       const scheduled = scheduler.getScheduledWorkflows();
-      const activeWorkflows = scheduled.filter(w => w.status === 'active').length;
-      const pausedWorkflows = scheduled.filter(w => w.status === 'paused').length;
+      const activeWorkflows = new Set(scheduled.filter(w => w.status === 'active').map(w => w.name)).size;
+      const pausedWorkflows = new Set(scheduled.filter(w => w.status === 'paused').map(w => w.name)).size;
+      const totalWorkflows = new Set(scheduled.map(w => w.name)).size;
 
       // Calculate success rate from run history
       const completedRuns = runHistory.filter(r => r.status !== 'running');
@@ -496,7 +512,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         workflows: {
           active: activeWorkflows,
           paused: pausedWorkflows,
-          total: scheduled.length,
+          total: totalWorkflows,
         },
         runs: {
           total: runHistory.length,
@@ -514,6 +530,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     const workflows = scheduler.getScheduledWorkflows();
     return c.json({
       workflows: workflows.map(w => ({
+        id: w.id,
         name: w.name,
         triggerType: w.triggerType,
         triggerConfig: w.triggerConfig,
@@ -528,9 +545,15 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   app.post('/api/scheduler/:name/deploy', async (c) => {
     const name = c.req.param('name');
     try {
-      const filePath = join(workflowsDir, `${name}.yaml`);
+      const yamlPath = join(workflowsDir, `${name}.yaml`);
+      const ymlPath = join(workflowsDir, `${name}.yml`);
+      const filePath = (await stat(yamlPath).then(() => yamlPath).catch(() => null))
+        ?? (await stat(ymlPath).then(() => ymlPath).catch(() => null));
+      if (!filePath) {
+        return c.json({ success: false, error: 'Workflow file not found' }, 404);
+      }
       const content = await readFile(filePath, 'utf-8');
-      const result = await scheduler.scheduleWorkflow(name, content);
+      const result = await scheduler.scheduleWorkflow(name, content, filePath);
 
       if (result) {
         return c.json({
