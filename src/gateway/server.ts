@@ -405,6 +405,54 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     return c.json(run);
   });
 
+  // Dashboard stats endpoint
+  app.get('/api/stats', async (c) => {
+    try {
+      // Get AI usage stats
+      const { getUsageStats, getGlobalAIConfig } = await import('../plugins/builtin/ai/index.js');
+      const usage = getUsageStats();
+      const aiConfig = getGlobalAIConfig();
+
+      // Build safe AI config info (no secrets)
+      const ai = {
+        provider: aiConfig.provider ?? 'none',
+        model: aiConfig.model ?? 'not configured',
+        authMethod: aiConfig.authMethod ?? 'apikey',
+        hasApiKey: Boolean(aiConfig.apiKey),
+        hasOAuth: Boolean(aiConfig.oauth?.accessToken),
+      };
+
+      // Get workflow stats from scheduler
+      const scheduled = scheduler.getScheduledWorkflows();
+      const activeWorkflows = scheduled.filter(w => w.status === 'active').length;
+      const pausedWorkflows = scheduled.filter(w => w.status === 'paused').length;
+
+      // Calculate success rate from run history
+      const completedRuns = runHistory.filter(r => r.status !== 'running');
+      const successfulRuns = completedRuns.filter(r => r.status === 'success');
+      const successRate = completedRuns.length > 0
+        ? Math.round((successfulRuns.length / completedRuns.length) * 100)
+        : 100;
+
+      return c.json({
+        ai,
+        usage,
+        workflows: {
+          active: activeWorkflows,
+          paused: pausedWorkflows,
+          total: scheduled.length,
+        },
+        runs: {
+          total: runHistory.length,
+          successRate,
+          active: runHistory.filter(r => r.status === 'running').length,
+        },
+      });
+    } catch (err) {
+      return c.json({ error: `Failed to get stats: ${String(err)}` }, 500);
+    }
+  });
+
   // Scheduler management endpoints
   app.get('/api/scheduler', (c) => {
     const workflows = scheduler.getScheduledWorkflows();

@@ -543,3 +543,350 @@ code, pre {
 .tooltip:hover::after {
   opacity: 1;
 }
+
+/* Dashboard Stats Grid */
+.dashboard-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.dashboard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.dashboard-card-icon {
+  font-size: 20px;
+}
+
+.dashboard-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-card-content {
+  min-height: 60px;
+}
+
+/* Model Card */
+.model-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.model-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.auth-status {
+  margin-top: 4px;
+}
+
+.auth-ok {
+  color: var(--accent-green);
+}
+
+.auth-missing {
+  color: var(--accent-yellow);
+}
+
+/* Usage Card */
+.usage-stats {
+  display: flex;
+  justify-content: space-between;
+}
+
+.usage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.usage-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.usage-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Workflows Summary Card */
+.workflow-counts {
+  display: flex;
+  justify-content: space-between;
+}
+
+.workflow-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.workflow-count .count-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.workflow-count .count-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.workflow-count.active .count-value {
+  color: var(--accent-green);
+}
+
+.workflow-count.paused .count-value {
+  color: var(--accent-yellow);
+}
+
+.workflow-count.total .count-value {
+  color: var(--accent-purple);
+}
+
+/* Connection Status */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.connection-status.connected {
+  color: var(--accent-green);
+}
+
+.connection-status.disconnected {
+  color: var(--accent-red);
+}
+
+/* Workflow List (Dashboard) */
+.workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workflow-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.15s ease;
+}
+
+.workflow-list-item:hover {
+  border-color: var(--accent-purple);
+}
+
+.workflow-list-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.workflow-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workflow-list-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-paused-badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--accent-yellow);
+}
+
+.workflow-list-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.workflow-last-run {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.run-status-indicator.success {
+  color: var(--accent-green);
+}
+
+.run-status-indicator.failed {
+  color: var(--accent-red);
+}
+
+.workflow-list-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.workflow-trigger-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.trigger-icon {
+  font-size: 16px;
+}
+
+.workflow-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Status Dots */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.active {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.status-dot.paused {
+  background: var(--accent-yellow);
+}
+
+.status-dot.inactive {
+  background: var(--text-muted);
+}
+
+/* Recent Runs List */
+.recent-runs-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-run-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.recent-run-item:last-child {
+  border-bottom: none;
+}
+
+.run-status-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.run-status-icon.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+}
+
+.run-status-icon.failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+}
+
+.run-status-icon.running {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-blue);
+}
+
+.recent-run-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recent-run-workflow {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.recent-run-time {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.recent-run-duration {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* Empty state small variant */
+.empty-state.small {
+  padding: 30px 20px;
+}
+
+.empty-state.small p {
+  margin: 0;
+}
+
+/* Small button variant */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
