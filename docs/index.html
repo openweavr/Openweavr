@@ -267,6 +267,8 @@
       }
 
       .install-tab {
+        display: inline-flex;
+        align-items: center;
         padding: 10px 20px;
         background: transparent;
         border: 1px solid var(--border-color);
@@ -769,9 +771,26 @@
       <!-- Install Block -->
       <div class="install-block fade-in delay-3">
         <div class="install-tabs">
-          <button class="install-tab active" onclick="switchInstallTab('curl')">curl</button>
-          <button class="install-tab" onclick="switchInstallTab('npm')">npm</button>
-          <button class="install-tab" onclick="switchInstallTab('brew')">Homebrew</button>
+          <button class="install-tab active" onclick="switchInstallTab('curl')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+              <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>curl
+          </button>
+          <button class="install-tab" onclick="switchInstallTab('npm')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;">
+              <path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331z"/>
+            </svg>npm
+          </button>
+          <button class="install-tab" onclick="switchInstallTab('brew')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;">
+              <path d="M5.17 16.667c-.07.12-.14.24-.2.36-.12.24-.24.48-.35.72-.11.24-.21.48-.31.72s-.19.48-.28.72c-.09.24-.17.48-.25.72-.07.24-.14.48-.2.72h15.8c-.06-.24-.12-.48-.2-.72-.07-.24-.15-.48-.25-.72-.09-.24-.18-.48-.28-.72s-.2-.48-.31-.72c-.11-.24-.22-.48-.35-.72-.06-.12-.13-.24-.2-.36H5.17zm12.66-2c-.35-.47-.73-.92-1.14-1.35-.4-.43-.83-.84-1.28-1.23-.45-.39-.93-.76-1.42-1.11-.5-.35-1.01-.68-1.54-.99-.53-.31-1.08-.6-1.64-.87-.56-.27-1.14-.52-1.72-.74-.58-.23-1.18-.44-1.78-.62-.6-.19-1.22-.36-1.84-.5l-.2.92c.62.14 1.23.31 1.82.5.59.19 1.17.4 1.74.63.57.23 1.12.49 1.66.77.54.28 1.06.58 1.57.91.51.33.99.68 1.46 1.06.46.38.9.78 1.32 1.2.42.42.81.86 1.18 1.31.18.23.36.47.53.71H5.64c.17-.24.34-.48.53-.71.36-.45.76-.89 1.18-1.31.41-.42.86-.82 1.32-1.2.46-.38.95-.74 1.46-1.06.51-.33 1.04-.63 1.57-.91.54-.28 1.09-.54 1.66-.77.57-.23 1.15-.44 1.74-.63.59-.19 1.2-.36 1.82-.5l-.2-.92c-.62.14-1.24.31-1.84.5-.6.19-1.2.39-1.78.62-.58.22-1.16.47-1.72.74-.56.27-1.11.56-1.64.87-.53.31-1.04.64-1.54.99-.49.35-.97.72-1.42 1.11-.45.39-.88.8-1.28 1.23-.4.43-.79.88-1.14 1.35H17.83z"/>
+            </svg>Homebrew
+          </button>
+          <button class="install-tab" onclick="switchInstallTab('macos')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>macOS App
+          </button>
         </div>
 
         <div class="install-content active" id="install-curl">
@@ -810,6 +829,30 @@
               <button class="copy-btn" onclick="copyInstallCommand(this, 'brew-command')">Copy</button>
             </div>
             <pre><code id="brew-command">brew tap openweavr/tap && brew install weavr</code></pre>
+          </div>
+        </div>
+
+        <div class="install-content" id="install-macos">
+          <div class="code-block" style="text-align: center; padding: 32px;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 16px; color: var(--text-secondary);">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>
+            <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">
+              One-click installer for macOS with menu bar app
+            </p>
+            <a href="https://github.com/openweavr/Openweavr/releases/latest/download/Weavr-Launcher.dmg"
+               class="btn btn-primary"
+               style="display: inline-flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download for macOS
+            </a>
+            <p style="color: var(--text-muted); margin-top: 12px; font-size: 12px;">
+              Includes menu bar controls, auto-start, and CLI installer
+            </p>
           </div>
         </div>
 
