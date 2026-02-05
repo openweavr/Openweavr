@@ -75,18 +75,41 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
     const webSpinner = p.spinner();
     webSpinner.start('Starting server...');
 
+    const port = existingConfig.server.port || 3847;
+
     // Start server in background
     const { spawn } = await import('node:child_process');
-    const serverProcess = spawn('node', [process.argv[1].replace(/onboard.*$/, 'serve')], {
+    const cliPath = process.argv[1];
+    const serverProcess = spawn('node', [cliPath, 'serve'], {
       detached: true,
       stdio: 'ignore',
+      cwd: process.cwd(),
     });
     serverProcess.unref();
 
-    // Wait a moment for server to start
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for server to be ready with health check
+    const maxAttempts = 30;
+    let ready = false;
 
-    const port = existingConfig.server.port || 3847;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        const response = await fetch(`http://localhost:${port}/health`);
+        if (response.ok) {
+          ready = true;
+          break;
+        }
+      } catch {
+        // Server not ready yet
+      }
+    }
+
+    if (!ready) {
+      webSpinner.stop('Server failed to start');
+      p.log.error('Could not start the server. Try running manually: weavr serve');
+      process.exit(1);
+    }
+
     const url = `http://localhost:${port}/settings`;
 
     webSpinner.stop('Server started!');
@@ -397,7 +420,7 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     try {
-      const response = await fetch(`http://localhost:${port}/api/health`);
+      const response = await fetch(`http://localhost:${port}/health`);
       if (response.ok) {
         ready = true;
         break;
