@@ -2494,8 +2494,8 @@ When the user approves the plan and you generate the final YAML, include the com
         ...storedMessages,
         { role: 'user' as const, content: message, timestamp: Date.now() },
       ];
-      const apiMessages = allMessages.map(m => ({
-        role: m.role === 'tool' ? 'user' : m.role,
+      const apiMessages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string }> = allMessages.map(m => ({
+        role: m.role === 'tool' ? 'user' as const : m.role,
         content: m.role === 'tool' ? `[Tool Result: ${m.toolName}]\n${m.content}` : m.content,
       }));
 
@@ -2806,9 +2806,10 @@ When the user approves the plan and you generate the final YAML, include the com
                     toolName,
                     timestamp: Date.now(),
                   });
+                  // Ollama expects tool results with role: 'tool' format
                   apiMessages.push({
-                    role: 'user',
-                    content: `[Tool Result: ${toolName}]\n${toolResult}`,
+                    role: 'tool',
+                    content: toolResult,
                   });
                 }
                 continueLoop = true;
