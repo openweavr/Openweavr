@@ -625,6 +625,76 @@ pre .operator,
 .delay-3 { animation-delay: 0.3s; opacity: 0; }
 .delay-4 { animation-delay: 0.4s; opacity: 0; }
 
+/* ===== TABS ===== */
+.install-tabs {
+  margin-top: 16px;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+  background: var(--bg-card);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  background: var(--bg-card);
+  border-color: var(--border);
+  border-bottom-color: var(--bg-card);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Copy button in code blocks */
+.copy-btn {
+  margin-left: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border);
+  color: var(--ink-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--ink);
+}
+
+.copy-btn.copied {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .page {

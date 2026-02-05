@@ -8,6 +8,37 @@ if (toggle && nav) {
   });
 }
 
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabGroup = btn.closest('.install-tabs');
+    const tabId = btn.dataset.tab;
+
+    // Update buttons
+    tabGroup.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update content
+    tabGroup.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tabGroup.querySelector(`#tab-${tabId}`).classList.add('active');
+  });
+});
+
+// Copy code functionality
+function copyCode(btn, codeId) {
+  const codeEl = document.getElementById(codeId);
+  const text = codeEl.textContent;
+
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
 // Sidebar scroll handling
 const sidebar = document.querySelector('.sidebar');
 const sections = document.querySelectorAll('.section[id]');

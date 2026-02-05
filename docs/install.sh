@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Weavr Installer
-# https://github.com/openweavr/Openweavr
+# Openweavr Installer
+# https://openweavr.ai
 #
 # Usage:
-#   curl -fsSL https://openweavr.github.io/Openweavr/install.sh | bash
+#   curl -fsSL https://openweavr.ai/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://openweavr.github.io/Openweavr/install.sh | bash -s -- --no-modify-path
+#   curl -fsSL https://openweavr.ai/install.sh | bash -s -- --no-modify-path
 #
 
 set -e
@@ -61,9 +61,12 @@ fatal() {
 banner() {
   printf "\n"
   printf "${PURPLE}${BOLD}"
-  printf "  ╦ ╦┌─┐┌─┐┬  ┬┬─┐\n"
-  printf "  ║║║├┤ ├─┤└┐┌┘├┬┘\n"
-  printf "  ╚╩╝└─┘┴ ┴ └┘ ┴└─\n"
+  printf "   ___                                         \n"
+  printf "  / _ \ _ __   ___ _ ____      _____  __ ___   _ __ \n"
+  printf " | | | | '_ \ / _ \ '_ \ \ /\ / / _ \/ _\` \ \ / / '__|\n"
+  printf " | |_| | |_) |  __/ | | \ V  V /  __/ (_| |\ V /| |   \n"
+  printf "  \___/| .__/ \___|_| |_|\_/\_/ \___|\__,_| \_/ |_|   \n"
+  printf "       |_|                                            \n"
   printf "${NC}\n"
   printf "  ${CYAN}Self-hosted workflow automation with AI agents${NC}\n"
   printf "\n"
@@ -241,14 +244,14 @@ add_to_path() {
   # Check if already in config
   if grep -q "WEAVR" "$shell_config" 2>/dev/null; then
     info "PATH already configured in $shell_config"
-    return
+    return 0
   fi
 
-  info "Adding Weavr to PATH in $shell_config..."
+  info "Adding Openweavr to PATH in $shell_config..."
 
   {
     echo ""
-    echo "# Weavr"
+    echo "# Openweavr"
     if [ "$shell_name" = "fish" ]; then
       echo "set -gx PATH \"$BIN_DIR\" \$PATH"
     else
@@ -257,7 +260,7 @@ add_to_path() {
   } >> "$shell_config"
 
   success "Added to PATH in $shell_config"
-  warn "Run 'source $shell_config' or restart your terminal to use 'weavr' command"
+  return 0
 }
 
 # Create wrapper script
@@ -266,7 +269,7 @@ create_wrapper() {
 
   cat > "$BIN_DIR/weavr" << EOF
 #!/usr/bin/env bash
-# Weavr CLI wrapper
+# Openweavr CLI wrapper
 exec node "$INSTALL_DIR/weavr.mjs" "\$@"
 EOF
 
@@ -293,9 +296,9 @@ main() {
         shift 2
         ;;
       --help|-h)
-        echo "Weavr Installer"
+        echo "Openweavr Installer"
         echo ""
-        echo "Usage: curl -fsSL https://openweavr.github.io/Openweavr/install.sh | bash"
+        echo "Usage: curl -fsSL https://openweavr.ai/install.sh | bash"
         echo ""
         echo "Options:"
         echo "  --no-modify-path    Don't add weavr to PATH"
@@ -371,7 +374,7 @@ main() {
       mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)"
     fi
 
-    info "Cloning Weavr..."
+    info "Cloning Openweavr..."
     git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$INSTALL_DIR"
     success "Cloned to $INSTALL_DIR"
   fi
@@ -383,7 +386,7 @@ main() {
   success "Dependencies installed"
 
   # Build
-  info "Building Weavr..."
+  info "Building Openweavr..."
   npm run build --loglevel=error
   success "Build complete"
 
@@ -395,6 +398,9 @@ main() {
     add_to_path
   fi
 
+  # Refresh PATH for current session
+  export PATH="$BIN_DIR:$PATH"
+
   # Print success message
   printf "\n"
   printf "${GREEN}${BOLD}Installation complete!${NC}\n"
@@ -403,26 +409,38 @@ main() {
   printf "  ${CYAN}Binary location:${NC}        $BIN_DIR/weavr\n"
   printf "\n"
 
-  if [ "$modify_path" = true ]; then
-    printf "  To get started, run:\n"
-    printf "\n"
-    printf "    ${BOLD}source $(get_shell_config)${NC}\n"
-    printf "    ${BOLD}weavr --help${NC}\n"
+  # Verify installation by running weavr
+  info "Verifying installation..."
+  if "$BIN_DIR/weavr" --version >/dev/null 2>&1; then
+    local version
+    version=$("$BIN_DIR/weavr" --version 2>/dev/null || echo "unknown")
+    success "weavr $version is ready!"
   else
-    printf "  To get started, run:\n"
-    printf "\n"
-    printf "    ${BOLD}$BIN_DIR/weavr --help${NC}\n"
+    warn "Installation completed but weavr command verification failed"
+    warn "Try running: $BIN_DIR/weavr --version"
   fi
 
   printf "\n"
-  printf "  Or start the server:\n"
+  printf "  ${BOLD}Quick start:${NC}\n"
   printf "\n"
-  printf "    ${BOLD}weavr serve${NC}\n"
+  printf "    ${CYAN}weavr serve${NC}              Start the server\n"
+  printf "    ${CYAN}weavr onboard${NC}            Configure AI providers\n"
+  printf "    ${CYAN}weavr --help${NC}             Show all commands\n"
   printf "\n"
   printf "  Then open ${CYAN}http://localhost:3847${NC} in your browser.\n"
   printf "\n"
-  printf "  ${PURPLE}Documentation:${NC} https://openweavr.github.io/Openweavr/\n"
+  printf "  ${PURPLE}Documentation:${NC} https://openweavr.ai/docs\n"
   printf "\n"
+
+  # Source shell config to make weavr available immediately
+  # We do this at the end so the user's current shell session has access
+  if [ "$modify_path" = true ]; then
+    local shell_config
+    shell_config=$(get_shell_config)
+    printf "  ${YELLOW}Note:${NC} Run ${BOLD}source $shell_config${NC} or open a new terminal\n"
+    printf "        to use 'weavr' command globally.\n"
+    printf "\n"
+  fi
 }
 
 # Run main function

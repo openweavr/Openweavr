@@ -59,25 +59,54 @@
 
         <div class="section" id="quickstart">
           <h2>Quick Start</h2>
-        <p>Get up and running in under a minute.</p>
-        <div class="code-block fade" style="--delay: 0.1s;">
-          <div class="code-header">
-            <div class="code-dot red"></div>
-            <div class="code-dot yellow"></div>
-            <div class="code-dot green"></div>
-          </div>
-          <pre><code><span class="comment"># Clone and install</span>
+          <p>Get up and running in under a minute.</p>
+
+          <!-- Tabs -->
+          <div class="install-tabs fade" style="--delay: 0.1s;">
+            <div class="tab-buttons">
+              <button class="tab-btn active" data-tab="script">One-liner Install</button>
+              <button class="tab-btn" data-tab="manual">Manual (Git Clone)</button>
+            </div>
+
+            <div class="tab-content active" id="tab-script">
+              <div class="code-block" style="margin-top: 0; border-top-left-radius: 0;">
+                <div class="code-header">
+                  <div class="code-dot red"></div>
+                  <div class="code-dot yellow"></div>
+                  <div class="code-dot green"></div>
+                  <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">Recommended</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'install-cmd')">Copy</button>
+                </div>
+                <pre><code id="install-cmd"><span class="comment"># Works on macOS, Linux, and WSL</span>
+curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
+              </div>
+              <p style="margin-top: 16px; color: var(--muted); font-size: 14px;">
+                This script installs Node.js if needed, clones the repo, builds everything, and adds <span class="inline-code">weavr</span> to your PATH.
+              </p>
+            </div>
+
+            <div class="tab-content" id="tab-manual">
+              <div class="code-block" style="margin-top: 0; border-top-left-radius: 0;">
+                <div class="code-header">
+                  <div class="code-dot red"></div>
+                  <div class="code-dot yellow"></div>
+                  <div class="code-dot green"></div>
+                  <button class="copy-btn" onclick="copyCode(this, 'manual-cmd')">Copy</button>
+                </div>
+                <pre><code id="manual-cmd"><span class="comment"># Clone and install</span>
 git clone https://github.com/openweavr/Openweavr.git
 cd Openweavr
 npm install
 
 <span class="comment"># Build backend and web UI</span>
 npm run build
-npm run build:web
 
 <span class="comment"># Start the server</span>
 node weavr.mjs serve</code></pre>
-        </div>
+              </div>
+            </div>
+          </div>
+
           <p style="margin-top: 16px; color: var(--muted);">
             Open <span class="inline-code">http://localhost:3847</span> to access the web interface.
           </p>

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Weavr Uninstaller
-# https://github.com/openweavr/Openweavr
+# Openweavr Uninstaller
+# https://openweavr.ai
 #
 # Usage:
-#   curl -fsSL https://openweavr.github.io/Openweavr/uninstall.sh | bash
+#   curl -fsSL https://openweavr.ai/uninstall.sh | bash
 #
 
 set -e
@@ -60,9 +60,9 @@ main() {
         shift
         ;;
       --help|-h)
-        echo "Weavr Uninstaller"
+        echo "Openweavr Uninstaller"
         echo ""
-        echo "Usage: curl -fsSL https://openweavr.github.io/Openweavr/uninstall.sh | bash"
+        echo "Usage: curl -fsSL https://openweavr.ai/uninstall.sh | bash"
         echo ""
         echo "Options:"
         echo "  --keep-config    Keep ~/.weavr/config.yaml and workflows"
@@ -77,7 +77,7 @@ main() {
   done
 
   printf "\n"
-  printf "${PURPLE}${BOLD}Weavr Uninstaller${NC}\n"
+  printf "${PURPLE}${BOLD}Openweavr Uninstaller${NC}\n"
   printf "\n"
 
   # Remove binary
@@ -130,7 +130,7 @@ main() {
   fi
 
   printf "\n"
-  printf "${GREEN}${BOLD}Weavr has been uninstalled.${NC}\n"
+  printf "${GREEN}${BOLD}Openweavr has been uninstalled.${NC}\n"
   printf "\n"
 
   if [ "$keep_config" = false ]; then
@@ -140,7 +140,7 @@ main() {
 
   printf "\n"
   printf "Note: You may want to remove the PATH entry from your shell config.\n"
-  printf "Look for lines containing 'WEAVR' in:\n"
+  printf "Look for lines containing 'WEAVR' or 'Openweavr' in:\n"
   printf "  - ~/.zshrc\n"
   printf "  - ~/.bashrc\n"
   printf "  - ~/.bash_profile\n"
