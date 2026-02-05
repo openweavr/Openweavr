@@ -1,27 +1,11 @@
 /**
  * Model Registry
  *
- * Provides a unified catalog of all available LLM models
+ * Provides a unified catalog of all available LLM models from pi-ai
  * plus CLI-based models (ollama, llm CLI, claude CLI).
  */
 
-// Dynamic import to handle missing module gracefully
-let piAiModule: { getProviders: () => string[]; getModels: (provider: string) => Array<{
-  id: string;
-  name: string;
-  contextWindow: number;
-  maxTokens: number;
-  input: string[];
-  reasoning: boolean;
-  cost?: { input: number; output: number };
-}> } | null = null;
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  piAiModule = require('@mariozechner/pi-ai');
-} catch {
-  // pi-ai not installed - we'll use fallback providers
-}
+import { getProviders, getModels, type KnownProvider } from '@mariozechner/pi-ai';
 
 export interface ModelInfo {
   id: string;
@@ -113,8 +97,8 @@ const PROVIDER_META: Record<string, Omit<ProviderInfo, 'models'>> = {
     authType: 'api_key',
     setupUrl: 'https://openrouter.ai/keys',
   },
-  'azure-openai-responses': {
-    id: 'azure-openai-responses',
+  'azure-openai': {
+    id: 'azure-openai',
     name: 'Azure OpenAI',
     description: 'OpenAI models on Azure infrastructure',
     envVar: 'AZURE_OPENAI_API_KEY',
@@ -187,87 +171,38 @@ const CLI_MODELS: Record<string, ModelInfo[]> = {
   ],
 };
 
-// Fallback models when pi-ai is not available
-function getFallbackModels(providerId: string): ModelInfo[] {
-  switch (providerId) {
-    case 'anthropic':
-      return [
-        { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', contextWindow: 200000, maxTokens: 8192, supportsImages: true, supportsReasoning: false },
-        { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic', contextWindow: 200000, maxTokens: 8192, supportsImages: true, supportsReasoning: true },
-        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic', contextWindow: 200000, maxTokens: 8192, supportsImages: true, supportsReasoning: false },
-        { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic', contextWindow: 200000, maxTokens: 8192, supportsImages: true, supportsReasoning: false },
-      ];
-    case 'openai':
-      return [
-        { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, maxTokens: 16384, supportsImages: true, supportsReasoning: false },
-        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', contextWindow: 128000, maxTokens: 16384, supportsImages: true, supportsReasoning: false },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai', contextWindow: 128000, maxTokens: 4096, supportsImages: true, supportsReasoning: false },
-        { id: 'o1', name: 'o1', provider: 'openai', contextWindow: 200000, maxTokens: 100000, supportsImages: false, supportsReasoning: true },
-        { id: 'o1-mini', name: 'o1 Mini', provider: 'openai', contextWindow: 128000, maxTokens: 65536, supportsImages: false, supportsReasoning: true },
-      ];
-    default:
-      return [];
-  }
-}
-
 /**
  * Get all available providers with their models
  */
 export function getAllProviders(): ProviderInfo[] {
   const providers: ProviderInfo[] = [];
 
-  // Get providers from pi-ai if available
-  if (piAiModule) {
-    try {
-      const piAiProviders = piAiModule.getProviders();
+  // Get providers from pi-ai
+  const piAiProviders = getProviders();
 
-      for (const providerId of piAiProviders) {
-        const meta = PROVIDER_META[providerId];
-        if (!meta) continue; // Skip unknown providers
+  for (const providerId of piAiProviders) {
+    const meta = PROVIDER_META[providerId];
+    if (!meta) continue; // Skip unknown providers
 
-        const piAiModels = piAiModule.getModels(providerId);
-        const models: ModelInfo[] = piAiModels.map((m: {
-          id: string;
-          name: string;
-          contextWindow: number;
-          maxTokens: number;
-          input: string[];
-          reasoning: boolean;
-          cost?: { input: number; output: number };
-        }) => ({
-          id: m.id,
-          name: m.name,
-          provider: providerId,
-          contextWindow: m.contextWindow,
-          maxTokens: m.maxTokens,
-          supportsImages: m.input.includes('image'),
-          supportsReasoning: m.reasoning,
-          cost: m.cost ? {
-            input: m.cost.input,
-            output: m.cost.output,
-          } : undefined,
-        }));
+    const piAiModels = getModels(providerId as KnownProvider);
+    const models: ModelInfo[] = piAiModels.map((m) => ({
+      id: m.id,
+      name: m.name,
+      provider: providerId,
+      contextWindow: m.contextWindow,
+      maxTokens: m.maxTokens,
+      supportsImages: m.input.includes('image'),
+      supportsReasoning: m.reasoning,
+      cost: m.cost ? {
+        input: m.cost.input,
+        output: m.cost.output,
+      } : undefined,
+    }));
 
-        providers.push({
-          ...meta,
-          models,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to load pi-ai providers:', err);
-    }
-  } else {
-    // Fallback: add known providers with common models
-    const fallbackProviders = ['anthropic', 'openai'];
-    for (const providerId of fallbackProviders) {
-      const meta = PROVIDER_META[providerId];
-      if (meta) {
-        providers.push({
-          ...meta,
-          models: getFallbackModels(providerId),
-        });
-      }
-    }
+    providers.push({
+      ...meta,
+      models,
+    });
   }
 
   // Add Ollama (local)
