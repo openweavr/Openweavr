@@ -40,5 +40,3 @@ workflows/
 
 # Local build artifacts
 build/
-macos/
-scripts/
