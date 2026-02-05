@@ -450,10 +450,16 @@ main() {
   printf "\n"
 
   # Run onboarding to configure AI providers
-  printf "\n"
-  info "Starting onboarding to configure AI providers..."
-  printf "\n"
-  "$BIN_DIR/weavr" onboard
+  # Use /dev/tty for stdin since the script may be piped from curl
+  if [ -t 0 ] || [ -e /dev/tty ]; then
+    printf "\n"
+    info "Starting onboarding to configure AI providers..."
+    printf "\n"
+    "$BIN_DIR/weavr" onboard < /dev/tty
+  else
+    printf "\n"
+    info "Run 'weavr onboard' to configure AI providers."
+  fi
 
   printf "\n"
   printf "  ${BOLD}Quick start:${NC}\n"
