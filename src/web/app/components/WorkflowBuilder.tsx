@@ -455,6 +455,8 @@ const ACTION_SCHEMAS: ActionSchema[] = [
         { value: 'sh', label: 'Shell' },
         { value: 'python3', label: 'Python' },
         { value: 'node', label: 'Node.js' },
+        { value: 'powershell', label: 'PowerShell' },
+        { value: 'cmd', label: 'CMD (Windows)' },
       ], default: 'bash' },
     ],
     outputFields: [

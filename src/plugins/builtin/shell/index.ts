@@ -5,6 +5,10 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
+// Platform-aware defaults
+const isWindows = process.platform === 'win32';
+const defaultShell = isWindows ? 'cmd.exe' : '/bin/bash';
+
 const ExecSchema = z.object({
   command: z.string(),
   cwd: z.string().optional(),
@@ -15,7 +19,7 @@ const ExecSchema = z.object({
 
 const ScriptSchema = z.object({
   script: z.string(),
-  interpreter: z.enum(['bash', 'sh', 'zsh', 'python', 'python3', 'node']).default('bash'),
+  interpreter: z.enum(['bash', 'sh', 'zsh', 'python', 'python3', 'node', 'powershell', 'cmd']).default(isWindows ? 'powershell' : 'bash'),
   cwd: z.string().optional(),
   env: z.record(z.string()).optional(),
   timeout: z.number().default(60000),
@@ -42,7 +46,7 @@ export default definePlugin({
             cwd: config.cwd,
             env: { ...process.env, ...config.env },
             timeout: config.timeout,
-            shell: config.shell ?? '/bin/bash',
+            shell: config.shell ?? defaultShell,
             maxBuffer: 10 * 1024 * 1024, // 10MB
           });
 
@@ -95,20 +99,42 @@ export default definePlugin({
         const config = ScriptSchema.parse(ctx.config);
         ctx.log(`Running ${config.interpreter} script`);
 
-        const interpreterPaths: Record<string, string> = {
-          bash: '/bin/bash',
-          sh: '/bin/sh',
-          zsh: '/bin/zsh',
-          python: 'python',
-          python3: 'python3',
-          node: 'node',
-        };
+        const interpreterPaths: Record<string, string> = isWindows
+          ? {
+              bash: 'bash', // Git Bash or WSL
+              sh: 'sh',
+              zsh: 'zsh',
+              python: 'python',
+              python3: 'python3',
+              node: 'node',
+              powershell: 'powershell.exe',
+              cmd: 'cmd.exe',
+            }
+          : {
+              bash: '/bin/bash',
+              sh: '/bin/sh',
+              zsh: '/bin/zsh',
+              python: 'python',
+              python3: 'python3',
+              node: 'node',
+              powershell: 'pwsh', // PowerShell Core on Unix
+              cmd: 'cmd', // Won't work on Unix but included for completeness
+            };
 
         const interpreterPath = interpreterPaths[config.interpreter];
+
+        // Different argument formats for different interpreters
+        const getArgs = (interpreter: string, script: string): string[] => {
+          if (interpreter === 'powershell' || interpreter === 'cmd') {
+            return interpreter === 'cmd' ? ['/c', script] : ['-Command', script];
+          }
+          return ['-c', script];
+        };
+
         const startTime = Date.now();
 
         return new Promise((resolve) => {
-          const child = spawn(interpreterPath, ['-c', config.script], {
+          const child = spawn(interpreterPath, getArgs(config.interpreter, config.script), {
             cwd: config.cwd,
             env: { ...process.env, ...config.env },
             shell: false,
