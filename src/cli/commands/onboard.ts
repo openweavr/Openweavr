@@ -378,12 +378,64 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
 
   p.note(noteLines.join('\n'), 'Your Weavr home');
 
-  p.outro(
-    chalk.green('✓ Setup complete! ') +
-      chalk.dim('Run ') +
-      chalk.cyan('weavr serve') +
-      chalk.dim(' to start the gateway.')
-  );
+  // Start the server and open the UI
+  const serverSpinner = p.spinner();
+  serverSpinner.start('Starting Weavr server...');
+
+  const { spawn } = await import('node:child_process');
+  const serverProcess = spawn('node', [process.argv[1].replace(/onboard.*$/, 'serve')], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  serverProcess.unref();
+
+  // Wait for server to be ready
+  const port = config.server.port || 3847;
+  const maxAttempts = 20;
+  let ready = false;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const response = await fetch(`http://localhost:${port}/api/health`);
+      if (response.ok) {
+        ready = true;
+        break;
+      }
+    } catch {
+      // Server not ready yet
+    }
+  }
+
+  if (ready) {
+    serverSpinner.stop('Server started!');
+    const url = `http://localhost:${port}`;
+
+    p.note(
+      [
+        chalk.dim('Weavr is running at:'),
+        chalk.cyan(url),
+        '',
+        chalk.dim('Opening in your browser...'),
+      ].join('\n'),
+      'Ready!'
+    );
+
+    await openBrowser(url);
+
+    p.outro(
+      chalk.green('✓ Setup complete! ') +
+        chalk.dim('Weavr is running in the background.')
+    );
+  } else {
+    serverSpinner.stop('Server may still be starting...');
+    p.outro(
+      chalk.green('✓ Setup complete! ') +
+        chalk.dim('Run ') +
+        chalk.cyan('weavr serve') +
+        chalk.dim(' if the server didn\'t start.')
+    );
+  }
 }
 
 async function runNonInteractiveOnboard(
