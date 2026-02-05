@@ -37,3 +37,8 @@ pnpm-lock.yaml
 bun.lockb
 workflows/
 ~/Desktop/news.txt
+
+# Local build artifacts
+build/
+macos/
+scripts/
