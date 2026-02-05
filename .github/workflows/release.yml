@@ -10,29 +10,8 @@ permissions:
   id-token: write
 
 jobs:
-  # Build macOS Launcher DMG
-  macos-launcher:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build macOS Launcher
-        run: ./scripts/macos/build-launcher.sh
-
-      - name: Build DMG
-        run: ./scripts/macos/build-dmg.sh
-
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg
-          path: build/macos/Weavr-Launcher.dmg
-
-  # Publish npm package and create GitHub release
   release:
     runs-on: ubuntu-latest
-    needs: macos-launcher
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,12 +40,6 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Download macOS DMG
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-dmg
-          path: ./artifacts
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -74,8 +47,6 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
-          files: |
-            artifacts/Weavr-Launcher.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
