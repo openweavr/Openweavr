@@ -127,7 +127,28 @@ private final class StatusBarController: NSObject {
   }
 
   private func updateStatusIcon() {
-    if let button = statusItem.button {
+    guard let button = statusItem.button else { return }
+
+    // Try to load the Weavr logo
+    if let logoImage = loadWeavrLogo() {
+      button.image = logoImage
+      button.imagePosition = .imageLeft
+
+      // Add status indicator as a small dot
+      if isServerReachable {
+        button.title = " ●"
+        // Use attributed string for green color
+        let attrs: [NSAttributedString.Key: Any] = [
+          .foregroundColor: NSColor.systemGreen,
+          .font: NSFont.systemFont(ofSize: 8)
+        ]
+        button.attributedTitle = NSAttributedString(string: " ●", attributes: attrs)
+      } else {
+        button.title = ""
+        button.attributedTitle = NSAttributedString(string: "")
+      }
+    } else {
+      // Fallback to SF Symbols
       let imageName = isServerReachable ? "bolt.fill" : "bolt.slash"
       let color = isServerReachable ? NSColor.systemGreen : NSColor.secondaryLabelColor
 
@@ -140,6 +161,26 @@ private final class StatusBarController: NSObject {
         button.title = isServerReachable ? "●" : "○"
       }
     }
+  }
+
+  private func loadWeavrLogo() -> NSImage? {
+    // Try bundle resource first
+    if let url = Bundle.main.url(forResource: "weavr-icon", withExtension: "png"),
+       let image = NSImage(contentsOf: url) {
+      return resizedImage(image, size: NSSize(width: 18, height: 18))
+    }
+    return nil
+  }
+
+  private func resizedImage(_ image: NSImage, size: NSSize) -> NSImage {
+    let newImage = NSImage(size: size)
+    newImage.lockFocus()
+    image.draw(in: NSRect(origin: .zero, size: size),
+               from: NSRect(origin: .zero, size: image.size),
+               operation: .sourceOver,
+               fraction: 1.0)
+    newImage.unlockFocus()
+    return newImage
   }
 
   private func startPolling() {

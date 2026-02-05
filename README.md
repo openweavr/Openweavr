@@ -49,6 +49,25 @@ weavr serve
 weavr create
 ```
 
+## 🍎 macOS Menu Bar Launcher (Installer Assets)
+
+Build a minimal macOS menu bar app that starts/stops the server and opens the web UI:
+
+```bash
+./scripts/macos/build-launcher.sh
+./scripts/macos/build-dmg.sh    # Optional DMG
+./scripts/macos/build-pkg.sh    # Optional PKG installer
+```
+
+Requires Xcode Command Line Tools (for `xcrun`/`swiftc`).
+
+Optional: start the server automatically at login:
+
+```bash
+./scripts/macos/install-launchagent.sh
+./scripts/macos/uninstall-launchagent.sh
+```
+
 ## 📖 Example Workflows
 
 ### AI Research Agent
