@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Openweavr - Self-hosted Workflow Automation with AI Agents</title>
-    <meta name="description" content="Build powerful workflow automations with native AI agent support. Self-hosted, open-source, and fully customizable." />
+    <title>Openweavr - Turn Your Spare Mac into an AI Automation Engine</title>
+    <meta name="description" content="Self-hosted workflow automation with AI agents. No cloud fees, fully private, runs on macOS/Linux. Turn your spare computer into an autonomous automation engine." />
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
     <style>
       :root {
@@ -16,6 +16,7 @@
         --accent-blue: #3b82f6;
         --accent-green: #22c55e;
         --accent-orange: #f97316;
+        --accent-red: #ef4444;
         --text-primary: #f8fafc;
         --text-secondary: #94a3b8;
         --text-muted: #64748b;
@@ -38,7 +39,6 @@
         overflow-x: hidden;
       }
 
-      /* Animated background */
       .bg-grid {
         position: fixed;
         inset: 0;
@@ -62,7 +62,6 @@
         z-index: 0;
       }
 
-      /* Navigation */
       nav {
         position: fixed;
         top: 0;
@@ -88,9 +87,7 @@
         text-decoration: none;
       }
 
-      .logo img {
-        height: 32px;
-      }
+      .logo img { height: 32px; }
 
       .nav-links {
         display: flex;
@@ -105,9 +102,7 @@
         transition: color 0.2s;
       }
 
-      .nav-links a:hover {
-        color: var(--text-primary);
-      }
+      .nav-links a:hover { color: var(--text-primary); }
 
       .btn {
         display: inline-flex;
@@ -145,6 +140,11 @@
         border-color: var(--accent-purple-dim);
       }
 
+      .btn-sm {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+
       /* Hero Section */
       .hero {
         position: relative;
@@ -172,7 +172,7 @@
       }
 
       .hero h1 {
-        font-size: clamp(48px, 8vw, 80px);
+        font-size: clamp(36px, 6vw, 64px);
         font-weight: 800;
         line-height: 1.1;
         max-width: 900px;
@@ -189,12 +189,44 @@
         background-clip: text;
       }
 
-      .hero p {
+      .hero .subtitle {
         font-size: 20px;
         color: var(--text-secondary);
-        max-width: 600px;
-        margin-bottom: 40px;
+        max-width: 650px;
+        margin-bottom: 32px;
       }
+
+      /* Value Props */
+      .value-props {
+        display: flex;
+        gap: 32px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 40px;
+        max-width: 800px;
+      }
+
+      .value-prop {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        color: var(--text-secondary);
+      }
+
+      .value-prop .icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+      }
+
+      .value-prop .icon.green { background: rgba(34, 197, 94, 0.2); }
+      .value-prop .icon.purple { background: rgba(168, 85, 247, 0.2); }
+      .value-prop .icon.blue { background: rgba(59, 130, 246, 0.2); }
 
       .hero-buttons {
         display: flex;
@@ -203,28 +235,96 @@
         justify-content: center;
       }
 
-      .hero-visual {
-        margin-top: 80px;
-        max-width: 1000px;
+      /* Install Block */
+      .install-block {
+        margin-top: 48px;
+        max-width: 700px;
         width: 100%;
-        border-radius: 16px;
+        text-align: left;
+      }
+
+      .code-block {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow:
-          0 0 0 1px var(--border-color),
-          0 20px 80px rgba(0, 0, 0, 0.5),
-          0 0 100px rgba(168, 85, 247, 0.1);
       }
 
-      .hero-visual img {
-        width: 100%;
-        display: block;
+      .code-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid var(--border-color);
       }
 
-      /* Features Section */
+      .code-dot { width: 12px; height: 12px; border-radius: 50%; }
+      .code-dot.red { background: #ff5f56; }
+      .code-dot.yellow { background: #ffbd2e; }
+      .code-dot.green { background: #27ca40; }
+
+      .code-block pre {
+        padding: 20px;
+        overflow-x: auto;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        margin: 0;
+      }
+
+      .code-block .keyword { color: var(--accent-purple); }
+      .code-block .string { color: var(--accent-green); }
+      .code-block .comment { color: var(--text-muted); }
+
+      .copy-btn {
+        margin-left: auto;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .copy-btn:hover {
+        border-color: var(--accent-purple-dim);
+        color: var(--text-primary);
+      }
+
+      .install-note {
+        margin-top: 12px;
+        font-size: 14px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      /* Requirements */
+      .requirements {
+        display: flex;
+        gap: 24px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .requirements span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Section */
       .section {
         position: relative;
         z-index: 1;
-        padding: 120px 40px;
+        padding: 100px 40px;
         max-width: 1200px;
         margin: 0 auto;
       }
@@ -247,9 +347,124 @@
         margin: 0 auto;
       }
 
+      /* Use Cases */
+      .use-cases-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 24px;
+      }
+
+      .use-case-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 28px;
+        transition: all 0.3s;
+      }
+
+      .use-case-card:hover {
+        border-color: var(--accent-purple-dim);
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      }
+
+      .use-case-card .trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        background: rgba(168, 85, 247, 0.15);
+        border-radius: 100px;
+        font-size: 12px;
+        color: var(--accent-purple);
+        margin-bottom: 16px;
+      }
+
+      .use-case-card h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .use-case-card .description {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+      }
+
+      .use-case-card .outcome {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+        background: rgba(34, 197, 94, 0.1);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--accent-green);
+      }
+
+      .use-case-card .outcome .check {
+        flex-shrink: 0;
+        font-weight: bold;
+      }
+
+      /* Comparison Table */
+      .comparison-section {
+        background: linear-gradient(180deg, transparent 0%, rgba(168, 85, 247, 0.03) 50%, transparent 100%);
+      }
+
+      .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--bg-card);
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+      }
+
+      .comparison-table th,
+      .comparison-table td {
+        padding: 16px 20px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .comparison-table th {
+        background: rgba(0, 0, 0, 0.3);
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .comparison-table th:first-child {
+        width: 40%;
+      }
+
+      .comparison-table td {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .comparison-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .comparison-table .highlight {
+        background: rgba(168, 85, 247, 0.05);
+      }
+
+      .comparison-table .highlight td:nth-child(2) {
+        color: var(--accent-purple);
+        font-weight: 500;
+      }
+
+      .check-yes { color: var(--accent-green); }
+      .check-no { color: var(--accent-red); opacity: 0.7; }
+      .check-partial { color: var(--accent-orange); }
+
+      /* Features Grid */
       .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 24px;
       }
 
@@ -257,7 +472,7 @@
         background: var(--bg-card);
         border: 1px solid var(--border-color);
         border-radius: 16px;
-        padding: 32px;
+        padding: 28px;
         transition: all 0.3s;
       }
 
@@ -284,80 +499,58 @@
       .feature-icon.orange { background: rgba(249, 115, 22, 0.15); }
 
       .feature-card h3 {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 600;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
 
       .feature-card p {
         color: var(--text-secondary);
-        font-size: 15px;
+        font-size: 14px;
       }
 
-      /* Code Example Section */
-      .code-section {
+      /* Onboarding Steps */
+      .onboarding-steps {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 48px;
-        align-items: center;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+        margin-top: 48px;
       }
 
-      .code-content h2 {
-        font-size: 36px;
-        font-weight: 700;
-        margin-bottom: 20px;
+      .step-card {
+        text-align: center;
+        padding: 24px;
       }
 
-      .code-content p {
-        color: var(--text-secondary);
-        font-size: 17px;
-        margin-bottom: 32px;
-      }
-
-      .code-block {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        overflow: hidden;
-      }
-
-      .code-header {
+      .step-number {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--gradient-purple);
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 12px 16px;
-        background: rgba(0, 0, 0, 0.3);
-        border-bottom: 1px solid var(--border-color);
+        justify-content: center;
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0 auto 16px;
       }
 
-      .code-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
+      .step-card h4 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
       }
 
-      .code-dot.red { background: #ff5f56; }
-      .code-dot.yellow { background: #ffbd2e; }
-      .code-dot.green { background: #27ca40; }
-
-      .code-block pre {
-        padding: 20px;
-        overflow-x: auto;
-        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-        font-size: 13px;
-        line-height: 1.7;
+      .step-card p {
+        font-size: 14px;
         color: var(--text-secondary);
       }
-
-      .code-block .keyword { color: var(--accent-purple); }
-      .code-block .string { color: var(--accent-green); }
-      .code-block .comment { color: var(--text-muted); }
 
       /* Integrations */
       .integrations-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 16px;
+        gap: 12px;
         justify-content: center;
         margin-top: 48px;
       }
@@ -365,36 +558,42 @@
       .integration-badge {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 12px 20px;
+        gap: 8px;
+        padding: 10px 16px;
         background: var(--bg-card);
         border: 1px solid var(--border-color);
         border-radius: 100px;
-        font-size: 15px;
+        font-size: 14px;
         color: var(--text-secondary);
+        transition: all 0.2s;
       }
 
-      .integration-badge span {
-        font-size: 20px;
+      .integration-badge:hover {
+        border-color: var(--accent-purple-dim);
+        background: var(--bg-card-hover);
       }
+
+      .integration-badge span { font-size: 18px; }
 
       /* CTA Section */
       .cta-section {
         text-align: center;
-        padding: 120px 40px;
+        padding: 100px 40px;
         background: linear-gradient(180deg, transparent 0%, rgba(168, 85, 247, 0.05) 100%);
+        position: relative;
+        z-index: 1;
       }
 
       .cta-section h2 {
-        font-size: 48px;
+        font-size: 42px;
         font-weight: 700;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
       }
 
       .cta-section p {
         font-size: 18px;
         color: var(--text-secondary);
-        margin-bottom: 40px;
+        margin-bottom: 32px;
         max-width: 500px;
         margin-left: auto;
         margin-right: auto;
@@ -416,62 +615,34 @@
         text-decoration: none;
       }
 
-      footer a:hover {
-        color: var(--accent-purple);
-      }
+      footer a:hover { color: var(--accent-purple); }
 
       /* Responsive */
       @media (max-width: 900px) {
-        nav {
-          padding: 16px 24px;
-        }
+        nav { padding: 16px 24px; }
+        .nav-links { display: none; }
+        .hero { padding: 100px 24px 60px; }
+        .section { padding: 60px 24px; }
+        .value-props { gap: 16px; }
+        .value-prop { font-size: 13px; }
+        .use-cases-grid { grid-template-columns: 1fr; }
+        .onboarding-steps { grid-template-columns: repeat(2, 1fr); }
+        .comparison-table { font-size: 13px; }
+        .comparison-table th, .comparison-table td { padding: 12px; }
+      }
 
-        .nav-links {
-          display: none;
-        }
-
-        .hero {
-          padding: 100px 24px 60px;
-        }
-
-        .section {
-          padding: 80px 24px;
-        }
-
-        .code-section {
-          grid-template-columns: 1fr;
-        }
-
-        .features-grid {
-          grid-template-columns: 1fr;
-        }
+      @media (max-width: 600px) {
+        .onboarding-steps { grid-template-columns: 1fr; }
+        .requirements { flex-direction: column; align-items: center; }
       }
 
       /* Animations */
-      @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-      }
-
-      .hero-visual {
-        animation: float 6s ease-in-out infinite;
-      }
-
       @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
-      .fade-in {
-        animation: fadeInUp 0.8s ease-out forwards;
-      }
-
+      .fade-in { animation: fadeInUp 0.8s ease-out forwards; }
       .delay-1 { animation-delay: 0.1s; opacity: 0; }
       .delay-2 { animation-delay: 0.2s; opacity: 0; }
       .delay-3 { animation-delay: 0.3s; opacity: 0; }
@@ -490,24 +661,44 @@
       <div class="nav-links">
         <a href="overview.html">Docs</a>
         <a href="https://github.com/openweavr/Openweavr">GitHub</a>
-        <a href="getting-started.html" class="btn btn-primary">Get Started</a>
+        <a href="getting-started.html" class="btn btn-primary btn-sm">Get Started</a>
       </div>
     </nav>
 
+    <!-- Hero Section -->
     <section class="hero">
       <div class="hero-badge fade-in">
-        <span>&#x2728;</span> Open Source & Self-Hosted
+        <span>&#x2728;</span> Open Source &bull; Self-Hosted &bull; No Cloud Fees
       </div>
+
       <h1 class="fade-in delay-1">
-        Workflow Automation<br />with <span>AI Agents</span>
+        Turn Your Spare Mac into an<br /><span>AI Automation Engine</span>
       </h1>
-      <p class="fade-in delay-2">
-        Build powerful automations that combine traditional workflows with intelligent AI agents.
-        Self-hosted, open-source, and fully under your control.
+
+      <p class="subtitle fade-in delay-2">
+        Self-hosted workflow automation that runs on your hardware. AI agents build and run workflows for you.
+        No monthly fees. No data leaving your machine. Just automation that works.
       </p>
+
+      <!-- Value Props -->
+      <div class="value-props fade-in delay-2">
+        <div class="value-prop">
+          <div class="icon green">&#x2713;</div>
+          No monthly cloud fees
+        </div>
+        <div class="value-prop">
+          <div class="icon purple">&#x2713;</div>
+          AI builds workflows for you
+        </div>
+        <div class="value-prop">
+          <div class="icon blue">&#x2713;</div>
+          Your data stays on your machine
+        </div>
+      </div>
+
       <div class="hero-buttons fade-in delay-3">
         <a href="getting-started.html" class="btn btn-primary">
-          Get Started
+          Get Started Free
           <span>&#x2192;</span>
         </a>
         <a href="https://github.com/openweavr/Openweavr" class="btn btn-secondary">
@@ -516,126 +707,256 @@
         </a>
       </div>
 
-      <!-- Quick Install -->
-      <div class="code-block fade-in delay-3" style="margin-top: 48px; max-width: 700px; text-align: left; position: relative;">
-        <div class="code-header">
-          <div class="code-dot red"></div>
-          <div class="code-dot yellow"></div>
-          <div class="code-dot green"></div>
-          <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">One-liner install</span>
-          <button onclick="copyInstallCommand(this)" style="margin-left: 12px; padding: 6px 12px; font-size: 12px; font-weight: 500; background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;">Copy</button>
-        </div>
-        <pre style="padding: 20px; margin: 0;"><code id="install-command" style="color: var(--text-secondary);">curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
-      </div>
-      <script>
-        function copyInstallCommand(btn) {
-          const command = document.getElementById('install-command').textContent;
-          navigator.clipboard.writeText(command).then(() => {
-            btn.textContent = 'Copied!';
-            btn.style.background = 'rgba(34, 197, 94, 0.2)';
-            btn.style.borderColor = 'rgba(34, 197, 94, 0.5)';
-            btn.style.color = '#22c55e';
-            setTimeout(() => {
-              btn.textContent = 'Copy';
-              btn.style.background = '';
-              btn.style.borderColor = '';
-              btn.style.color = '';
-            }, 2000);
-          });
-        }
-      </script>
-      <p class="fade-in delay-3" style="color: var(--text-muted); font-size: 14px; margin-top: 12px;">
-        Works on macOS, Linux, and WSL. Installs Node.js if needed.
-      </p>
-
-      <div class="hero-visual fade-in delay-4">
-        <img src="assets/dashboard-screenshot.png" alt="Openweavr Dashboard" />
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-header">
-        <h2>Why Openweavr?</h2>
-        <p>Everything you need to automate your workflows with the power of AI</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon purple">&#x1F9E0;</div>
-          <h3>Native AI Agents</h3>
-          <p>Build workflows powered by Claude, GPT, and other LLMs with tool use, web search, and persistent memory.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon blue">&#x26A1;</div>
-          <h3>Event-Driven Triggers</h3>
-          <p>React to GitHub events, cron schedules, webhooks, Telegram messages, Slack, Discord, and more.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon green">&#x1F512;</div>
-          <h3>Self-Hosted</h3>
-          <p>Run on your own infrastructure. Your data never leaves your servers. Full control and privacy.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon orange">&#x1F527;</div>
-          <h3>Visual Builder + AI Assistant</h3>
-          <p>Design workflows visually or describe what you want in plain English. The AI assistant generates YAML for you.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon purple">&#x1F50C;</div>
-          <h3>MCP Support</h3>
-          <p>20+ pre-configured MCP servers. Enable/disable tools in real-time from the UI without restarting.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon blue">&#x1F4E6;</div>
-          <h3>Plugin System</h3>
-          <p>17+ built-in integrations with an extensible plugin architecture for custom actions and triggers.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="code-section">
-        <div class="code-content">
-          <h2>Simple YAML Syntax</h2>
-          <p>Define workflows in simple, readable YAML. Use AI agents as steps alongside traditional actions. Variable interpolation makes it easy to pass data between steps.</p>
-          <a href="workflows.html" class="btn btn-secondary">View Documentation</a>
-        </div>
+      <!-- Install Block -->
+      <div class="install-block fade-in delay-3">
         <div class="code-block">
           <div class="code-header">
             <div class="code-dot red"></div>
             <div class="code-dot yellow"></div>
             <div class="code-dot green"></div>
+            <span style="color: var(--text-muted); font-size: 12px; margin-left: 12px;">Install in 60 seconds</span>
+            <button class="copy-btn" onclick="copyInstallCommand(this)">Copy</button>
           </div>
-          <pre><code><span class="keyword">name:</span> <span class="string">daily-briefing</span>
-
-<span class="keyword">trigger:</span>
-  <span class="keyword">type:</span> <span class="string">cron.schedule</span>
-  <span class="keyword">with:</span>
-    <span class="keyword">cron:</span> <span class="string">"0 9 * * *"</span>
-
-<span class="keyword">steps:</span>
-  - <span class="keyword">id:</span> <span class="string">research</span>
-    <span class="keyword">action:</span> <span class="string">ai.agent</span>
-    <span class="keyword">with:</span>
-      <span class="keyword">task:</span> <span class="string">"Research today's top tech news"</span>
-      <span class="keyword">tools:</span> <span class="string">[web_search, web_fetch]</span>
-
-  - <span class="keyword">id:</span> <span class="string">notify</span>
-    <span class="keyword">action:</span> <span class="string">telegram.send</span>
-    <span class="keyword">with:</span>
-      <span class="keyword">text:</span> <span class="string">"{{ steps.research.result }}"</span></code></pre>
+          <pre><code id="install-command">curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
+        </div>
+        <p class="install-note">Works on macOS, Linux, and WSL. No Docker required.</p>
+        <div class="requirements">
+          <span>&#x1F4BB; macOS 12+ / Ubuntu 20+</span>
+          <span>&#x1F9E0; 4GB RAM minimum</span>
+          <span>&#x26A1; Node.js 22+ (auto-installed)</span>
         </div>
       </div>
     </section>
 
+    <!-- Real Use Cases Section -->
     <section class="section">
       <div class="section-header">
-        <h2>Integrations</h2>
-        <p>Connect with your favorite tools and services out of the box</p>
+        <h2>Automate What You Actually Do</h2>
+        <p>Real workflows people run on their home servers and spare Macs</p>
       </div>
+
+      <div class="use-cases-grid">
+        <div class="use-case-card">
+          <div class="trigger">&#x23F0; Every morning at 9 AM</div>
+          <h3>Daily News Digest to Telegram</h3>
+          <p class="description">AI researches top tech/finance news, summarizes the highlights, and sends a personalized briefing to your Telegram.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Wake up to a curated news summary without doomscrolling
+          </div>
+        </div>
+
+        <div class="use-case-card">
+          <div class="trigger">&#x1F419; On GitHub issue created</div>
+          <h3>Auto-Triage GitHub Issues</h3>
+          <p class="description">AI reads new issues, labels them by type (bug, feature, question), estimates complexity, and posts a summary comment.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Issues organized automatically, ready for your review
+          </div>
+        </div>
+
+        <div class="use-case-card">
+          <div class="trigger">&#x1F4C1; When file added to folder</div>
+          <h3>Document Summarizer</h3>
+          <p class="description">Watch a folder for new PDFs or documents. AI extracts key points and saves a summary alongside the original.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Never read a 50-page doc just to find one answer again
+          </div>
+        </div>
+
+        <div class="use-case-card">
+          <div class="trigger">&#x1F4AC; Slack message with keyword</div>
+          <h3>Meeting Notes Extractor</h3>
+          <p class="description">When someone shares meeting notes in Slack, AI extracts action items, assigns owners, and creates Linear tickets.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Action items tracked without manual copy-paste
+          </div>
+        </div>
+
+        <div class="use-case-card">
+          <div class="trigger">&#x23F0; Every Friday at 5 PM</div>
+          <h3>Weekly Expense Report</h3>
+          <p class="description">AI scans your email for receipts, categorizes expenses, and generates a formatted report sent to your accountant.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Expense reporting done in seconds, not hours
+          </div>
+        </div>
+
+        <div class="use-case-card">
+          <div class="trigger">&#x1F310; Webhook from your app</div>
+          <h3>Customer Feedback Analyzer</h3>
+          <p class="description">New support ticket comes in? AI analyzes sentiment, extracts product feedback, and routes urgent issues to Slack.</p>
+          <div class="outcome">
+            <span class="check">&#x2713;</span>
+            Never miss critical customer feedback again
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="section comparison-section">
+      <div class="section-header">
+        <h2>How Openweavr Compares</h2>
+        <p>The best of self-hosted automation with native AI capabilities</p>
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Openweavr</th>
+            <th>n8n</th>
+            <th>Zapier</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="highlight">
+            <td>Self-hosted (no cloud fees)</td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr class="highlight">
+            <td>AI agent builds workflows for you</td>
+            <td><span class="check-yes">&#x2713; Built-in</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr class="highlight">
+            <td>AI can use tools (search, browse, code)</td>
+            <td><span class="check-yes">&#x2713; Native</span></td>
+            <td><span class="check-partial">~ Limited</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr>
+            <td>Visual workflow builder</td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+          </tr>
+          <tr>
+            <td>Local LLM support (Ollama)</td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-partial">~ Plugin</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr>
+            <td>MCP tool servers (20+)</td>
+            <td><span class="check-yes">&#x2713; Built-in</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr>
+            <td>Runs on Mac Mini / Raspberry Pi</td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-no">&#x2717; No</span></td>
+          </tr>
+          <tr>
+            <td>No Docker required</td>
+            <td><span class="check-yes">&#x2713; Yes</span></td>
+            <td><span class="check-no">&#x2717; Docker</span></td>
+            <td><span class="check-partial">~ N/A</span></td>
+          </tr>
+          <tr>
+            <td>Monthly cost</td>
+            <td><span class="check-yes">$0</span></td>
+            <td><span class="check-yes">$0</span></td>
+            <td><span class="check-no">$20-600+</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Up and Running in 4 Steps</h2>
+        <p>From install to your first automated workflow</p>
+      </div>
+
+      <div class="onboarding-steps">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h4>Install</h4>
+          <p>One command. Auto-installs Node.js if needed. No Docker.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h4>Connect AI</h4>
+          <p>Add your Claude or GPT key. Or use free local models with Ollama.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h4>Describe a Workflow</h4>
+          <p>"Summarize my emails every morning and send to Telegram"</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">4</div>
+          <h4>Deploy & Forget</h4>
+          <p>AI generates the workflow. It runs automatically on schedule.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Built for Self-Hosters</h2>
+        <p>Everything you need to run automation on your own hardware</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon purple">&#x1F9E0;</div>
+          <h3>AI That Actually Does Things</h3>
+          <p>Not just chat. Agents can search the web, read files, run code, and take actions across your connected services.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon blue">&#x1F527;</div>
+          <h3>Visual Builder + AI Assistant</h3>
+          <p>Drag-and-drop workflows or describe what you want in plain English. The AI writes the YAML for you.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon green">&#x1F512;</div>
+          <h3>100% Private</h3>
+          <p>Your data never leaves your machine. No cloud sync, no telemetry. You own everything.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon orange">&#x1F4BB;</div>
+          <h3>Runs on Anything</h3>
+          <p>Mac Mini, old laptop, Raspberry Pi, Linux server. If it runs Node.js, it runs Openweavr.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon purple">&#x1F50C;</div>
+          <h3>20+ MCP Tool Servers</h3>
+          <p>Give AI access to filesystem, databases, browsers, Git, and more. Enable/disable from the UI.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon blue">&#x26A1;</div>
+          <h3>Local LLMs Welcome</h3>
+          <p>Use Ollama for completely offline AI. No API costs. Great for privacy-sensitive workflows.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Integrations Section -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Connects to Everything</h2>
+        <p>Built-in integrations for the tools you already use</p>
+      </div>
+
       <div class="integrations-grid">
-        <div class="integration-badge"><span>&#x1F916;</span> Anthropic Claude</div>
-        <div class="integration-badge"><span>&#x1F9E0;</span> OpenAI GPT</div>
-        <div class="integration-badge"><span>&#x2728;</span> Google Gemini</div>
+        <div class="integration-badge"><span>&#x1F916;</span> Claude</div>
+        <div class="integration-badge"><span>&#x1F9E0;</span> GPT-4</div>
+        <div class="integration-badge"><span>&#x1F99C;</span> Ollama</div>
+        <div class="integration-badge"><span>&#x2728;</span> Gemini</div>
         <div class="integration-badge"><span>&#x1F419;</span> GitHub</div>
         <div class="integration-badge"><span>&#x2708;&#xFE0F;</span> Telegram</div>
         <div class="integration-badge"><span>&#x1F4AC;</span> Slack</div>
@@ -644,19 +965,20 @@
         <div class="integration-badge"><span>&#x1F4E7;</span> Email</div>
         <div class="integration-badge"><span>&#x23F0;</span> Cron</div>
         <div class="integration-badge"><span>&#x1F310;</span> Webhooks</div>
-        <div class="integration-badge"><span>&#x1F4C1;</span> Filesystem MCP</div>
-        <div class="integration-badge"><span>&#x1F5C3;&#xFE0F;</span> Database MCP</div>
-        <div class="integration-badge"><span>&#x1F310;</span> Browser MCP</div>
-        <div class="integration-badge"><span>&#x1F50D;</span> 20+ MCP Servers</div>
+        <div class="integration-badge"><span>&#x1F4C1;</span> Filesystem</div>
+        <div class="integration-badge"><span>&#x1F5C3;&#xFE0F;</span> SQLite/Postgres</div>
+        <div class="integration-badge"><span>&#x1F310;</span> Web Browser</div>
+        <div class="integration-badge"><span>&#x1F50D;</span> Brave Search</div>
       </div>
     </section>
 
+    <!-- CTA Section -->
     <section class="cta-section">
-      <h2>Ready to automate?</h2>
-      <p>Get started in under a minute. No credit card required. Self-host on your own infrastructure.</p>
+      <h2>Ready to Automate?</h2>
+      <p>Install in 60 seconds. No credit card. No cloud account. Just you and your Mac.</p>
       <div class="hero-buttons">
         <a href="getting-started.html" class="btn btn-primary">
-          Get Started
+          Get Started Free
           <span>&#x2192;</span>
         </a>
         <a href="https://github.com/openweavr/Openweavr" class="btn btn-secondary">
@@ -674,5 +996,23 @@
         MIT License
       </p>
     </footer>
+
+    <script>
+      function copyInstallCommand(btn) {
+        const command = document.getElementById('install-command').textContent;
+        navigator.clipboard.writeText(command).then(() => {
+          btn.textContent = 'Copied!';
+          btn.style.background = 'rgba(34, 197, 94, 0.2)';
+          btn.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+          btn.style.color = '#22c55e';
+          setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+          }, 2000);
+        });
+      }
+    </script>
   </body>
 </html>
