@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { IntegrationIcon } from './IntegrationIcon';
 
 interface ActionSchema {
   id: string;
@@ -236,7 +237,7 @@ export function NodeLibrary({
                   e.currentTarget.style.background = 'var(--bg-primary)';
                 }}
               >
-                <span style={{ fontSize: '16px' }}>{schema.icon}</span>
+                <IntegrationIcon name={schema.icon} size={16} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '12px', fontWeight: 500, color: '#fff' }}>
                     {schema.label}
