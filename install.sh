@@ -446,19 +446,25 @@ main() {
   fi
 
   printf "\n"
+  printf "  ${PURPLE}Documentation:${NC} https://openweavr.ai\n"
+  printf "\n"
+
+  # Run onboarding to configure AI providers
+  printf "\n"
+  info "Starting onboarding to configure AI providers..."
+  printf "\n"
+  "$BIN_DIR/weavr" onboard
+
+  printf "\n"
   printf "  ${BOLD}Quick start:${NC}\n"
   printf "\n"
   printf "    ${CYAN}weavr serve${NC}              Start the server\n"
-  printf "    ${CYAN}weavr onboard${NC}            Configure AI providers\n"
   printf "    ${CYAN}weavr --help${NC}             Show all commands\n"
   printf "\n"
   printf "  Then open ${CYAN}http://localhost:3847${NC} in your browser.\n"
   printf "\n"
-  printf "  ${PURPLE}Documentation:${NC} https://openweavr.ai/docs\n"
-  printf "\n"
 
-  # Source shell config to make weavr available immediately
-  # We do this at the end so the user's current shell session has access
+  # Note about PATH if we modified it
   if [ "$modify_path" = true ]; then
     local shell_config
     shell_config=$(get_shell_config)
