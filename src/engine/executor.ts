@@ -161,7 +161,7 @@ export class WorkflowExecutor {
       if (!action) {
         // Check if it's a built-in action
         const interpolationCtx = await this.buildInterpolationContext(run, workflow);
-        const output = await this.executeBuiltinAction(step, run, workflow, interpolationCtx);
+        const output = await this.executeBuiltinAction(step, workflow, interpolationCtx);
         stepResult.output = output;
         stepResult.status = 'completed';
       } else {
@@ -292,7 +292,6 @@ export class WorkflowExecutor {
 
   private async executeBuiltinAction(
     step: Step,
-    _run: WorkflowRun,
     workflow: Workflow,
     context: Record<string, unknown>
   ): Promise<unknown> {
