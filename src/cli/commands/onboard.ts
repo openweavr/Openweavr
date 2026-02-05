@@ -110,7 +110,7 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
       process.exit(1);
     }
 
-    const url = `http://localhost:${port}/settings`;
+    const url = `http://localhost:${port}?onboard=true`;
 
     webSpinner.stop('Server started!');
 
@@ -119,7 +119,7 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
         chalk.dim('Opening your browser to:'),
         chalk.cyan(url),
         '',
-        chalk.dim('Configure your AI providers in the Settings page.'),
+        chalk.dim('Complete the setup wizard in your browser.'),
       ].join('\n'),
       'Web Setup'
     );
@@ -356,6 +356,7 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
       ...existingConfig.server,
       port: parseInt(answers.port as string, 10),
     },
+    onboarded: true,
   };
 
   if (answers.aiProvider && answers.aiProvider !== 'none') {
@@ -479,6 +480,7 @@ async function runNonInteractiveOnboard(
       port,
       host: options.host ?? existingConfig.server.host,
     },
+    onboarded: true,
   };
 
   const provider = options.aiProvider ?? existingConfig.ai?.provider ?? 'none';

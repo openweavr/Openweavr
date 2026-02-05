@@ -218,6 +218,7 @@ export interface WeavrConfig {
   workflowsDir: string;
   pluginsDir: string;
   logsDir: string;
+  onboarded?: boolean; // True when user has completed onboarding
   scheduler?: {
     dbPath?: string; // Path to scheduler SQLite DB (default: ~/.weavr/scheduler.db)
   };

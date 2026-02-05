@@ -50,3 +50,33 @@ export async function saveWorkflowFile(name: string, content: string): Promise<v
   const path = await getWorkflowPath(name);
   await writeFile(path, content, 'utf-8');
 }
+
+/**
+ * Check if Weavr has been configured (user completed onboarding).
+ * Returns true if config file exists AND has meaningful configuration
+ * (either an AI provider is set or user explicitly skipped it).
+ */
+export async function isConfigured(): Promise<boolean> {
+  try {
+    const content = await readFile(CONFIG_FILE, 'utf-8');
+    const config = parseYaml(content) as Partial<WeavrConfig>;
+
+    // Config is considered "configured" if:
+    // 1. User has set up an AI provider (even 'none' means they made a choice), OR
+    // 2. Config has an 'onboarded' flag set to true
+    if (config.onboarded === true) {
+      return true;
+    }
+
+    // Check if AI config exists and has a provider set
+    if (config.ai && config.ai.provider) {
+      return true;
+    }
+
+    // If config file exists but is just defaults, not configured
+    return false;
+  } catch {
+    // Config file doesn't exist
+    return false;
+  }
+}

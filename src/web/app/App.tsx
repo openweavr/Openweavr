@@ -20,15 +20,24 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
+    // Check URL params for forced onboarding
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceOnboard = urlParams.get('onboard') === 'true';
+
     // Check if user has completed onboarding
     fetch('/api/config/status')
       .then((res) => res.json())
       .then((data) => {
-        setNeedsOnboarding(!data.configured);
+        setNeedsOnboarding(forceOnboard || !data.configured);
         setCheckingConfig(false);
+        // Clean up URL param after reading it
+        if (forceOnboard) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
       })
       .catch(() => {
-        // If we can't check, assume configured
+        // If we can't check, assume configured unless forced
+        setNeedsOnboarding(forceOnboard);
         setCheckingConfig(false);
       });
   }, []);

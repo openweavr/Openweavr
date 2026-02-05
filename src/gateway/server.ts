@@ -30,6 +30,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { getAllProviders, hasProviderCredentials } from '../models/registry.js';
 import { MCP_SERVER_CATALOG, type MCPServerConfig } from '../mcp/catalog.js';
 import { validateWorkflow, quickValidate } from '../validation/workflow-validator.js';
+import { isConfigured } from '../config/index.js';
 
 export interface GatewayServer {
   start(): Promise<void>;
@@ -908,12 +909,8 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
   });
 
   app.get('/api/config/status', async (c) => {
-    try {
-      await access(configFile);
-      return c.json({ configured: true });
-    } catch {
-      return c.json({ configured: false });
-    }
+    const configured = await isConfigured();
+    return c.json({ configured });
   });
 
   // ============================================================================

@@ -4,7 +4,7 @@ interface OnboardingProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'ai' | 'auth-method' | 'apikey' | 'cli-setup' | 'complete';
+type Step = 'welcome' | 'ai' | 'auth-method' | 'apikey' | 'model' | 'cli-setup' | 'complete';
 type AuthMethod = 'apikey' | 'oauth';
 
 export function Onboarding({ onComplete }: OnboardingProps) {
@@ -17,6 +17,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [error, setError] = useState<string | null>(null);
   const [cliTool, setCliTool] = useState<'auto' | 'claude' | 'ollama' | 'llm'>('auto');
   const [cliModel, setCliModel] = useState('');
+  const [model, setModel] = useState('');
   const [oauthConnecting, setOauthConnecting] = useState(false);
   const [oauthConnected, setOauthConnected] = useState(false);
 
@@ -87,14 +88,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         // Just set the provider and auth method
         aiConfig = {
           provider: 'openai',
-          model: getDefaultModel('openai'),
+          model: model || getDefaultModel('openai'),
           authMethod: 'oauth',
         };
       } else if (provider && provider !== 'none') {
         // API key-based AI configuration
         aiConfig = {
           provider,
-          model: getDefaultModel(provider),
+          model: model || getDefaultModel(provider),
           apiKey: apiKey || undefined,
           authMethod: 'apikey',
         };
@@ -103,6 +104,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       const config = {
         server: { port: 3847, host: 'localhost' },
         ai: aiConfig,
+        onboarded: true,
       };
 
       const response = await fetch('/api/config', {
@@ -134,8 +136,29 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const getModelOptions = (p: string): { id: string; name: string; desc: string }[] => {
+    switch (p) {
+      case 'anthropic':
+        return [
+          { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', desc: 'Fast and capable - recommended' },
+          { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', desc: 'Most capable, best for complex tasks' },
+          { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', desc: 'Fastest and most affordable' },
+        ];
+      case 'openai':
+        return [
+          { id: 'gpt-4o', name: 'GPT-4o', desc: 'Most capable - recommended' },
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini', desc: 'Fast and affordable' },
+          { id: 'o1', name: 'o1', desc: 'Advanced reasoning' },
+          { id: 'o1-mini', name: 'o1-mini', desc: 'Fast reasoning' },
+        ];
+      default:
+        return [];
+    }
+  };
+
   const needsAuthMethod = provider === 'openai';
   const needsApiKey = provider && provider !== 'none' && provider !== 'ollama' && provider !== 'cli' && !(provider === 'openai' && authMethod === 'oauth');
+  const needsModelSelection = provider && provider !== 'none' && provider !== 'cli';
   const needsCliSetup = provider === 'cli';
 
   return (
@@ -159,14 +182,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       >
         {/* Progress indicator */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '40px', justifyContent: 'center' }}>
-          {['welcome', 'ai', 'setup', 'complete'].map((s, i) => (
+          {['welcome', 'ai', 'setup', 'model', 'complete'].map((s, i) => (
             <div
               key={s}
               style={{
                 width: '40px',
                 height: '4px',
                 borderRadius: '2px',
-                background: (['welcome', 'ai', 'apikey', 'cli-setup', 'complete'].indexOf(step) >= i)
+                background: (['welcome', 'ai', 'auth-method', 'apikey', 'cli-setup', 'model', 'complete'].indexOf(step) >= i)
                   ? 'var(--accent-purple)'
                   : 'var(--bg-tertiary)',
                 transition: 'background 0.3s',
@@ -279,6 +302,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     setStep('apikey');
                   } else if (needsCliSetup) {
                     setStep('cli-setup');
+                  } else if (needsModelSelection) {
+                    setStep('model');
                   } else {
                     handleFinish();
                   }
@@ -286,7 +311,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 disabled={!provider}
                 style={{ flex: 1 }}
               >
-                {needsAuthMethod || needsApiKey || needsCliSetup ? 'Next' : 'Finish Setup'}
+                {needsAuthMethod || needsApiKey || needsCliSetup || needsModelSelection ? 'Next' : 'Finish Setup'}
               </button>
             </div>
           </div>
@@ -444,7 +469,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 onClick={() => {
                   if (authMethod === 'oauth') {
                     if (oauthConnected) {
-                      handleFinish();
+                      setStep('model');
                     }
                     // If not connected, button is disabled
                   } else {
@@ -454,7 +479,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 disabled={authMethod === 'oauth' && !oauthConnected}
                 style={{ flex: 1 }}
               >
-                {authMethod === 'oauth' ? 'Finish Setup' : 'Next'}
+                Next
               </button>
             </div>
           </div>
@@ -534,18 +559,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 className="btn btn-ghost"
-                onClick={() => setStep('ai')}
+                onClick={() => provider === 'openai' ? setStep('auth-method') : setStep('ai')}
                 style={{ flex: 1 }}
               >
                 Back
               </button>
               <button
                 className="btn btn-primary"
-                onClick={handleFinish}
-                disabled={saving || !apiKey}
+                onClick={() => setStep('model')}
+                disabled={!apiKey}
                 style={{ flex: 1 }}
               >
-                {saving ? 'Saving...' : 'Finish Setup'}
+                Next
               </button>
             </div>
 
@@ -553,12 +578,128 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               className="btn btn-ghost"
               onClick={() => {
                 setApiKey('');
-                handleFinish();
+                setStep('model');
               }}
               style={{ width: '100%', marginTop: '12px', fontSize: '13px' }}
             >
               Skip - I'll add it later in Settings
             </button>
+          </div>
+        )}
+
+        {/* Model Selection Step */}
+        {step === 'model' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '12px', textAlign: 'center' }}>
+              Choose a Model
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '32px', textAlign: 'center' }}>
+              {provider === 'ollama'
+                ? 'Enter the Ollama model you want to use.'
+                : 'Select which AI model to use for workflow generation.'}
+            </p>
+
+            {provider === 'ollama' ? (
+              <div style={{ marginBottom: '24px' }}>
+                <label className="label">Model Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="llama3.2"
+                  style={{ width: '100%' }}
+                  autoFocus
+                />
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+                  Popular models: llama3.2, mistral, codellama, gemma2, qwen2.5
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px', marginBottom: '32px' }}>
+                {getModelOptions(provider).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setModel(opt.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      padding: '16px 20px',
+                      background: model === opt.id ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                      border: `2px solid ${model === opt.id ? 'var(--accent-purple)' : 'var(--border-color)'}`,
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      width: '100%',
+                      transition: 'all 0.15s',
+                      color: '#fff',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: '2px', color: '#fff' }}>{opt.name}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{opt.desc}</div>
+                    </div>
+                    {model === opt.id && (
+                      <span style={{ marginLeft: 'auto', color: 'var(--accent-purple)', fontSize: '20px' }}>✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <div style={{
+                padding: '12px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid var(--accent-red)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--accent-red)',
+                fontSize: '13px',
+                marginBottom: '24px',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  if (needsApiKey) {
+                    setStep('apikey');
+                  } else if (needsAuthMethod) {
+                    setStep('auth-method');
+                  } else {
+                    setStep('ai');
+                  }
+                }}
+                style={{ flex: 1 }}
+              >
+                Back
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleFinish}
+                disabled={saving}
+                style={{ flex: 1 }}
+              >
+                {saving ? 'Saving...' : 'Finish Setup'}
+              </button>
+            </div>
+
+            {provider !== 'ollama' && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setModel('');
+                  handleFinish();
+                }}
+                style={{ width: '100%', marginTop: '12px', fontSize: '13px' }}
+              >
+                Use default ({getDefaultModel(provider)})
+              </button>
+            )}
           </div>
         )}
 

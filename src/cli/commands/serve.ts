@@ -1,10 +1,11 @@
 import chalk from 'chalk';
 import { createGatewayServer } from '../../gateway/server.js';
-import { loadConfig, ensureConfigDir } from '../../config/index.js';
+import { loadConfig, ensureConfigDir, isConfigured } from '../../config/index.js';
 import { PluginRegistry } from '../../plugins/sdk/registry.js';
 import { PluginLoader } from '../../plugins/sdk/loader.js';
 import { PLUGINS_DIR } from '../../config/index.js';
 import { loadBuiltinPlugins, getLoadedPluginCount } from '../../plugins/loader.js';
+import { isInteractive } from '../utils/tty.js';
 
 interface ServeOptions {
   port: string;
@@ -12,9 +13,17 @@ interface ServeOptions {
 }
 
 export async function serveCommand(options: ServeOptions): Promise<void> {
-  console.log(chalk.cyan('\n🚀 Starting Weavr gateway...\n'));
-
   await ensureConfigDir();
+
+  // Check if user has completed onboarding
+  const configured = await isConfigured();
+  if (!configured && isInteractive()) {
+    console.log(chalk.yellow('\n⚠️  Weavr is not configured yet.\n'));
+    console.log(chalk.dim('Run ') + chalk.cyan('weavr onboard') + chalk.dim(' to complete setup.\n'));
+    console.log(chalk.dim('Or visit ') + chalk.cyan(`http://localhost:${options.port}`) + chalk.dim(' after the server starts.\n'));
+  }
+
+  console.log(chalk.cyan('\n🚀 Starting Weavr gateway...\n'));
 
   const config = await loadConfig();
   config.server.port = parseInt(options.port, 10);
