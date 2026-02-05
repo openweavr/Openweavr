@@ -57,6 +57,59 @@ export async function onboardCommand(options: OnboardOptions = {}): Promise<void
 
   p.intro(chalk.magenta('🧵 Welcome to Weavr!'));
 
+  // Ask if user prefers CLI or Web UI onboarding
+  const onboardMethod = await p.select({
+    message: 'How would you like to configure Weavr?',
+    options: [
+      { value: 'cli', label: 'Continue in terminal', hint: 'Quick setup right here' },
+      { value: 'web', label: 'Open web interface', hint: 'Visual setup at localhost:3847' },
+    ],
+  });
+
+  if (p.isCancel(onboardMethod)) {
+    p.cancel('Setup cancelled');
+    process.exit(0);
+  }
+
+  if (onboardMethod === 'web') {
+    const webSpinner = p.spinner();
+    webSpinner.start('Starting server...');
+
+    // Start server in background
+    const { spawn } = await import('node:child_process');
+    const serverProcess = spawn('node', [process.argv[1].replace(/onboard.*$/, 'serve')], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    serverProcess.unref();
+
+    // Wait a moment for server to start
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const port = existingConfig.server.port || 3847;
+    const url = `http://localhost:${port}/settings`;
+
+    webSpinner.stop('Server started!');
+
+    p.note(
+      [
+        chalk.dim('Opening your browser to:'),
+        chalk.cyan(url),
+        '',
+        chalk.dim('Configure your AI providers in the Settings page.'),
+      ].join('\n'),
+      'Web Setup'
+    );
+
+    await openBrowser(url);
+
+    p.outro(
+      chalk.green('✓ Server running! ') +
+        chalk.dim('Complete setup in your browser.')
+    );
+    return;
+  }
+
   const answers = await p.group(
     {
       port: () =>
