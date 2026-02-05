@@ -1,0 +1,6 @@
+# Openweavr - Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://openweavr.ai/sitemap.xml
