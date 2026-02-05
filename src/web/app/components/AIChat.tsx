@@ -447,6 +447,9 @@ export function AIChat({ onClose, onGenerateWorkflow, mode = 'modal', initialMes
                   <li>
                     When a file changes in my folder, back it up to another location
                   </li>
+                  <li style={{ marginTop: '6px' }}>
+                    Create a workflow that uses memory blocks from docs/overview.md and https://openweavr.ai
+                  </li>
                 </ul>
               </div>
             </div>

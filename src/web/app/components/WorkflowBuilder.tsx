@@ -33,6 +33,31 @@ interface StepData {
   stepId: string; // The user-visible step name/ID used in YAML and templates
 }
 
+type MemorySourceType = 'text' | 'file' | 'url' | 'web_search' | 'step' | 'trigger';
+
+interface MemorySourceInput {
+  id?: string;
+  label?: string;
+  type: MemorySourceType;
+  text?: string;
+  path?: string;
+  url?: string;
+  query?: string;
+  step?: string;
+  maxResults?: number;
+  maxChars?: number;
+}
+
+interface MemoryBlockInput {
+  id: string;
+  description?: string;
+  sources: MemorySourceInput[];
+  template?: string;
+  separator?: string;
+  maxChars?: number;
+  dedupe?: boolean;
+}
+
 interface OutputField {
   name: string;
   type: string;
@@ -256,6 +281,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
         { value: 'shell', label: 'Shell Commands' },
         { value: 'filesystem', label: 'File System' },
       ], default: ['web_search', 'web_fetch'] },
+      { name: 'memory', label: 'Memory Blocks', type: 'multiselect', options: [] },
       { name: 'maxIterations', label: 'Max Iterations', type: 'number', placeholder: '10', default: 10 },
     ],
     outputFields: [
@@ -823,12 +849,14 @@ function VariableSuggestions({
   filterText,
   visible,
   triggerType,
+  memoryBlocks,
 }: {
   suggestions: Array<{ stepId: string; actionId: string; outputFields: OutputField[] }>;
   onSelect: (variable: string) => void;
   filterText: string;
   visible: boolean;
   triggerType?: string;
+  memoryBlocks: MemoryBlockInput[];
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -852,8 +880,27 @@ function VariableSuggestions({
       vars.push({ ...tv, category: 'trigger' });
     }
 
+    if (memoryBlocks.length > 0) {
+      for (const block of memoryBlocks) {
+        if (!block.id) continue;
+        vars.push({
+          path: `memory.blocks.${block.id}`,
+          description: block.description || 'Memory block',
+          category: 'memory',
+        });
+        block.sources.forEach((source, index) => {
+          const sourceId = source.id || `source_${index + 1}`;
+          vars.push({
+            path: `memory.sources.${block.id}.${sourceId}`,
+            description: source.label || 'Memory source',
+            category: 'memory',
+          });
+        });
+      }
+    }
+
     return vars;
-  }, [suggestions, triggerType]);
+  }, [suggestions, triggerType, memoryBlocks]);
 
   // Filter by what user has typed
   const filtered = useMemo(() => {
@@ -929,6 +976,294 @@ function normalizeConfig(action: string, config: Record<string, unknown>): Recor
   return normalized;
 }
 
+function MemoryEditor({
+  blocks,
+  onAddBlock,
+  onUpdateBlock,
+  onRemoveBlock,
+  onAddSource,
+  onUpdateSource,
+  onRemoveSource,
+}: {
+  blocks: MemoryBlockInput[];
+  onAddBlock: () => void;
+  onUpdateBlock: (index: number, patch: Partial<MemoryBlockInput>) => void;
+  onRemoveBlock: (index: number) => void;
+  onAddSource: (blockIndex: number) => void;
+  onUpdateSource: (blockIndex: number, sourceIndex: number, patch: Partial<MemorySourceInput>) => void;
+  onRemoveSource: (blockIndex: number, sourceIndex: number) => void;
+}) {
+  const sourceTypes: Array<{ value: MemorySourceType; label: string }> = [
+    { value: 'text', label: 'Text' },
+    { value: 'file', label: 'File' },
+    { value: 'url', label: 'URL' },
+    { value: 'web_search', label: 'Web Search' },
+    { value: 'step', label: 'Step Output' },
+    { value: 'trigger', label: 'Trigger Data' },
+  ];
+
+  return (
+    <div className="card" style={{ flex: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <h3 style={{ fontSize: '14px', margin: 0 }}>Memory Blocks</h3>
+        <button className="btn btn-ghost" onClick={onAddBlock} style={{ padding: '6px 10px' }}>
+          + Add
+        </button>
+      </div>
+
+      {blocks.length === 0 && (
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          No memory blocks yet. Add one to assemble reusable context.
+        </div>
+      )}
+
+      {blocks.map((block, index) => (
+        <div
+          key={`${block.id}-${index}`}
+          style={{
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            padding: '12px',
+            marginBottom: '12px',
+            background: 'var(--bg-secondary)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Block {index + 1}
+            </div>
+            <button className="btn btn-ghost" onClick={() => onRemoveBlock(index)} style={{ color: 'var(--accent-red)', padding: '4px 8px' }}>
+              Remove
+            </button>
+          </div>
+
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+            Block ID
+          </label>
+          <input
+            className="input"
+            value={block.id}
+            onChange={(e) => onUpdateBlock(index, { id: e.target.value })}
+            placeholder="project-context"
+            style={{ marginBottom: '10px' }}
+          />
+
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+            Description
+          </label>
+          <input
+            className="input"
+            value={block.description ?? ''}
+            onChange={(e) => onUpdateBlock(index, { description: e.target.value })}
+            placeholder="Short label for this memory block"
+            style={{ marginBottom: '10px' }}
+          />
+
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+            Template
+          </label>
+          <textarea
+            className="input"
+            value={block.template ?? ''}
+            onChange={(e) => onUpdateBlock(index, { template: e.target.value })}
+            placeholder="Optional: combine sources with {{ sources.source_id }}"
+            style={{ minHeight: '70px', marginBottom: '10px' }}
+          />
+
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+            Separator
+          </label>
+          <input
+            className="input"
+            value={block.separator ?? ''}
+            onChange={(e) => onUpdateBlock(index, { separator: e.target.value })}
+            placeholder="Default separator between sources"
+            style={{ marginBottom: '10px' }}
+          />
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Max Chars
+              </label>
+              <input
+                type="number"
+                className="input"
+                value={block.maxChars ?? ''}
+                onChange={(e) => onUpdateBlock(index, { maxChars: e.target.value ? Number(e.target.value) : undefined })}
+                placeholder="12000"
+              />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(block.dedupe)}
+                onChange={(e) => onUpdateBlock(index, { dedupe: e.target.checked })}
+              />
+              <span style={{ fontSize: '12px' }}>Dedupe</span>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Sources</div>
+            <button className="btn btn-ghost" onClick={() => onAddSource(index)} style={{ padding: '4px 8px' }}>
+              + Add Source
+            </button>
+          </div>
+
+          {block.sources.map((source, sourceIndex) => (
+            <div
+              key={`${source.type}-${sourceIndex}`}
+              style={{
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '10px',
+                marginBottom: '8px',
+                background: 'var(--bg-primary)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Source {sourceIndex + 1}
+                </div>
+                <button className="btn btn-ghost" onClick={() => onRemoveSource(index, sourceIndex)} style={{ color: 'var(--accent-red)', padding: '4px 8px' }}>
+                  Remove
+                </button>
+              </div>
+
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Source ID
+              </label>
+              <input
+                className="input"
+                value={source.id ?? ''}
+                onChange={(e) => onUpdateSource(index, sourceIndex, { id: e.target.value })}
+                placeholder="docs"
+                style={{ marginBottom: '8px' }}
+              />
+
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Label
+              </label>
+              <input
+                className="input"
+                value={source.label ?? ''}
+                onChange={(e) => onUpdateSource(index, sourceIndex, { label: e.target.value })}
+                placeholder="Optional display label"
+                style={{ marginBottom: '8px' }}
+              />
+
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Type
+              </label>
+              <select
+                className="input"
+                value={source.type}
+                onChange={(e) => onUpdateSource(index, sourceIndex, { type: e.target.value as MemorySourceType })}
+                style={{ marginBottom: '8px' }}
+              >
+                {sourceTypes.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+
+              {source.type === 'text' && (
+                <textarea
+                  className="input"
+                  value={source.text ?? ''}
+                  onChange={(e) => onUpdateSource(index, sourceIndex, { text: e.target.value })}
+                  placeholder="Inline text or instructions"
+                  style={{ minHeight: '60px', marginBottom: '8px' }}
+                />
+              )}
+
+              {source.type === 'file' && (
+                <input
+                  className="input"
+                  value={source.path ?? ''}
+                  onChange={(e) => onUpdateSource(index, sourceIndex, { path: e.target.value })}
+                  placeholder="docs/overview.md"
+                  style={{ marginBottom: '8px' }}
+                />
+              )}
+
+              {source.type === 'url' && (
+                <input
+                  className="input"
+                  value={source.url ?? ''}
+                  onChange={(e) => onUpdateSource(index, sourceIndex, { url: e.target.value })}
+                  placeholder="https://openweavr.ai"
+                  style={{ marginBottom: '8px' }}
+                />
+              )}
+
+              {source.type === 'web_search' && (
+                <>
+                  <input
+                    className="input"
+                    value={source.query ?? ''}
+                    onChange={(e) => onUpdateSource(index, sourceIndex, { query: e.target.value })}
+                    placeholder="Search query"
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <input
+                    type="number"
+                    className="input"
+                    value={source.maxResults ?? ''}
+                    onChange={(e) => onUpdateSource(index, sourceIndex, { maxResults: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="Max results"
+                    style={{ marginBottom: '8px' }}
+                  />
+                </>
+              )}
+
+              {source.type === 'step' && (
+                <>
+                  <input
+                    className="input"
+                    value={source.step ?? ''}
+                    onChange={(e) => onUpdateSource(index, sourceIndex, { step: e.target.value })}
+                    placeholder="step-id"
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <input
+                    className="input"
+                    value={source.path ?? ''}
+                    onChange={(e) => onUpdateSource(index, sourceIndex, { path: e.target.value })}
+                    placeholder="output.path (optional)"
+                    style={{ marginBottom: '8px' }}
+                  />
+                </>
+              )}
+
+              {source.type === 'trigger' && (
+                <input
+                  className="input"
+                  value={source.path ?? ''}
+                  onChange={(e) => onUpdateSource(index, sourceIndex, { path: e.target.value })}
+                  placeholder="trigger.path (optional)"
+                  style={{ marginBottom: '8px' }}
+                />
+              )}
+
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Max Chars
+              </label>
+              <input
+                type="number"
+                className="input"
+                value={source.maxChars ?? ''}
+                onChange={(e) => onUpdateSource(index, sourceIndex, { maxChars: e.target.value ? Number(e.target.value) : undefined })}
+                placeholder="12000"
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Property Editor Component
 function PropertyEditor({
   node,
@@ -939,6 +1274,7 @@ function PropertyEditor({
   nodes,
   edges,
   availableTools,
+  memoryBlocks,
 }: {
   node: Node<StepData>;
   schema: ActionSchema | undefined;
@@ -948,6 +1284,7 @@ function PropertyEditor({
   nodes: Node<StepData>[];
   edges: Edge[];
   availableTools?: ToolInfo[];
+  memoryBlocks: MemoryBlockInput[];
 }) {
   const [config, setConfig] = useState<Record<string, unknown>>(
     normalizeConfig(node.data.action, node.data.config)
@@ -1033,6 +1370,7 @@ function PropertyEditor({
               filterText={filterText}
               visible={showSuggestions === field.name}
               triggerType={triggerType}
+              memoryBlocks={memoryBlocks}
             />
           </div>
         );
@@ -1063,6 +1401,42 @@ function PropertyEditor({
 
         // For tools field in ai.agent, use dynamic tools from API
         const isToolsField = field.name === 'tools' && node.data.action === 'ai.agent';
+        const isMemoryField = field.name === 'memory' && node.data.action === 'ai.agent';
+
+        if (isMemoryField) {
+          const options = memoryBlocks.map((block) => ({
+            value: block.id,
+            label: block.description ? `${block.id} — ${block.description}` : block.id,
+          })).filter((opt) => opt.value);
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {options.length > 0 ? options.map((opt) => (
+                <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedValues.includes(opt.value)}
+                    onChange={(e) => {
+                      const newValues = e.target.checked
+                        ? [...selectedValues, opt.value]
+                        : selectedValues.filter((v: string) => v !== opt.value);
+                      handleFieldChange(field.name, newValues);
+                    }}
+                    style={{ marginTop: '2px' }}
+                  />
+                  <div>
+                    <span style={{ fontSize: '13px' }}>{opt.label}</span>
+                  </div>
+                </label>
+              )) : (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
+                  Add a memory block to enable selection here
+                </div>
+              )}
+            </div>
+          );
+        }
+
         const options = isToolsField && availableTools && availableTools.length > 0
           ? availableTools.map(t => ({
               value: t.id,
@@ -1260,6 +1634,7 @@ function PropertyEditor({
               filterText={filterText}
               visible={showSuggestions === field.name}
               triggerType={triggerType}
+              memoryBlocks={memoryBlocks}
             />
           </div>
         );
@@ -1505,10 +1880,11 @@ function getSchema(actionId: string, type: 'trigger' | 'step'): ActionSchema | u
   return schemas.find((s) => s.id === actionId);
 }
 
-function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Edge[]; name: string } {
+function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Edge[]; name: string; memory: MemoryBlockInput[] } {
   const nodes: Node<StepData>[] = [];
   const edges: Edge[] = [];
   let name = 'my-workflow';
+  let memory: MemoryBlockInput[] = [];
 
   try {
     // Use proper YAML parser to handle multiline strings correctly
@@ -1516,6 +1892,7 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       name?: string;
       trigger?: { type?: string; with?: Record<string, unknown> };
       triggers?: { type?: string; with?: Record<string, unknown> };
+      memory?: MemoryBlockInput[];
       steps?: Array<{
         id: string;
         action: string;
@@ -1526,6 +1903,13 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
 
     if (parsed.name) {
       name = parsed.name;
+    }
+
+    if (Array.isArray(parsed.memory)) {
+      memory = parsed.memory.map((block) => ({
+        ...block,
+        sources: Array.isArray(block.sources) ? block.sources : [],
+      }));
     }
 
     // Handle trigger (supports both 'trigger' and 'triggers' keys)
@@ -1625,7 +2009,86 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
     console.error('Failed to parse YAML:', err);
   }
 
-  return { nodes, edges, name };
+  return { nodes, edges, name, memory };
+}
+
+function escapeYamlString(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function indentLines(value: string, indent: number): string {
+  return value.split('\n').map((line) => `${' '.repeat(indent)}${line}`).join('\n');
+}
+
+function formatYamlString(value: string, indent: number): string {
+  if (value.includes('\n')) {
+    return `|\n${indentLines(value, indent)}`;
+  }
+  return escapeYamlString(value);
+}
+
+function renderMemoryYaml(blocks: MemoryBlockInput[]): string {
+  if (!blocks.length) return '';
+
+  let yaml = 'memory:\n';
+
+  for (const block of blocks) {
+    if (!block.id) continue;
+    yaml += `  - id: ${block.id}\n`;
+    if (block.description) {
+      yaml += `    description: ${formatYamlString(block.description, 6)}\n`;
+    }
+    if (block.separator) {
+      yaml += `    separator: ${formatYamlString(block.separator, 6)}\n`;
+    }
+    if (typeof block.maxChars === 'number') {
+      yaml += `    maxChars: ${block.maxChars}\n`;
+    }
+    if (typeof block.dedupe === 'boolean') {
+      yaml += `    dedupe: ${block.dedupe}\n`;
+    }
+    if (block.template) {
+      yaml += `    template: ${formatYamlString(block.template, 6)}\n`;
+    }
+
+    if (block.sources.length === 0) {
+      yaml += '    sources: []\n';
+      continue;
+    }
+
+    yaml += '    sources:\n';
+    for (const source of block.sources) {
+      if (!source.type) continue;
+      yaml += `      - type: ${source.type}\n`;
+      if (source.id) yaml += `        id: ${source.id}\n`;
+      if (source.label) yaml += `        label: ${formatYamlString(source.label, 10)}\n`;
+      if (typeof source.maxChars === 'number') yaml += `        maxChars: ${source.maxChars}\n`;
+      if (source.type === 'text' && source.text) {
+        yaml += `        text: ${formatYamlString(source.text, 10)}\n`;
+      }
+      if (source.type === 'file' && source.path) {
+        yaml += `        path: ${formatYamlString(source.path, 10)}\n`;
+      }
+      if (source.type === 'url' && source.url) {
+        yaml += `        url: ${formatYamlString(source.url, 10)}\n`;
+      }
+      if (source.type === 'web_search' && source.query) {
+        yaml += `        query: ${formatYamlString(source.query, 10)}\n`;
+        if (typeof source.maxResults === 'number') {
+          yaml += `        maxResults: ${source.maxResults}\n`;
+        }
+      }
+      if (source.type === 'step' && source.step) {
+        yaml += `        step: ${formatYamlString(source.step, 10)}\n`;
+        if (source.path) yaml += `        path: ${formatYamlString(source.path, 10)}\n`;
+      }
+      if (source.type === 'trigger' && source.path) {
+        yaml += `        path: ${formatYamlString(source.path, 10)}\n`;
+      }
+    }
+  }
+
+  return yaml.trimEnd();
 }
 
 // Tool info from API
@@ -1649,6 +2112,7 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [hasGeneratedWorkflow, setHasGeneratedWorkflow] = useState(false);
+  const [memoryBlocks, setMemoryBlocks] = useState<MemoryBlockInput[]>([]);
 
   // Dynamic tool list for AI agent
   const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
@@ -1677,10 +2141,11 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
 
   useEffect(() => {
     if (initialYaml) {
-      const { nodes: parsedNodes, edges: parsedEdges, name: parsedName } = parseYamlToGraph(initialYaml);
+      const { nodes: parsedNodes, edges: parsedEdges, name: parsedName, memory: parsedMemory } = parseYamlToGraph(initialYaml);
       setNodes(parsedNodes);
       setEdges(parsedEdges);
       setName(parsedName);
+      setMemoryBlocks(parsedMemory);
     }
   }, [initialYaml, setNodes, setEdges]);
 
@@ -1752,11 +2217,59 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
     ));
   }, [setNodes]);
 
+  const addMemoryBlock = useCallback(() => {
+    setMemoryBlocks((blocks) => [
+      ...blocks,
+      {
+        id: `memory-${blocks.length + 1}`,
+        sources: [{ id: 'source_1', type: 'text', text: '' }],
+      },
+    ]);
+  }, []);
+
+  const updateMemoryBlock = useCallback((index: number, patch: Partial<MemoryBlockInput>) => {
+    setMemoryBlocks((blocks) => blocks.map((block, i) => (i === index ? { ...block, ...patch } : block)));
+  }, []);
+
+  const removeMemoryBlock = useCallback((index: number) => {
+    setMemoryBlocks((blocks) => blocks.filter((_, i) => i !== index));
+  }, []);
+
+  const addMemorySource = useCallback((blockIndex: number) => {
+    setMemoryBlocks((blocks) => blocks.map((block, i) => {
+      if (i !== blockIndex) return block;
+      const nextIndex = block.sources.length + 1;
+      return {
+        ...block,
+        sources: [...block.sources, { id: `source_${nextIndex}`, type: 'text', text: '' }],
+      };
+    }));
+  }, []);
+
+  const updateMemorySource = useCallback((blockIndex: number, sourceIndex: number, patch: Partial<MemorySourceInput>) => {
+    setMemoryBlocks((blocks) => blocks.map((block, i) => {
+      if (i !== blockIndex) return block;
+      const sources = block.sources.map((source, sIdx) => (sIdx === sourceIndex ? { ...source, ...patch } : source));
+      return { ...block, sources };
+    }));
+  }, []);
+
+  const removeMemorySource = useCallback((blockIndex: number, sourceIndex: number) => {
+    setMemoryBlocks((blocks) => blocks.map((block, i) => {
+      if (i !== blockIndex) return block;
+      return { ...block, sources: block.sources.filter((_, sIdx) => sIdx !== sourceIndex) };
+    }));
+  }, []);
+
   const generateYaml = useCallback(() => {
     const triggers = nodes.filter((n) => n.type === 'trigger');
     const steps = nodes.filter((n) => n.type === 'step');
 
     let yaml = `name: ${name}\n\n`;
+    const memoryYaml = renderMemoryYaml(memoryBlocks);
+    if (memoryYaml) {
+      yaml += `${memoryYaml}\n\n`;
+    }
 
     if (triggers.length > 0) {
       yaml += 'trigger:\n';
@@ -1825,15 +2338,16 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
     }
 
     return yaml;
-  }, [name, nodes, edges]);
+  }, [name, nodes, edges, memoryBlocks]);
 
   // Handle workflow generation from AIChat component
   const handleAIGenerateWorkflow = useCallback((yaml: string, messages: ChatMessage[], sessionId: string | null) => {
     try {
-      const { nodes: parsedNodes, edges: parsedEdges, name: parsedName } = parseYamlToGraph(yaml);
+      const { nodes: parsedNodes, edges: parsedEdges, name: parsedName, memory: parsedMemory } = parseYamlToGraph(yaml);
       setNodes(parsedNodes);
       setEdges(parsedEdges);
       setName(parsedName);
+      setMemoryBlocks(parsedMemory);
       // Store chat history and keep sidebar open
       setChatMessages(messages);
       setChatSessionId(sessionId);
@@ -1972,66 +2486,80 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
               {generateYaml()}
             </pre>
           </div>
-        ) : selectedNode ? (
-          <PropertyEditor
-            node={selectedNode}
-            schema={selectedNodeSchema}
-            onUpdate={(config) => updateNodeConfig(selectedNode.id, config)}
-            onUpdateStepId={(stepId) => updateNodeStepId(selectedNode.id, stepId)}
-            onDelete={() => deleteNode(selectedNode.id)}
-            nodes={nodes}
-            edges={edges}
-            availableTools={availableTools}
-          />
         ) : (
-          <div className="card" style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '14px', marginBottom: '16px' }}>Getting Started</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {!hasTrigger && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowSelector('trigger')}
-                  style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-                >
-                  <span style={{ marginRight: '10px' }}>⚡</span>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 500 }}>Add a Trigger</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Start your workflow</div>
-                  </div>
-                </button>
-              )}
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowSelector('step')}
-                style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-              >
-                <span style={{ marginRight: '10px' }}>➕</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 500 }}>Add an Action</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HTTP, Slack, AI, etc.</div>
+          <>
+            <MemoryEditor
+              blocks={memoryBlocks}
+              onAddBlock={addMemoryBlock}
+              onUpdateBlock={updateMemoryBlock}
+              onRemoveBlock={removeMemoryBlock}
+              onAddSource={addMemorySource}
+              onUpdateSource={updateMemorySource}
+              onRemoveSource={removeMemorySource}
+            />
+            {selectedNode ? (
+              <PropertyEditor
+                node={selectedNode}
+                schema={selectedNodeSchema}
+                onUpdate={(config) => updateNodeConfig(selectedNode.id, config)}
+                onUpdateStepId={(stepId) => updateNodeStepId(selectedNode.id, stepId)}
+                onDelete={() => deleteNode(selectedNode.id)}
+                nodes={nodes}
+                edges={edges}
+                availableTools={availableTools}
+                memoryBlocks={memoryBlocks}
+              />
+            ) : (
+              <div className="card" style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '14px', marginBottom: '16px' }}>Getting Started</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {!hasTrigger && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => setShowSelector('trigger')}
+                      style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    >
+                      <span style={{ marginRight: '10px' }}>⚡</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 500 }}>Add a Trigger</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Start your workflow</div>
+                      </div>
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowSelector('step')}
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                  >
+                    <span style={{ marginRight: '10px' }}>➕</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 500 }}>Add an Action</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HTTP, Slack, AI, etc.</div>
+                    </div>
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setShowAI(true)}
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                  >
+                    <span style={{ marginRight: '10px' }}>✨</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 500 }}>Generate with AI</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Describe what you want</div>
+                    </div>
+                  </button>
                 </div>
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowAI(true)}
-                style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-              >
-                <span style={{ marginRight: '10px' }}>✨</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 500 }}>Generate with AI</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Describe what you want</div>
-                </div>
-              </button>
-            </div>
 
-            {nodes.length > 0 && (
-              <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  Click on a node to edit its properties
-                </div>
+                {nodes.length > 0 && (
+                  <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                      Click on a node to edit its properties
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
