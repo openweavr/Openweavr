@@ -3,6 +3,51 @@ import { z } from 'zod';
 // Workflow Definition Schemas
 export const StepConfigSchema = z.record(z.unknown());
 
+export const MemorySourceBaseSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().optional(),
+  maxChars: z.number().optional(),
+});
+
+export const MemorySourceSchema = z.discriminatedUnion('type', [
+  MemorySourceBaseSchema.extend({
+    type: z.literal('text'),
+    text: z.string(),
+  }),
+  MemorySourceBaseSchema.extend({
+    type: z.literal('file'),
+    path: z.string(),
+  }),
+  MemorySourceBaseSchema.extend({
+    type: z.literal('url'),
+    url: z.string(),
+  }),
+  MemorySourceBaseSchema.extend({
+    type: z.literal('web_search'),
+    query: z.string(),
+    maxResults: z.number().optional(),
+  }),
+  MemorySourceBaseSchema.extend({
+    type: z.literal('step'),
+    step: z.string(),
+    path: z.string().optional(),
+  }),
+  MemorySourceBaseSchema.extend({
+    type: z.literal('trigger'),
+    path: z.string().optional(),
+  }),
+]);
+
+export const MemoryBlockSchema = z.object({
+  id: z.string(),
+  description: z.string().optional(),
+  sources: z.array(MemorySourceSchema).min(1),
+  template: z.string().optional(),
+  separator: z.string().optional(),
+  maxChars: z.number().optional(),
+  dedupe: z.boolean().optional(),
+});
+
 export const StepSchema = z.object({
   id: z.string(),
   action: z.string(),
@@ -29,12 +74,15 @@ export const WorkflowSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   triggers: z.array(TriggerSchema).optional(),
+  memory: z.array(MemoryBlockSchema).optional(),
   steps: z.array(StepSchema),
   env: z.record(z.string()).optional(),
 });
 
 export type Step = z.infer<typeof StepSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
+export type MemorySource = z.infer<typeof MemorySourceSchema>;
+export type MemoryBlock = z.infer<typeof MemoryBlockSchema>;
 export type Workflow = z.infer<typeof WorkflowSchema>;
 
 // Execution Types
@@ -59,6 +107,7 @@ export interface WorkflowRun {
   startedAt: Date;
   completedAt?: Date;
   error?: string;
+  memory?: MemoryContext;
 }
 
 // Plugin Types
@@ -70,7 +119,13 @@ export interface ActionContext {
   trigger?: unknown;
   steps: Record<string, unknown>;
   env: Record<string, string>;
+  memory?: MemoryContext;
   log: (message: string) => void;
+}
+
+export interface MemoryContext {
+  blocks: Record<string, string>;
+  sources: Record<string, Record<string, string>>;
 }
 
 export interface ActionDefinition {

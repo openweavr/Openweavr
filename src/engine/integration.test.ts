@@ -89,6 +89,54 @@ steps:
       expect(result.steps.size).toBe(3);
     });
 
+    it('should expose memory blocks to step interpolation', async () => {
+      const yaml = `
+name: memory-test
+trigger:
+  type: manual
+memory:
+  - id: step-context
+    sources:
+      - id: fetched
+        type: step
+        step: fetch
+        path: message
+    template: "Step says: {{ sources.fetched }}"
+steps:
+  - id: fetch
+    action: test.fetch
+  - id: use
+    action: test.use
+    needs: [fetch]
+    with:
+      text: "{{ memory.blocks.step-context }}"
+`;
+      const workflow = parseWorkflow(yaml);
+      const mockPlugin: WeavrPlugin = {
+        name: 'test',
+        version: '1.0.0',
+        description: 'Test plugin',
+        actions: [
+          {
+            name: 'fetch',
+            description: 'Fetch data',
+            execute: vi.fn().mockResolvedValue({ message: 'hello-memory' }),
+          },
+          {
+            name: 'use',
+            description: 'Use memory',
+            execute: vi.fn().mockImplementation(async (ctx) => ctx.config.text),
+          },
+        ],
+      };
+
+      registerMockPlugin(mockPlugin);
+      const result = await executor.execute(workflow);
+
+      expect(result.status).toBe('completed');
+      expect(result.steps.get('use')?.output).toBe('Step says: hello-memory');
+    });
+
     it('should execute parallel steps when no dependencies', async () => {
       const yaml = `
 name: parallel-test

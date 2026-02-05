@@ -54,6 +54,23 @@ Triggers:
 name: workflow-name
 description: What this workflow does
 
+memory:
+  - id: project-context
+    description: Optional human-readable label
+    sources:
+      - id: docs
+        type: file
+        path: docs/overview.md
+      - id: website
+        type: url
+        url: https://openweavr.ai
+      - id: notes
+        type: text
+        text: "Static notes or instructions"
+    template: |
+      # Project Context
+      {{ sources.docs }}
+
 triggers:
   - type: plugin.trigger_name
     config:
@@ -77,6 +94,8 @@ In step configs, you can use:
 - {{ trigger.field }}: Access trigger data
 - {{ steps.step_id }}: Access output from a previous step
 - {{ env.VAR_NAME }}: Access environment variables
+- {{ memory.blocks.block_id }}: Use assembled memory block content
+- {{ memory.sources.block_id.source_id }}: Use specific memory source content
 
 ## Guidelines
 

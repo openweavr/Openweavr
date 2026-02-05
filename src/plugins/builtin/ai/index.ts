@@ -8,6 +8,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getGlobalMCPManager } from '../../loader.js';
 import { refreshAccessToken, isTokenExpired, type OAuthTokens } from '../../../auth/openai-oauth.js';
+import type { MemoryContext } from '../../../types/index.js';
 const execAsync = promisify(exec);
 
 // Token usage tracking - now persisted to SQLite
@@ -91,6 +92,33 @@ export function trackUsage(inputTokens: number, outputTokens: number, model?: st
       console.error('[ai] Failed to persist token usage:', err);
     }
   }
+}
+
+function formatMemoryContext(memory: MemoryContext | undefined, selection: unknown): string {
+  if (!memory) return '';
+
+  const blocks = memory.blocks ?? {};
+  let blockIds: string[] = [];
+
+  if (selection === true || selection === 'all') {
+    blockIds = Object.keys(blocks);
+  } else if (Array.isArray(selection)) {
+    blockIds = selection.map((id) => String(id));
+  } else if (typeof selection === 'string') {
+    blockIds = [selection];
+  } else {
+    return '';
+  }
+
+  const sections: string[] = [];
+  for (const id of blockIds) {
+    const value = blocks[id];
+    if (value) {
+      sections.push(`### ${id}\n${value}`);
+    }
+  }
+
+  return sections.join('\n\n');
 }
 
 // Helper to sleep for a given duration
@@ -827,7 +855,12 @@ Return ONLY the category name, nothing else.`;
       name: 'agent',
       description: 'Run a free-flowing AI agent that can use tools to accomplish a task',
       async execute(ctx) {
-        const task = ctx.config.task as string;
+        const rawTask = ctx.config.task as string;
+        const memorySelection = ctx.config.memory;
+        const memoryContext = formatMemoryContext(ctx.memory, memorySelection);
+        const task = memoryContext
+          ? `${rawTask}\n\n## Memory Context\n${memoryContext}`
+          : rawTask;
         const tools = (ctx.config.tools as string[] | undefined) ?? ['web_search', 'web_fetch', 'shell'];
         const maxIterations = (ctx.config.maxIterations as number) ?? 10;
         const systemPrompt = ctx.config.system as string | undefined;

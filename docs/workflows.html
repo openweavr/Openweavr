@@ -37,6 +37,7 @@
         <a class="active" href="#structure">Structure</a>
         <a href="#triggers">Triggers</a>
         <a href="#steps">Steps</a>
+        <a href="#memory">Memory Blocks</a>
         <a href="#actions">Built-in Actions</a>
         <a href="#dependencies">Dependencies</a>
         <a href="#interpolation">Interpolation</a>
@@ -90,6 +91,11 @@
                 <td><span class="inline-code">description</span></td>
                 <td>No</td>
                 <td>Human-readable description</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">memory</span></td>
+                <td>No</td>
+                <td>Optional memory blocks that assemble reusable context</td>
               </tr>
               <tr>
                 <td><span class="inline-code">trigger</span></td>
@@ -202,6 +208,69 @@
               <tr>
                 <td><span class="inline-code">retry</span></td>
                 <td>Retry configuration for failed steps</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section" id="memory">
+          <h2>Memory Blocks</h2>
+          <p>Memory blocks let workflows assemble reusable context from files, URLs, search results, trigger data, and step outputs.</p>
+
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">memory:</span>
+  - <span class="keyword">id:</span> <span class="string">project-context</span>
+    <span class="keyword">description:</span> <span class="string">Product overview</span>
+    <span class="keyword">sources:</span>
+      - <span class="keyword">id:</span> <span class="string">docs</span>
+        <span class="keyword">type:</span> <span class="string">file</span>
+        <span class="keyword">path:</span> <span class="string">"docs/overview.md"</span>
+      - <span class="keyword">id:</span> <span class="string">website</span>
+        <span class="keyword">type:</span> <span class="string">url</span>
+        <span class="keyword">url:</span> <span class="string">"https://openweavr.ai"</span>
+      - <span class="keyword">id:</span> <span class="string">brief</span>
+        <span class="keyword">type:</span> <span class="string">text</span>
+        <span class="keyword">text:</span> <span class="string">"Focus on developer experience."</span>
+    <span class="keyword">template:</span> <span class="string">"Docs: {{ sources.docs }}\nWebsite: {{ sources.website }}\nNotes: {{ sources.brief }}"</span></code></pre>
+          </div>
+
+          <h3>Source Types</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">text</span></td>
+                <td>Inline text content</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">file</span></td>
+                <td>Load a local file by path</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">url</span></td>
+                <td>Fetch content from a URL</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">web_search</span></td>
+                <td>Search the web and store top results</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">step</span></td>
+                <td>Use output from a completed step</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">trigger</span></td>
+                <td>Use data from the workflow trigger</td>
               </tr>
             </tbody>
           </table>
@@ -388,6 +457,14 @@
               <tr>
                 <td><span class="inline-code">{{ steps.stepId.field }}</span></td>
                 <td>Specific field from step output</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ memory.blocks.blockId }}</span></td>
+                <td>Assembled memory block content</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">{{ memory.sources.blockId.sourceId }}</span></td>
+                <td>Specific memory source content</td>
               </tr>
               <tr>
                 <td><span class="inline-code">{{ input.* }}</span></td>
