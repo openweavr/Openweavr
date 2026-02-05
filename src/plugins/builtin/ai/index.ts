@@ -870,9 +870,10 @@ Return ONLY the category name, nothing else.`;
         const oauthToken = await getOpenAIOAuthToken(ctx.log);
         const globalConfig = getGlobalAIConfig();
         const useCodexAPI = oauthToken && !openaiKey && !anthropicKey;
+        const useOllama = globalConfig.provider === 'ollama';
 
-        if (!anthropicKey && !openaiKey && !oauthToken) {
-          throw new Error('Agent action requires an API key (Anthropic or OpenAI) or OAuth authentication.');
+        if (!anthropicKey && !openaiKey && !oauthToken && !useOllama) {
+          throw new Error('Agent action requires an API key (Anthropic or OpenAI), OAuth authentication, or Ollama.');
         }
 
         // Use global MCP manager (initialized on server startup)
@@ -1463,6 +1464,148 @@ If a tool returns [FAILED] or [ERROR]:
             } else {
               // No tool calls means the agent is done
               finalResult = textResponse;
+              break;
+            }
+          } else if (useOllama) {
+            // Ollama with tool calling support (OpenAI-compatible format)
+            ctx.log(`Using Ollama with model: ${globalConfig.model ?? 'llama3.2'}`);
+
+            // Convert tools to OpenAI format for Ollama
+            const ollamaTools = availableTools.map(tool => ({
+              type: 'function' as const,
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.input_schema,
+              },
+            }));
+
+            // Build messages for Ollama (OpenAI format)
+            type OllamaMessage =
+              | { role: 'system'; content: string }
+              | { role: 'user'; content: string }
+              | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
+              | { role: 'tool'; tool_call_id: string; content: string };
+
+            const ollamaMessages: OllamaMessage[] = [
+              { role: 'system', content: finalSystemPrompt },
+            ];
+
+            // Convert internal messages to Ollama/OpenAI format
+            for (const m of messages) {
+              if (typeof m.content === 'string') {
+                ollamaMessages.push({ role: m.role, content: m.content });
+              } else if (Array.isArray(m.content)) {
+                const hasToolUse = m.content.some((b: { type: string }) => b.type === 'tool_use');
+                const hasToolResult = m.content.some((b: { type: string }) => b.type === 'tool_result');
+
+                if (hasToolUse && m.role === 'assistant') {
+                  const textContent = m.content.find((b: { type: string }) => b.type === 'text') as { text?: string } | undefined;
+                  const toolUses = m.content.filter((b: { type: string }) => b.type === 'tool_use') as Array<{ id: string; name: string; input: unknown }>;
+
+                  ollamaMessages.push({
+                    role: 'assistant',
+                    content: textContent?.text ?? null,
+                    tool_calls: toolUses.map(tu => ({
+                      id: tu.id,
+                      type: 'function' as const,
+                      function: {
+                        name: tu.name,
+                        arguments: JSON.stringify(tu.input),
+                      },
+                    })),
+                  });
+                } else if (hasToolResult) {
+                  for (const block of m.content as Array<{ type: string; tool_use_id?: string; content?: string }>) {
+                    if (block.type === 'tool_result') {
+                      ollamaMessages.push({
+                        role: 'tool',
+                        tool_call_id: block.tool_use_id!,
+                        content: block.content ?? '',
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
+            const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: globalConfig.model ?? 'llama3.2',
+                messages: ollamaMessages,
+                tools: ollamaTools.length > 0 ? ollamaTools : undefined,
+                stream: false,
+              }),
+            });
+
+            if (!ollamaResponse.ok) {
+              const errText = await ollamaResponse.text();
+              throw new Error(`Ollama API error: ${errText.slice(0, 200)}`);
+            }
+
+            const ollamaData = await ollamaResponse.json() as {
+              message?: {
+                content?: string;
+                tool_calls?: Array<{ id?: string; function: { name: string; arguments: string | Record<string, unknown> } }>;
+              };
+            };
+
+            const assistantContent = ollamaData.message?.content ?? '';
+            const toolCalls = ollamaData.message?.tool_calls ?? [];
+
+            if (toolCalls.length > 0) {
+              // Process tool calls
+              const toolUses: Array<{ id: string; name: string; input: unknown }> = [];
+              for (let i = 0; i < toolCalls.length; i++) {
+                const tc = toolCalls[i];
+                const args = typeof tc.function.arguments === 'string'
+                  ? JSON.parse(tc.function.arguments)
+                  : tc.function.arguments;
+                toolUses.push({
+                  id: tc.id ?? `call_${i}`,
+                  name: tc.function.name,
+                  input: args,
+                });
+              }
+
+              // Store in Anthropic format for internal tracking
+              const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }> = [];
+              if (assistantContent) {
+                content.push({ type: 'text', text: assistantContent });
+              }
+              for (const tu of toolUses) {
+                content.push({ type: 'tool_use', id: tu.id, name: tu.name, input: tu.input });
+              }
+              messages.push({ role: 'assistant', content: content as unknown as string });
+
+              // Execute tools
+              const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
+              for (const toolUse of toolUses) {
+                const rawResult = await executeTool(toolUse.name, toolUse.input as Record<string, unknown>);
+                const validation = validateToolResult(toolUse.name, rawResult);
+
+                if (!validation.valid) {
+                  const existing = failedTools.get(toolUse.name) ?? { count: 0, lastError: '' };
+                  failedTools.set(toolUse.name, {
+                    count: existing.count + 1,
+                    lastError: rawResult.slice(0, 200),
+                  });
+                  ctx.log(`Tool ${toolUse.name} failed (attempt ${existing.count + 1})`);
+                }
+
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: toolUse.id,
+                  content: validation.feedback,
+                });
+              }
+
+              messages.push({ role: 'user', content: toolResults as unknown as string });
+            } else {
+              // No tool calls - agent is done
+              finalResult = assistantContent;
               break;
             }
           } else if (useCodexAPI) {

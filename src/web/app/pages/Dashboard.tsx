@@ -242,7 +242,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div className="model-details">
               <span>Provider: {getProviderDisplayName(stats?.ai?.provider)}</span>
               <span className="auth-status">
-                {stats?.ai?.hasApiKey || stats?.ai?.hasOAuth ? (
+                {stats?.ai?.provider === 'ollama' ? (
+                  <span className="auth-ok">✓ Local</span>
+                ) : stats?.ai?.hasApiKey || stats?.ai?.hasOAuth ? (
                   <span className="auth-ok">✓ Authenticated</span>
                 ) : (
                   <span className="auth-missing">⚠ No API key</span>

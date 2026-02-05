@@ -66,6 +66,23 @@ export interface TokenUsageStats {
   totalRequests: number;
 }
 
+export interface ChatSession {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  workflowName?: string;
+  planReady: boolean;
+}
+
+export interface ChatMessage {
+  id?: number;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  toolName?: string;
+  timestamp: number;
+}
+
 interface EnqueueRunInput {
   id: string;
   workflowName: string;
@@ -177,6 +194,30 @@ export class SchedulerStore {
 
       CREATE INDEX IF NOT EXISTS token_usage_date_idx ON token_usage (timestamp);
       CREATE INDEX IF NOT EXISTS token_usage_workflow_idx ON token_usage (workflow_name, timestamp);
+
+      -- Chat sessions for AI assistant persistence
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id TEXT PRIMARY KEY,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        workflow_name TEXT,
+        plan_ready INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE INDEX IF NOT EXISTS chat_sessions_updated_idx ON chat_sessions (updated_at);
+
+      -- Chat messages linked to sessions
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tool_name TEXT,
+        timestamp INTEGER NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS chat_messages_session_idx ON chat_messages (session_id, timestamp);
     `);
 
     // Enable foreign keys
@@ -580,7 +621,7 @@ export class SchedulerStore {
 
   // === Cleanup Methods ===
 
-  cleanupOldData(daysToKeep: number): { runsDeleted: number; tokenEntriesDeleted: number } {
+  cleanupOldData(daysToKeep: number): { runsDeleted: number; tokenEntriesDeleted: number; chatSessionsDeleted: number } {
     const cutoff = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
 
     // Delete old runs (cascade deletes logs and steps)
@@ -593,9 +634,167 @@ export class SchedulerStore {
       .prepare('DELETE FROM token_usage WHERE timestamp < ?')
       .run(cutoff);
 
+    // Delete old chat sessions (cascade deletes messages)
+    const chatResult = this.db
+      .prepare('DELETE FROM chat_sessions WHERE updated_at < ?')
+      .run(cutoff);
+
     return {
       runsDeleted: runsResult.changes,
       tokenEntriesDeleted: tokensResult.changes,
+      chatSessionsDeleted: chatResult.changes,
     };
+  }
+
+  // === Chat Session Methods ===
+
+  createChatSession(id: string, workflowName?: string): ChatSession {
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO chat_sessions (id, created_at, updated_at, workflow_name, plan_ready)
+         VALUES (@id, @createdAt, @updatedAt, @workflowName, 0)`
+      )
+      .run({
+        id,
+        createdAt: now,
+        updatedAt: now,
+        workflowName: workflowName ?? null,
+      });
+
+    return {
+      id,
+      createdAt: now,
+      updatedAt: now,
+      workflowName,
+      planReady: false,
+    };
+  }
+
+  getChatSession(id: string): ChatSession | null {
+    const row = this.db
+      .prepare('SELECT id, created_at, updated_at, workflow_name, plan_ready FROM chat_sessions WHERE id = ?')
+      .get(id) as {
+        id: string;
+        created_at: number;
+        updated_at: number;
+        workflow_name: string | null;
+        plan_ready: number;
+      } | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      workflowName: row.workflow_name ?? undefined,
+      planReady: row.plan_ready === 1,
+    };
+  }
+
+  updateChatSession(id: string, updates: { workflowName?: string; planReady?: boolean }): void {
+    const setClauses: string[] = ['updated_at = @updatedAt'];
+    const params: Record<string, unknown> = { id, updatedAt: Date.now() };
+
+    if (updates.workflowName !== undefined) {
+      setClauses.push('workflow_name = @workflowName');
+      params.workflowName = updates.workflowName;
+    }
+
+    if (updates.planReady !== undefined) {
+      setClauses.push('plan_ready = @planReady');
+      params.planReady = updates.planReady ? 1 : 0;
+    }
+
+    this.db
+      .prepare(`UPDATE chat_sessions SET ${setClauses.join(', ')} WHERE id = @id`)
+      .run(params);
+  }
+
+  deleteChatSession(id: string): void {
+    this.db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(id);
+  }
+
+  addChatMessage(message: Omit<ChatMessage, 'id'>): number {
+    const result = this.db
+      .prepare(
+        `INSERT INTO chat_messages (session_id, role, content, tool_name, timestamp)
+         VALUES (@sessionId, @role, @content, @toolName, @timestamp)`
+      )
+      .run({
+        sessionId: message.sessionId,
+        role: message.role,
+        content: message.content,
+        toolName: message.toolName ?? null,
+        timestamp: message.timestamp,
+      });
+
+    // Update session updated_at
+    this.db
+      .prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?')
+      .run(message.timestamp, message.sessionId);
+
+    return Number(result.lastInsertRowid);
+  }
+
+  getChatMessages(sessionId: string): ChatMessage[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, session_id, role, content, tool_name, timestamp
+         FROM chat_messages
+         WHERE session_id = ?
+         ORDER BY timestamp ASC`
+      )
+      .all(sessionId) as Array<{
+        id: number;
+        session_id: string;
+        role: string;
+        content: string;
+        tool_name: string | null;
+        timestamp: number;
+      }>;
+
+    return rows.map(row => ({
+      id: row.id,
+      sessionId: row.session_id,
+      role: row.role as 'user' | 'assistant' | 'tool',
+      content: row.content,
+      toolName: row.tool_name ?? undefined,
+      timestamp: row.timestamp,
+    }));
+  }
+
+  getRecentChatSessions(limit: number = 10): ChatSession[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, created_at, updated_at, workflow_name, plan_ready
+         FROM chat_sessions
+         ORDER BY updated_at DESC
+         LIMIT ?`
+      )
+      .all(limit) as Array<{
+        id: string;
+        created_at: number;
+        updated_at: number;
+        workflow_name: string | null;
+        plan_ready: number;
+      }>;
+
+    return rows.map(row => ({
+      id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      workflowName: row.workflow_name ?? undefined,
+      planReady: row.plan_ready === 1,
+    }));
+  }
+
+  cleanupOldChatSessions(maxAgeDays: number): number {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const result = this.db
+      .prepare('DELETE FROM chat_sessions WHERE updated_at < ?')
+      .run(cutoff);
+    return result.changes;
   }
 }

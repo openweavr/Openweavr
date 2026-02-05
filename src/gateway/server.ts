@@ -29,6 +29,7 @@ import { verifyWebhookSignature, parseWebhookEvent } from '../plugins/builtin/gi
 import { createServer as createHttpServer } from 'node:http';
 import { getAllProviders, hasProviderCredentials } from '../models/registry.js';
 import { MCP_SERVER_CATALOG, type MCPServerConfig } from '../mcp/catalog.js';
+import { validateWorkflow, quickValidate } from '../validation/workflow-validator.js';
 
 export interface GatewayServer {
   start(): Promise<void>;
@@ -438,6 +439,33 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
       return c.json({ success: true, name: safeName, path: filePath, yaml: formattedYaml });
     } catch (err) {
       return c.json({ error: 'Failed to save workflow', details: String(err) }, 500);
+    }
+  });
+
+  // Validate workflow YAML
+  app.post('/api/workflows/validate', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { yaml: yamlContent, quick } = body as { yaml?: string; quick?: boolean };
+
+      if (!yamlContent) {
+        return c.json({ error: 'No YAML content provided' }, 400);
+      }
+
+      // Quick validation only checks syntax and schema
+      if (quick) {
+        const result = quickValidate(yamlContent);
+        return c.json(result);
+      }
+
+      // Full validation also checks action/trigger references and variable references
+      const availableActions = globalRegistry.listActions().map(({ plugin, action }) => `${plugin}.${action.name}`);
+      const availableTriggers = globalRegistry.listTriggers().map(({ plugin, trigger }) => `${plugin}.${trigger.name}`);
+
+      const result = validateWorkflow(yamlContent, availableActions, availableTriggers);
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: `Validation error: ${String(err)}` }, 500);
     }
   });
 
@@ -1132,6 +1160,232 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     });
   });
 
+  // Memory block preview API
+  app.post('/api/memory/preview', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { block } = body as {
+        block?: {
+          id: string;
+          sources: Array<{
+            type: string;
+            text?: string;
+            path?: string;
+            url?: string;
+            query?: string;
+            step?: string;
+            maxChars?: number;
+          }>;
+          template?: string;
+          separator?: string;
+          maxChars?: number;
+        };
+      };
+
+      if (!block) {
+        return c.json({ error: 'No block provided' }, 400);
+      }
+
+      const sourceResults: Array<{ id: string; content: string; charCount: number; status: 'success' | 'error'; error?: string }> = [];
+      let totalContent = '';
+
+      for (let i = 0; i < block.sources.length; i++) {
+        const source = block.sources[i];
+        const sourceId = (source as { id?: string }).id || `source_${i + 1}`;
+        let content = '';
+        let status: 'success' | 'error' = 'success';
+        let error: string | undefined;
+
+        try {
+          switch (source.type) {
+            case 'text':
+              content = source.text ?? '';
+              break;
+
+            case 'file':
+              if (source.path) {
+                try {
+                  content = await readFile(source.path, 'utf-8');
+                } catch (err) {
+                  status = 'error';
+                  error = `File not found: ${source.path}`;
+                }
+              }
+              break;
+
+            case 'url':
+              if (source.url) {
+                try {
+                  const response = await fetch(source.url, {
+                    headers: { 'User-Agent': 'Weavr/1.0 MemoryPreview' },
+                  });
+                  if (response.ok) {
+                    content = await response.text();
+                    // Strip HTML tags for preview
+                    content = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                  } else {
+                    status = 'error';
+                    error = `HTTP ${response.status}: ${response.statusText}`;
+                  }
+                } catch (err) {
+                  status = 'error';
+                  error = `Fetch failed: ${String(err)}`;
+                }
+              }
+              break;
+
+            case 'web_search':
+              content = `[Web search results for: ${source.query ?? 'no query'}]\n(Preview not available - results will be fetched at runtime)`;
+              break;
+
+            case 'step':
+              content = `[Output from step: ${source.step ?? 'unknown'}]\n(Preview not available - data will be available at runtime)`;
+              break;
+
+            case 'trigger':
+              content = `[Trigger data: ${source.path ?? 'all'}]\n(Preview not available - data will be available at runtime)`;
+              break;
+
+            default:
+              content = `[Unknown source type: ${source.type}]`;
+          }
+
+          // Apply maxChars limit if specified
+          if (source.maxChars && content.length > source.maxChars) {
+            content = content.slice(0, source.maxChars) + '... (truncated)';
+          }
+        } catch (err) {
+          status = 'error';
+          error = String(err);
+        }
+
+        sourceResults.push({
+          id: sourceId,
+          content,
+          charCount: content.length,
+          status,
+          error,
+        });
+      }
+
+      // Assemble final content
+      const separator = block.separator ?? '\n\n---\n\n';
+      if (block.template) {
+        // Use template if provided
+        totalContent = block.template;
+        for (const result of sourceResults) {
+          totalContent = totalContent.replace(
+            new RegExp(`\\{\\{\\s*sources\\.${result.id}\\s*\\}\\}`, 'g'),
+            result.content
+          );
+        }
+      } else {
+        // Just concatenate with separator
+        totalContent = sourceResults.map(r => r.content).join(separator);
+      }
+
+      // Apply block-level maxChars
+      if (block.maxChars && totalContent.length > block.maxChars) {
+        totalContent = totalContent.slice(0, block.maxChars) + '... (truncated)';
+      }
+
+      return c.json({
+        content: totalContent,
+        charCount: totalContent.length,
+        sources: sourceResults,
+      });
+    } catch (err) {
+      return c.json({ error: `Preview failed: ${String(err)}` }, 500);
+    }
+  });
+
+  // Test individual memory source
+  app.post('/api/memory/test-source', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { source } = body as {
+        source?: {
+          type: string;
+          text?: string;
+          path?: string;
+          url?: string;
+          query?: string;
+          maxChars?: number;
+        };
+      };
+
+      if (!source) {
+        return c.json({ error: 'No source provided' }, 400);
+      }
+
+      let content = '';
+      let status: 'success' | 'error' = 'success';
+      let error: string | undefined;
+
+      switch (source.type) {
+        case 'text':
+          content = source.text ?? '';
+          break;
+
+        case 'file':
+          if (source.path) {
+            try {
+              await stat(source.path); // Check file exists
+              content = await readFile(source.path, 'utf-8');
+              if (source.maxChars && content.length > source.maxChars) {
+                content = content.slice(0, source.maxChars);
+              }
+            } catch (err) {
+              status = 'error';
+              error = `File error: ${(err as NodeJS.ErrnoException).code === 'ENOENT' ? 'File not found' : String(err)}`;
+            }
+          } else {
+            status = 'error';
+            error = 'No path specified';
+          }
+          break;
+
+        case 'url':
+          if (source.url) {
+            try {
+              const response = await fetch(source.url, {
+                headers: { 'User-Agent': 'Weavr/1.0 MemoryTest' },
+              });
+              if (response.ok) {
+                content = await response.text();
+                if (source.maxChars && content.length > source.maxChars) {
+                  content = content.slice(0, source.maxChars);
+                }
+              } else {
+                status = 'error';
+                error = `HTTP ${response.status}: ${response.statusText}`;
+              }
+            } catch (err) {
+              status = 'error';
+              error = `Fetch failed: ${String(err)}`;
+            }
+          } else {
+            status = 'error';
+            error = 'No URL specified';
+          }
+          break;
+
+        default:
+          status = 'error';
+          error = `Cannot test source type: ${source.type} (runtime only)`;
+      }
+
+      return c.json({
+        content: status === 'success' ? content.slice(0, 1000) + (content.length > 1000 ? '...' : '') : '',
+        charCount: content.length,
+        status,
+        error,
+      });
+    } catch (err) {
+      return c.json({ error: `Test failed: ${String(err)}` }, 500);
+    }
+  });
+
   // OpenAI OAuth endpoints
   // In-memory storage for pending OAuth states (5-minute expiry)
   const pendingOAuthStates = new Map<string, PendingOAuthState & { callbackServer?: ReturnType<typeof createHttpServer> }>();
@@ -1739,23 +1993,15 @@ Output ONLY the YAML code block, no additional text.`;
     }
   });
 
-  // Agentic AI Chat sessions storage
-  const chatSessions = new Map<string, {
-    id: string;
-    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolName?: string }>;
-    createdAt: number;
-    planReady: boolean;
-  }>();
-
-  // Cleanup old sessions (older than 1 hour)
+  // Chat sessions are now persisted in scheduler.store (SQLite)
+  // Cleanup old sessions (older than 7 days) periodically
   setInterval(() => {
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    for (const [id, session] of chatSessions) {
-      if (session.createdAt < oneHourAgo) {
-        chatSessions.delete(id);
-      }
+    try {
+      scheduler.store.cleanupOldChatSessions(7);
+    } catch {
+      // Ignore cleanup errors
     }
-  }, 5 * 60 * 1000);
+  }, 60 * 60 * 1000); // Run every hour
 
   // Tool definitions for the agentic chat
   const chatTools = [
@@ -1907,23 +2153,25 @@ Output ONLY the YAML code block, no additional text.`;
         }
       }
 
-      // Get or create session
-      let sessionId = existingSessionId;
-      let session = sessionId ? chatSessions.get(sessionId) : null;
+      // Get or create session from persistent storage
+      let sessionId: string = existingSessionId ?? '';
+      let session = sessionId ? scheduler.store.getChatSession(sessionId) : null;
 
       if (!session) {
         sessionId = randomUUID();
-        session = {
-          id: sessionId,
-          messages: [],
-          createdAt: Date.now(),
-          planReady: false,
-        };
-        chatSessions.set(sessionId, session);
+        session = scheduler.store.createChatSession(sessionId);
       }
 
-      // Add user message
-      session.messages.push({ role: 'user', content: message });
+      // Get existing messages from persistent storage
+      const storedMessages = scheduler.store.getChatMessages(sessionId);
+
+      // Add user message to persistent storage
+      scheduler.store.addChatMessage({
+        sessionId,
+        role: 'user',
+        content: message,
+        timestamp: Date.now(),
+      });
 
       // Build dynamic context about available actions and user's configuration
       const actions = globalRegistry.listActions();
@@ -2166,12 +2414,90 @@ steps:
   2. The bot will reply with their chat ID
   3. IMPORTANT: User must first send ANY message to their Weavr bot before it can message them
 
-When the plan is complete and user approves, respond with "[PLAN_READY]" at the end.
+## IMPORTANT: Clarification Phase (FOLLOW THIS)
 
-Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, etc). For Telegram, always ask for the numeric chat ID if not provided.`;
+Before generating ANY workflow YAML, you MUST gather all required information. Follow this structured approach:
 
-      // Prepare messages for API
-      const apiMessages = session.messages.map(m => ({
+### Step 1: Understand the Intent
+Parse the user's request and identify:
+- What they want to automate
+- What trigger makes sense (schedule, webhook, manual)
+- What actions will be needed
+
+### Step 2: Ask Required Questions
+For each action/trigger you plan to use, identify required fields. Ask for ANY missing information:
+
+**For scheduled triggers (cron.schedule)**:
+- Ask: "What time should this run? (e.g., 9:00 AM)"
+- Ask: "What timezone are you in?" (default to user's system timezone if known)
+- Ask: "How often? (daily, weekly, every hour, etc.)"
+
+**For Telegram (telegram.send)**:
+- ALWAYS ask: "What's your Telegram chat ID? (Message @userinfobot on Telegram to get it)"
+- The user MUST provide their numeric chat ID - never guess or use placeholders
+
+**For Discord (discord.send)**:
+- Ask: "What's your Discord webhook URL?"
+
+**For Slack (slack.send)**:
+- Ask: "What Slack channel should messages go to?"
+
+**For HTTP requests**:
+- Ask: "What's the URL/endpoint?"
+- Ask: "What authentication is needed?" (if applicable)
+
+**For email**:
+- Ask: "What email address should receive this?"
+
+### Step 3: Confirm the Plan
+Once you have all information:
+1. Summarize what the workflow will do
+2. List the trigger and each step
+3. Ask "Does this look right? Should I generate the workflow?"
+
+### Step 4: Generate YAML
+ONLY after user confirms, generate the complete YAML. Include all the specific values they provided (chat IDs, times, etc.).
+
+### Example Conversation Flow
+
+User: "Send me a daily news summary on Telegram"
+
+You: "I'd love to help you set up a daily news summary workflow. I have a few questions:
+
+1. **Time**: What time would you like to receive the summary? (e.g., 9:00 AM)
+2. **Timezone**: What timezone are you in?
+3. **Telegram Chat ID**: What's your Telegram chat ID? (Send a message to @userinfobot on Telegram and it will tell you)
+4. **News Topics**: What topics would you like covered? (e.g., tech news, AI, specific companies)"
+
+[User provides answers]
+
+You: "Great! Here's the plan:
+
+**Workflow: daily-news-summary**
+- Trigger: Run daily at 9:00 AM EST
+- Step 1: AI agent researches news on [topics]
+- Step 2: AI agent formats into summary
+- Step 3: Send to Telegram chat [ID]
+
+Does this look right? Say 'yes' to generate the workflow."
+
+[User says yes]
+
+You: "Here's your workflow:
+\`\`\`yaml
+name: daily-news-summary
+...
+\`\`\`"
+
+## Output
+When the user approves the plan and you generate the final YAML, include the complete workflow in a yaml code block.`;
+
+      // Prepare messages for API - combine stored messages with the new user message
+      const allMessages = [
+        ...storedMessages,
+        { role: 'user' as const, content: message, timestamp: Date.now() },
+      ];
+      const apiMessages = allMessages.map(m => ({
         role: m.role === 'tool' ? 'user' : m.role,
         content: m.role === 'tool' ? `[Tool Result: ${m.toolName}]\n${m.content}` : m.content,
       }));
@@ -2326,8 +2652,14 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
 
                   send({ type: 'tool_end', toolName: block.name, result: toolResult.slice(0, 200) + '...' });
 
-                  // Add tool result to messages
-                  session!.messages.push({ role: 'tool', content: toolResult, toolName: block.name });
+                  // Add tool result to persistent storage and local apiMessages
+                  scheduler.store.addChatMessage({
+                    sessionId: sessionId!,
+                    role: 'tool',
+                    content: toolResult,
+                    toolName: block.name,
+                    timestamp: Date.now(),
+                  });
                   apiMessages.push({
                     role: 'user',
                     content: `[Tool Result: ${block.name}]\n${toolResult}`,
@@ -2390,7 +2722,14 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
 
                   send({ type: 'tool_end', toolName, result: toolResult.slice(0, 200) + '...' });
 
-                  session!.messages.push({ role: 'tool', content: toolResult, toolName });
+                  // Add tool result to persistent storage and local apiMessages
+                  scheduler.store.addChatMessage({
+                    sessionId: sessionId!,
+                    role: 'tool',
+                    content: toolResult,
+                    toolName,
+                    timestamp: Date.now(),
+                  });
                   apiMessages.push({
                     role: 'user',
                     content: `[Tool Result: ${toolName}]\n${toolResult}`,
@@ -2409,14 +2748,19 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
             }
           }
 
-          // Save assistant response
+          // Save assistant response to persistent storage
           if (fullResponse) {
-            session!.messages.push({ role: 'assistant', content: fullResponse });
+            scheduler.store.addChatMessage({
+              sessionId: sessionId!,
+              role: 'assistant',
+              content: fullResponse,
+              timestamp: Date.now(),
+            });
 
             // Check if plan is ready - either by magic string or by detecting a YAML workflow
             const hasYamlWorkflow = /```ya?ml\s*\n[\s\S]*?(?:trigger|steps):/i.test(fullResponse);
             if (fullResponse.includes('[PLAN_READY]') || hasYamlWorkflow) {
-              session!.planReady = true;
+              scheduler.store.updateChatSession(sessionId!, { planReady: true });
               send({ type: 'plan_ready' });
             }
           }
@@ -2440,6 +2784,58 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
     }
   });
 
+  // Get chat session with messages (for restoring session state)
+  app.get('/api/ai/chat/session/:sessionId', async (c) => {
+    try {
+      const sessionId = c.req.param('sessionId');
+      const session = scheduler.store.getChatSession(sessionId);
+
+      if (!session) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+
+      const messages = scheduler.store.getChatMessages(sessionId);
+
+      return c.json({
+        session,
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          toolName: m.toolName,
+          timestamp: m.timestamp,
+        })),
+      });
+    } catch (err) {
+      console.error('Get chat session error:', err);
+      return c.json({ error: `Error retrieving session: ${String(err)}` }, 500);
+    }
+  });
+
+  // List recent chat sessions
+  app.get('/api/ai/chat/sessions', async (c) => {
+    try {
+      const limit = parseInt(c.req.query('limit') ?? '10', 10);
+      const sessions = scheduler.store.getRecentChatSessions(limit);
+
+      return c.json({ sessions });
+    } catch (err) {
+      console.error('List chat sessions error:', err);
+      return c.json({ error: `Error listing sessions: ${String(err)}` }, 500);
+    }
+  });
+
+  // Delete a chat session
+  app.delete('/api/ai/chat/session/:sessionId', async (c) => {
+    try {
+      const sessionId = c.req.param('sessionId');
+      scheduler.store.deleteChatSession(sessionId);
+      return c.json({ success: true });
+    } catch (err) {
+      console.error('Delete chat session error:', err);
+      return c.json({ error: `Error deleting session: ${String(err)}` }, 500);
+    }
+  });
+
   // Generate workflow from chat session
   app.post('/api/ai/chat/generate', async (c) => {
     try {
@@ -2450,10 +2846,13 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
         return c.json({ error: 'No session ID provided' }, 400);
       }
 
-      const session = chatSessions.get(sessionId);
+      const session = scheduler.store.getChatSession(sessionId);
       if (!session) {
         return c.json({ error: 'Session not found' }, 404);
       }
+
+      // Get messages from persistent storage
+      const sessionMessages = scheduler.store.getChatMessages(sessionId);
 
       // Load AI config
       let aiConfig: { provider?: string; model?: string; apiKey?: string; authMethod?: string; oauth?: { accessToken?: string } } = {};
@@ -2484,8 +2883,8 @@ Ask clarifying questions when needed (chat IDs, specific URLs, schedule times, e
         }
       }
 
-      // Build conversation context
-      const conversationContext = session.messages
+      // Build conversation context from persisted messages
+      const conversationContext = sessionMessages
         .filter(m => m.role !== 'tool')
         .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
         .join('\n\n');
@@ -2667,8 +3066,8 @@ steps:
         });
       }
 
-      // Clean up session
-      chatSessions.delete(sessionId);
+      // Clean up session from persistent storage
+      scheduler.store.deleteChatSession(sessionId);
 
       return c.json({ yaml });
     } catch (err) {

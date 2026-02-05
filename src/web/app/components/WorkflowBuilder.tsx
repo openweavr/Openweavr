@@ -14,7 +14,12 @@ import {
   NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { AIChat, ChatMessage } from './AIChat';
+import { AIChat } from './AIChat';
+import { NodeLibrary } from './NodeLibrary';
+import { type ContextPanelTab } from './ContextPanel';
+import { YAMLEditor } from './YAMLEditor';
+import { MemoryBlockEditor } from './MemoryBlockEditor';
+import { AIChatPanel, type ChatMessage } from './AIChatPanel';
 import YAML from 'yaml';
 
 interface WorkflowBuilderProps {
@@ -649,7 +654,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
   },
 ];
 
-// Custom node component for workflow steps
+// Custom node component for workflow steps (horizontal flow: left-to-right)
 function StepNode({ data, selected }: NodeProps<Node<StepData>>) {
   return (
     <div
@@ -662,7 +667,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepData>>) {
         boxShadow: selected ? '0 0 0 2px rgba(139, 92, 246, 0.3)' : 'none',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: 'var(--accent-blue)' }} />
+      <Handle type="target" position={Position.Left} style={{ background: 'var(--accent-blue)' }} />
       {/* Step name badge */}
       <div style={{
         fontSize: '10px',
@@ -683,12 +688,12 @@ function StepNode({ data, selected }: NodeProps<Node<StepData>>) {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{data.action}</div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: 'var(--accent-green)' }} />
+      <Handle type="source" position={Position.Right} style={{ background: 'var(--accent-green)' }} />
     </div>
   );
 }
 
-// Custom trigger node
+// Custom trigger node (horizontal flow: left-to-right)
 function TriggerNode({ data, selected }: NodeProps<Node<StepData>>) {
   return (
     <div
@@ -720,7 +725,7 @@ function TriggerNode({ data, selected }: NodeProps<Node<StepData>>) {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{data.action}</div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: 'var(--accent-yellow)' }} />
+      <Handle type="source" position={Position.Right} style={{ background: 'var(--accent-yellow)' }} />
     </div>
   );
 }
@@ -1292,6 +1297,7 @@ function PropertyEditor({
   const [stepId, setStepId] = useState(node.data.stepId);
   const [showSuggestions, setShowSuggestions] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
+  const [expandedMcpServers, setExpandedMcpServers] = useState<Set<string>>(new Set());
 
   const upstreamSteps = useMemo(() => getUpstreamSteps(node.id, nodes, edges), [node.id, nodes, edges]);
 
@@ -1351,9 +1357,10 @@ function PropertyEditor({
 
   const renderField = (field: FieldDef) => {
     const value = config[field.name] ?? field.default ?? '';
+    const compactInputStyle = { fontSize: '12px', padding: '6px 8px' };
 
     switch (field.type) {
-      case 'textarea':
+      case 'textarea': {
         return (
           <div style={{ position: 'relative' }}>
             <textarea
@@ -1362,7 +1369,12 @@ function PropertyEditor({
               onChange={(e) => handleInputChange(field.name, e)}
               onBlur={() => setTimeout(() => setShowSuggestions(null), 200)}
               placeholder={field.placeholder}
-              style={{ minHeight: '80px', fontSize: '13px' }}
+              style={{
+                minHeight: '60px',
+                fontSize: '12px',
+                padding: '6px 8px',
+                resize: 'vertical',
+              }}
             />
             <VariableSuggestions
               suggestions={upstreamSteps}
@@ -1374,6 +1386,7 @@ function PropertyEditor({
             />
           </div>
         );
+      }
       case 'number':
         return (
           <input
@@ -1382,6 +1395,7 @@ function PropertyEditor({
             value={value as number}
             onChange={(e) => handleFieldChange(field.name, parseInt(e.target.value) || 0)}
             placeholder={field.placeholder}
+            style={compactInputStyle}
           />
         );
       case 'select':
@@ -1390,6 +1404,7 @@ function PropertyEditor({
             className="input"
             value={String(value)}
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
+            style={compactInputStyle}
           >
             {field.options?.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1410,9 +1425,9 @@ function PropertyEditor({
           })).filter((opt) => opt.value);
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {options.length > 0 ? options.map((opt) => (
-                <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', padding: '3px 6px', background: selectedValues.includes(opt.value) ? 'var(--bg-hover)' : 'var(--bg-tertiary)', borderRadius: '4px', border: selectedValues.includes(opt.value) ? '1px solid var(--accent-purple)' : '1px solid var(--border-color)' }}>
                   <input
                     type="checkbox"
                     checked={selectedValues.includes(opt.value)}
@@ -1422,15 +1437,13 @@ function PropertyEditor({
                         : selectedValues.filter((v: string) => v !== opt.value);
                       handleFieldChange(field.name, newValues);
                     }}
-                    style={{ marginTop: '2px' }}
+                    style={{ width: '12px', height: '12px' }}
                   />
-                  <div>
-                    <span style={{ fontSize: '13px' }}>{opt.label}</span>
-                  </div>
+                  <span>{opt.label}</span>
                 </label>
               )) : (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
-                  Add a memory block to enable selection here
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
+                  Add a memory block first
                 </div>
               )}
             </div>
@@ -1440,81 +1453,132 @@ function PropertyEditor({
         const options = isToolsField && availableTools && availableTools.length > 0
           ? availableTools.map(t => ({
               value: t.id,
-              label: t.source === 'mcp' ? `${t.name} (MCP: ${t.server ?? 'server'})` : t.name,
+              label: t.name,
               description: t.description,
               source: t.source,
+              server: t.server,
             }))
-          : field.options?.map(o => ({ ...o, source: 'builtin', description: '' })) ?? [];
+          : field.options?.map(o => ({ ...o, source: 'builtin', description: '', server: undefined })) ?? [];
 
         // Group tools by source
         const builtinTools = options.filter(o => o.source === 'builtin');
         const mcpTools = options.filter(o => o.source === 'mcp');
 
+        // Group MCP tools by server
+        const mcpByServer: Record<string, typeof mcpTools> = {};
+        for (const tool of mcpTools) {
+          const server = tool.server || 'unknown';
+          if (!mcpByServer[server]) mcpByServer[server] = [];
+          mcpByServer[server].push(tool);
+        }
+
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {/* Built-in tools */}
             {builtinTools.length > 0 && (
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Built-in Tools
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {builtinTools.map((opt) => (
-                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedValues.includes(opt.value)}
-                        onChange={(e) => {
-                          const newValues = e.target.checked
-                            ? [...selectedValues, opt.value]
-                            : selectedValues.filter((v: string) => v !== opt.value);
-                          handleFieldChange(field.name, newValues);
-                        }}
-                        style={{ marginTop: '2px' }}
-                      />
-                      <div>
-                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
-                        {opt.description && (
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{opt.description}</div>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {builtinTools.map((opt) => (
+                  <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', padding: '3px 6px', background: selectedValues.includes(opt.value) ? 'var(--bg-hover)' : 'var(--bg-tertiary)', borderRadius: '4px', border: selectedValues.includes(opt.value) ? '1px solid var(--accent-purple)' : '1px solid var(--border-color)' }} title={opt.description}>
+                    <input
+                      type="checkbox"
+                      checked={selectedValues.includes(opt.value)}
+                      onChange={(e) => {
+                        const newValues = e.target.checked
+                          ? [...selectedValues, opt.value]
+                          : selectedValues.filter((v: string) => v !== opt.value);
+                        handleFieldChange(field.name, newValues);
+                      }}
+                      style={{ width: '12px', height: '12px' }}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
               </div>
             )}
-            {mcpTools.length > 0 && (
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', marginTop: '8px', textTransform: 'uppercase' }}>
-                  MCP Tools {mcpTools.length > 0 && `(${mcpTools.length} available)`}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflow: 'auto' }}>
-                  {mcpTools.map((opt) => (
-                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedValues.includes(opt.value)}
-                        onChange={(e) => {
-                          const newValues = e.target.checked
-                            ? [...selectedValues, opt.value]
-                            : selectedValues.filter((v: string) => v !== opt.value);
-                          handleFieldChange(field.name, newValues);
+
+            {/* MCP tools grouped by server - collapsible */}
+            {Object.keys(mcpByServer).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {Object.entries(mcpByServer).map(([server, tools]) => {
+                  const isExpanded = expandedMcpServers.has(server);
+                  const selectedCount = tools.filter(t => selectedValues.includes(t.value)).length;
+                  const allSelected = selectedCount === tools.length;
+
+                  return (
+                    <div key={server} style={{ background: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                      {/* Server header - always visible */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 8px',
+                          cursor: 'pointer',
                         }}
-                        style={{ marginTop: '2px' }}
-                      />
-                      <div>
-                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
-                        {opt.description && (
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{opt.description}</div>
+                        onClick={() => {
+                          const newSet = new Set(expandedMcpServers);
+                          if (isExpanded) newSet.delete(server);
+                          else newSet.add(server);
+                          setExpandedMcpServers(newSet);
+                        }}
+                      >
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: 500, flex: 1 }}>
+                          {server}
+                        </span>
+                        {selectedCount > 0 && (
+                          <span style={{ fontSize: '10px', color: 'var(--accent-purple)', background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: '8px' }}>
+                            {selectedCount}/{tools.length}
+                          </span>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const serverToolIds = tools.map(t => t.value);
+                            const newValues = allSelected
+                              ? selectedValues.filter((v: string) => !serverToolIds.includes(v))
+                              : [...new Set([...selectedValues, ...serverToolIds])];
+                            handleFieldChange(field.name, newValues);
+                          }}
+                          style={{ fontSize: '9px', padding: '2px 6px', background: allSelected ? 'var(--accent-purple)' : 'var(--bg-primary)', color: allSelected ? 'white' : 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '3px', cursor: 'pointer' }}
+                        >
+                          {allSelected ? '✓ All' : 'Add All'}
+                        </button>
                       </div>
-                    </label>
-                  ))}
-                </div>
+
+                      {/* Tools list - only when expanded */}
+                      {isExpanded && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', padding: '0 8px 8px 8px' }}>
+                          {tools.map((opt) => (
+                            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '10px', padding: '2px 5px', background: selectedValues.includes(opt.value) ? 'var(--bg-hover)' : 'var(--bg-primary)', borderRadius: '3px', border: selectedValues.includes(opt.value) ? '1px solid var(--accent-purple)' : '1px solid var(--border-color)' }} title={opt.description}>
+                              <input
+                                type="checkbox"
+                                checked={selectedValues.includes(opt.value)}
+                                onChange={(e) => {
+                                  const newValues = e.target.checked
+                                    ? [...selectedValues, opt.value]
+                                    : selectedValues.filter((v: string) => v !== opt.value);
+                                  handleFieldChange(field.name, newValues);
+                                }}
+                                style={{ width: '10px', height: '10px' }}
+                              />
+                              <span>{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
-            {isToolsField && mcpTools.length === 0 && (
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
-                Enable MCP servers in Settings to add more tools
+
+            {isToolsField && mcpTools.length === 0 && builtinTools.length === 0 && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
+                Enable MCP servers in Settings
               </div>
             )}
           </div>
@@ -1522,13 +1586,14 @@ function PropertyEditor({
       }
       case 'boolean':
         return (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={Boolean(value)}
               onChange={(e) => handleFieldChange(field.name, e.target.checked)}
+              style={{ width: '14px', height: '14px' }}
             />
-            <span style={{ fontSize: '13px' }}>{field.label}</span>
+            <span style={{ fontSize: '12px' }}>{field.label}</span>
           </label>
         );
       case 'schedule': {
@@ -1557,7 +1622,7 @@ function PropertyEditor({
         const selectedPreset = SCHEDULE_PRESETS.find(p => p.value === preset);
 
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <select
               className="input"
               value={preset}
@@ -1565,11 +1630,10 @@ function PropertyEditor({
                 const newPreset = e.target.value;
                 const presetConfig = SCHEDULE_PRESETS.find(p => p.value === newPreset);
                 const newExpression = presetConfig?.expression ?? expression;
-                // Store expression directly for backend compatibility
                 handleFieldChange(field.name, { preset: newPreset, expression: newExpression });
-                // Also update the expression field directly for backward compatibility
                 handleFieldChange('expression', newExpression);
               }}
+              style={compactInputStyle}
             >
               {SCHEDULE_PRESETS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1577,15 +1641,7 @@ function PropertyEditor({
             </select>
 
             {isCustom ? (
-              <div>
-                <label style={{
-                  fontSize: '11px',
-                  color: 'var(--text-muted)',
-                  display: 'block',
-                  marginBottom: '6px'
-                }}>
-                  Cron Expression
-                </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="text"
                   className="input"
@@ -1595,22 +1651,16 @@ function PropertyEditor({
                     handleFieldChange('expression', e.target.value);
                   }}
                   placeholder="*/5 * * * *"
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px 8px', flex: 1 }}
                 />
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  Format: minute hour day month weekday
-                </div>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>min hr day mon wkd</span>
               </div>
             ) : (
               <div style={{
-                fontSize: '12px',
-                color: 'var(--text-secondary)',
-                background: 'var(--bg-primary)',
-                padding: '8px 12px',
-                borderRadius: '6px',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
                 fontFamily: 'var(--font-mono)',
               }}>
-                <span style={{ color: 'var(--text-muted)' }}>Cron: </span>
                 {selectedPreset?.expression}
               </div>
             )}
@@ -1627,6 +1677,7 @@ function PropertyEditor({
               onChange={(e) => handleInputChange(field.name, e)}
               onBlur={() => setTimeout(() => setShowSuggestions(null), 200)}
               placeholder={field.placeholder}
+              style={compactInputStyle}
             />
             <VariableSuggestions
               suggestions={upstreamSteps}
@@ -1642,91 +1693,66 @@ function PropertyEditor({
   };
 
   return (
-    <div className="card" style={{ flex: 1, overflow: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '24px' }}>{node.data.icon}</span>
-          <div>
-            <h3 style={{ fontSize: '15px', margin: 0, color: '#fff' }}>{node.data.label}</h3>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{node.data.action}</div>
-          </div>
-        </div>
-        <button className="btn btn-ghost" onClick={onDelete} style={{ color: 'var(--accent-red)', padding: '6px 10px' }}>
-          Delete
-        </button>
-      </div>
-
+    <div style={{ overflow: 'auto' }}>
       {/* Step Name field - only for steps, not triggers */}
       {node.type === 'step' && (
-        <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-          <label style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--accent-purple)',
-            display: 'block',
-            marginBottom: '6px'
-          }}>
-            Step Name <span style={{ color: 'var(--accent-red)' }}>*</span>
-          </label>
-          <input
-            type="text"
-            className="input"
-            value={stepId}
-            onChange={(e) => {
-              const newId = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-              setStepId(newId);
-              onUpdateStepId(newId);
-            }}
-            placeholder="e.g., fetch-data, send-notification"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}
-          />
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {schema?.outputFields && schema.outputFields.length > 0 ? (
-              <>
-                Available outputs:{' '}
-                {schema.outputFields.slice(0, 3).map((f, i) => (
-                  <span key={f.name}>
-                    {i > 0 && ', '}
-                    <code style={{ color: 'var(--accent-purple)' }}>{'{{ steps.' + stepId + '.' + f.name + ' }}'}</code>
-                  </span>
-                ))}
-                {schema.outputFields.length > 3 && <span style={{ color: 'var(--text-muted)' }}> +{schema.outputFields.length - 3} more</span>}
-              </>
-            ) : (
-              <>Use this name to reference this step: <code style={{ color: 'var(--accent-purple)' }}>{'{{ steps.' + stepId + '.data }}'}</code></>
-            )}
+        <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--accent-purple)',
+              whiteSpace: 'nowrap',
+            }}>
+              Step ID
+            </label>
+            <input
+              type="text"
+              className="input"
+              value={stepId}
+              onChange={(e) => {
+                const newId = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+                setStepId(newId);
+                onUpdateStepId(newId);
+              }}
+              placeholder="e.g., fetch-data"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', padding: '4px 8px', flex: 1 }}
+            />
+            <code style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              {'{{ steps.' + stepId + '.* }}'}
+            </code>
           </div>
         </div>
       )}
 
       {schema?.fields && schema.fields.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
           {schema.fields.map((field) => (
-            <div key={field.name}>
+            <div key={field.name} style={{ minWidth: 0 }}>
               <label style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 500,
                 color: 'var(--text-secondary)',
                 display: 'block',
-                marginBottom: '6px'
+                marginBottom: '4px'
               }}>
                 {field.label}
-                {field.required && <span style={{ color: 'var(--accent-red)', marginLeft: '4px' }}>*</span>}
+                {field.required && <span style={{ color: 'var(--accent-red)', marginLeft: '2px' }}>*</span>}
               </label>
               {renderField(field)}
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', padding: '12px' }}>
           No configuration options for this action.
         </div>
       )}
 
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-        <details>
-          <summary style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '8px' }}>
-            Advanced: Raw JSON
+      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <details style={{ flex: 1 }}>
+          <summary style={{ fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            Raw JSON
           </summary>
           <textarea
             className="input"
@@ -1740,9 +1766,12 @@ function PropertyEditor({
                 // Invalid JSON
               }
             }}
-            style={{ minHeight: '100px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+            style={{ minHeight: '80px', fontFamily: 'var(--font-mono)', fontSize: '10px', marginTop: '6px' }}
           />
         </details>
+        <button className="btn btn-ghost" onClick={onDelete} style={{ color: 'var(--accent-red)', padding: '4px 10px', fontSize: '12px', marginLeft: '12px' }}>
+          Delete Node
+        </button>
       </div>
     </div>
   );
@@ -1893,6 +1922,7 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       trigger?: { type?: string; with?: Record<string, unknown> };
       triggers?: { type?: string; with?: Record<string, unknown> };
       memory?: MemoryBlockInput[];
+      _ui?: { positions?: Record<string, { x: number; y: number }> };
       steps?: Array<{
         id: string;
         action: string;
@@ -1912,6 +1942,9 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       }));
     }
 
+    // Get saved UI positions if available
+    const savedPositions = parsed._ui?.positions ?? {};
+
     // Handle trigger (supports both 'trigger' and 'triggers' keys)
     const trigger = parsed.trigger || parsed.triggers;
     const triggerType = trigger?.type || '';
@@ -1925,12 +1958,17 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       config: step.with || {},
     }));
 
+    // Horizontal layout: nodes flow left to right
+    const Y_CENTER = 200;
+    let x = triggerType ? 300 : 50;
+
     if (triggerType) {
       const schema = getSchema(triggerType, 'trigger');
+      const savedPos = savedPositions['trigger-1'];
       nodes.push({
         id: 'trigger-1',
         type: 'trigger',
-        position: { x: 250, y: 50 },
+        position: savedPos ? { x: savedPos.x, y: savedPos.y } : { x: 50, y: Y_CENTER },
         data: {
           label: schema?.label ?? triggerType,
           action: triggerType,
@@ -1941,7 +1979,6 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       });
     }
 
-    let y = triggerType ? 180 : 50;
     const stepIdToNodeId: Record<string, string> = {};
 
     for (let i = 0; i < steps.length; i++) {
@@ -1950,10 +1987,11 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
       stepIdToNodeId[step.id] = nodeId;
       const schema = getSchema(step.action, 'step');
 
+      const savedPos = savedPositions[nodeId];
       nodes.push({
         id: nodeId,
         type: 'step',
-        position: { x: 250, y },
+        position: savedPos ? { x: savedPos.x, y: savedPos.y } : { x, y: Y_CENTER },
         data: {
           label: schema?.label ?? step.action,
           action: step.action,
@@ -1962,7 +2000,7 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
           stepId: step.id, // Preserve the original step ID from YAML
         },
       });
-      y += 130;
+      x += 250; // horizontal spacing
     }
 
     if (triggerType && steps.length > 0) {
@@ -2159,7 +2197,11 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
     const existingTriggers = nodes.filter(n => n.type === 'trigger');
     const existingSteps = nodes.filter(n => n.type === 'step');
 
-    const yOffset = type === 'trigger' ? 50 : (existingTriggers.length > 0 ? 180 : 50) + existingSteps.length * 130;
+    // Horizontal layout: position nodes left to right
+    const Y_CENTER = 200;
+    const xOffset = type === 'trigger'
+      ? 50
+      : (existingTriggers.length > 0 ? 300 : 50) + existingSteps.length * 250;
 
     // Generate a meaningful default step ID based on the action
     const baseStepId = schema.id.split('.').pop() ?? schema.id;
@@ -2182,7 +2224,7 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
     const newNode: Node<StepData> = {
       id,
       type,
-      position: { x: 250, y: yOffset },
+      position: { x: xOffset, y: Y_CENTER },
       data: {
         label: schema.label,
         action: schema.id,
@@ -2337,6 +2379,15 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
       }
     }
 
+    // Add UI metadata for node positions (persists when workflow is saved)
+    if (nodes.length > 0) {
+      yaml += '\n# UI metadata (positions persist when you drag nodes)\n';
+      yaml += '_ui:\n  positions:\n';
+      for (const node of nodes) {
+        yaml += `    ${node.id}: { x: ${Math.round(node.position.x)}, y: ${Math.round(node.position.y)} }\n`;
+      }
+    }
+
     return yaml;
   }, [name, nodes, edges, memoryBlocks]);
 
@@ -2370,200 +2421,357 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
 
   const hasTrigger = nodes.some(n => n.type === 'trigger');
 
+  // Layout state
+  const [nodeLibraryCollapsed, setNodeLibraryCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<'canvas' | 'memory' | 'yaml'>('canvas');
+
+  // Legacy state kept for compatibility (no longer used directly)
+  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>('properties');
+
+  // Handle YAML changes from the editor
+  const handleYamlChange = useCallback((yaml: string) => {
+    try {
+      const { nodes: parsedNodes, edges: parsedEdges, name: parsedName, memory: parsedMemory } = parseYamlToGraph(yaml);
+      setNodes(parsedNodes);
+      setEdges(parsedEdges);
+      setName(parsedName);
+      setMemoryBlocks(parsedMemory);
+    } catch (err) {
+      console.error('Failed to parse YAML:', err);
+    }
+  }, [setNodes, setEdges]);
+
+  // Handle drag and drop from NodeLibrary
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const data = e.dataTransfer.getData('application/json');
+    if (!data) return;
+
+    try {
+      const { type, schema } = JSON.parse(data);
+      addNode(schema, type);
+    } catch {
+      // Invalid data
+    }
+  }, [addNode]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  // Handle workflow generated from AI
+  const handleWorkflowFromAI = useCallback((yaml: string) => {
+    handleYamlChange(yaml);
+  }, [handleYamlChange]);
+
   return (
-    <div style={{ display: 'flex', height: '100%', gap: '16px' }}>
-      {/* Left Panel - Canvas */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {onBack && (
-            <button className="btn btn-ghost" onClick={onBack} style={{ padding: '8px 12px' }}>
-              ← Back
-            </button>
-          )}
-          <input
-            type="text"
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ fontWeight: 600, fontSize: '16px', width: '200px' }}
-          />
-          <button className="btn btn-secondary" onClick={() => setShowAI(true)}>
-            ✨ Generate with AI
+    <div style={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
+      {/* Header with view mode tabs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center',
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border-color)',
+          background: 'var(--bg-secondary)',
+        }}
+      >
+        {onBack && (
+          <button className="btn btn-ghost" onClick={onBack} style={{ padding: '8px 12px' }}>
+            ← Back
           </button>
-          <div style={{ flex: 1 }} />
-          <button className="btn btn-ghost" onClick={() => setShowYaml(!showYaml)}>
-            {showYaml ? 'Hide' : 'Show'} YAML
-          </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Workflow'}
-          </button>
-        </div>
+        )}
+        <input
+          type="text"
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ fontWeight: 600, fontSize: '16px', width: '200px' }}
+        />
 
-        {/* Canvas */}
-        <div style={{ flex: 1, borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedNode(node as Node<StepData>)}
-            onPaneClick={() => setSelectedNode(null)}
-            nodeTypes={nodeTypes}
-            fitView
-            style={{ background: 'var(--bg-primary)' }}
+        {/* View mode tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '2px',
+          background: 'var(--bg-primary)',
+          padding: '4px',
+          borderRadius: '8px',
+          marginLeft: '16px',
+        }}>
+          <button
+            className={viewMode === 'canvas' ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setViewMode('canvas')}
+            style={{ padding: '6px 14px', fontSize: '13px' }}
           >
-            <Controls style={{ background: 'var(--bg-secondary)', borderRadius: '8px' }} />
-            <Background color="var(--border-color)" gap={20} />
-          </ReactFlow>
-
-          {/* Empty state */}
-          {nodes.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-            }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧵</div>
-              <div style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
-                Start building your workflow
-              </div>
-              <div style={{ fontSize: '14px', marginBottom: '24px' }}>
-                Add a trigger to start, then add actions
-              </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button className="btn btn-primary" onClick={() => setShowSelector('trigger')}>
-                  ⚡ Add Trigger
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowAI(true)}>
-                  ✨ Generate with AI
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Add buttons when canvas has content */}
-          {nodes.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              bottom: '16px',
-              left: '16px',
-              display: 'flex',
-              gap: '8px',
-              zIndex: 10,
-            }}>
-              {!hasTrigger && (
-                <button className="btn btn-secondary" onClick={() => setShowSelector('trigger')}>
-                  ⚡ Add Trigger
-                </button>
-              )}
-              <button className="btn btn-secondary" onClick={() => setShowSelector('step')}>
-                ➕ Add Action
-              </button>
-            </div>
-          )}
+            Canvas
+          </button>
+          <button
+            className={viewMode === 'memory' ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setViewMode('memory')}
+            style={{ padding: '6px 14px', fontSize: '13px' }}
+          >
+            Memory
+          </button>
+          <button
+            className={viewMode === 'yaml' ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setViewMode('yaml')}
+            style={{ padding: '6px 14px', fontSize: '13px' }}
+          >
+            YAML
+          </button>
         </div>
+
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Workflow'}
+        </button>
       </div>
 
-      {/* Right Panel - Properties / YAML */}
-      <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {showYaml ? (
-          <div className="card" style={{ flex: 1, overflow: 'auto' }}>
-            <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Generated YAML</h3>
-            <pre style={{
-              background: 'var(--bg-primary)',
-              padding: '12px',
-              borderRadius: '6px',
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono)',
-              whiteSpace: 'pre-wrap',
-              overflow: 'auto',
-            }}>
-              {generateYaml()}
-            </pre>
-          </div>
-        ) : (
-          <>
-            <MemoryEditor
-              blocks={memoryBlocks}
-              onAddBlock={addMemoryBlock}
-              onUpdateBlock={updateMemoryBlock}
-              onRemoveBlock={removeMemoryBlock}
-              onAddSource={addMemorySource}
-              onUpdateSource={updateMemorySource}
-              onRemoveSource={removeMemorySource}
-            />
-            {selectedNode ? (
-              <PropertyEditor
-                node={selectedNode}
-                schema={selectedNodeSchema}
-                onUpdate={(config) => updateNodeConfig(selectedNode.id, config)}
-                onUpdateStepId={(stepId) => updateNodeStepId(selectedNode.id, stepId)}
-                onDelete={() => deleteNode(selectedNode.id)}
+      {/* Main content area */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Left Panel - Node Library (collapsed by default) */}
+        {viewMode === 'canvas' && (
+          <NodeLibrary
+            actionSchemas={ACTION_SCHEMAS}
+            triggerSchemas={TRIGGER_SCHEMAS}
+            onSelectAction={(schema) => addNode(schema, 'step')}
+            onSelectTrigger={(schema) => addNode(schema, 'trigger')}
+            hasTrigger={hasTrigger}
+            collapsed={nodeLibraryCollapsed}
+            onToggleCollapsed={() => setNodeLibraryCollapsed(!nodeLibraryCollapsed)}
+          />
+        )}
+
+        {/* Center Panel - Content based on view mode */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {/* Canvas view */}
+          {viewMode === 'canvas' && (
+            <div style={{ flex: 1, position: 'relative' }} onDrop={handleDrop} onDragOver={handleDragOver}>
+              <ReactFlow
                 nodes={nodes}
                 edges={edges}
-                availableTools={availableTools}
-                memoryBlocks={memoryBlocks}
-              />
-            ) : (
-              <div className="card" style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '14px', marginBottom: '16px' }}>Getting Started</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={(_, node) => setSelectedNode(node as Node<StepData>)}
+                onPaneClick={() => setSelectedNode(null)}
+                nodeTypes={nodeTypes}
+                fitView
+                style={{ background: 'var(--bg-primary)' }}
+              >
+                <Controls style={{ background: 'var(--bg-secondary)', borderRadius: '8px' }} />
+                <Background color="var(--border-color)" gap={20} />
+              </ReactFlow>
+
+              {/* Empty state */}
+              {nodes.length === 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧵</div>
+                  <div style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
+                    Start building your workflow
+                  </div>
+                  <div style={{ fontSize: '14px', marginBottom: '8px' }}>
+                    Expand the node library on the left or use the AI assistant
+                  </div>
+                </div>
+              )}
+
+              {/* Add buttons when canvas has content */}
+              {nodes.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '16px',
+                    left: '16px',
+                    display: 'flex',
+                    gap: '8px',
+                    zIndex: 10,
+                  }}
+                >
                   {!hasTrigger && (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setShowSelector('trigger')}
-                      style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-                    >
-                      <span style={{ marginRight: '10px' }}>⚡</span>
-                      <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontWeight: 500 }}>Add a Trigger</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Start your workflow</div>
-                      </div>
+                    <button className="btn btn-secondary" onClick={() => setShowSelector('trigger')}>
+                      ⚡ Add Trigger
                     </button>
                   )}
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setShowSelector('step')}
-                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-                  >
-                    <span style={{ marginRight: '10px' }}>➕</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 500 }}>Add an Action</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HTTP, Slack, AI, etc.</div>
-                    </div>
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => setShowAI(true)}
-                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
-                  >
-                    <span style={{ marginRight: '10px' }}>✨</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 500 }}>Generate with AI</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Describe what you want</div>
-                    </div>
+                  <button className="btn btn-secondary" onClick={() => setShowSelector('step')}>
+                    ➕ Add Action
                   </button>
                 </div>
+              )}
 
-                {nodes.length > 0 && (
-                  <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                      Click on a node to edit its properties
+              {/* Bottom properties drawer when node selected */}
+              {selectedNode && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    maxHeight: '40%',
+                    background: 'var(--bg-secondary)',
+                    borderTop: '1px solid var(--border-color)',
+                    overflow: 'auto',
+                    zIndex: 20,
+                    boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 12px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px' }}>{selectedNode.data.icon}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600 }}>{selectedNode.data.label}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedNode.data.action}</span>
+                    </div>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setSelectedNode(null)}
+                      style={{ padding: '2px 8px', fontSize: '14px' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div style={{ padding: '10px 12px' }}>
+                    <PropertyEditor
+                      node={selectedNode}
+                      schema={selectedNodeSchema}
+                      onUpdate={(config) => updateNodeConfig(selectedNode.id, config)}
+                      onUpdateStepId={(stepId) => updateNodeStepId(selectedNode.id, stepId)}
+                      onDelete={() => deleteNode(selectedNode.id)}
+                      nodes={nodes}
+                      edges={edges}
+                      availableTools={availableTools}
+                      memoryBlocks={memoryBlocks}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Memory view */}
+          {viewMode === 'memory' && (
+            <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+              {/* Memory Block Documentation */}
+              <div style={{
+                padding: '16px',
+                background: 'var(--bg-tertiary)',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                border: '1px solid var(--border-color)',
+              }}>
+                <h3 style={{ marginBottom: '8px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📚</span> Memory Blocks
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
+                  Memory blocks let you assemble context from multiple sources (files, URLs, search results,
+                  previous step outputs) and inject them into AI agent prompts.
+                </p>
+
+                <details style={{ fontSize: '13px' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--accent-purple)' }}>
+                    How to use memory blocks
+                  </summary>
+                  <div style={{ padding: '12px 0', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                      <li style={{ marginBottom: '8px' }}><strong>Create a block</strong> — Give it an ID like "project-docs"</li>
+                      <li style={{ marginBottom: '8px' }}><strong>Add sources</strong> — Files, URLs, text, web search, or step outputs</li>
+                      <li style={{ marginBottom: '8px' }}><strong>Reference in prompts</strong> — Use <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--accent-purple)' }}>{'{{ memory.blocks.project-docs }}'}</code></li>
+                      <li><strong>Or attach to AI agent</strong> — Select the block in the agent's "Memory" field</li>
+                    </ol>
+
+                    <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '6px' }}>
+                      <strong style={{ display: 'block', marginBottom: '8px' }}>Source Types:</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: '12px' }}>
+                        <span>📝 Text</span><span style={{ color: 'var(--text-muted)' }}>Inline text or instructions you write directly</span>
+                        <span>📄 File</span><span style={{ color: 'var(--text-muted)' }}>Contents of a local file</span>
+                        <span>🌐 URL</span><span style={{ color: 'var(--text-muted)' }}>Fetch and extract content from a web page</span>
+                        <span>🔍 Web Search</span><span style={{ color: 'var(--text-muted)' }}>Search the web and include top results</span>
+                        <span>⚡ Step Output</span><span style={{ color: 'var(--text-muted)' }}>Output from a previous workflow step</span>
+                        <span>🎯 Trigger Data</span><span style={{ color: 'var(--text-muted)' }}>Data from the workflow trigger</span>
+                      </div>
                     </div>
                   </div>
-                )}
+                </details>
               </div>
-            )}
-          </>
-        )}
+
+              <MemoryBlockEditor
+                blocks={memoryBlocks}
+                onAddBlock={addMemoryBlock}
+                onUpdateBlock={updateMemoryBlock}
+                onRemoveBlock={removeMemoryBlock}
+                onAddSource={addMemorySource}
+                onUpdateSource={updateMemorySource}
+                onRemoveSource={removeMemorySource}
+              />
+            </div>
+          )}
+
+          {/* YAML view */}
+          {viewMode === 'yaml' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <YAMLEditor
+                value={generateYaml()}
+                onChange={handleYamlChange}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel - AI Chat (always visible) */}
+        <div
+          style={{
+            width: '360px',
+            borderLeft: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--bg-secondary)',
+          }}
+        >
+          <div style={{
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--border-color)',
+            fontWeight: 600,
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <span>✨</span> AI Assistant
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <AIChatPanel
+              messages={chatMessages}
+              setMessages={setChatMessages}
+              sessionId={chatSessionId}
+              setSessionId={setChatSessionId}
+              onWorkflowGenerated={handleWorkflowFromAI}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Node Selector Modal */}
+      {/* Node Selector Modal (for buttons, not drag) */}
       {showSelector && (
         <NodeSelector
           type={showSelector}
@@ -2572,18 +2780,12 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
         />
       )}
 
-      {/* AI Chat - Modal (before generation) or Sidebar (after generation) */}
-      {(showAI || hasGeneratedWorkflow) && (
+      {/* AI Chat Modal (for initial generation before any workflow exists) */}
+      {showAI && (
         <AIChat
-          onClose={() => {
-            setShowAI(false);
-            if (hasGeneratedWorkflow) {
-              // Don't clear chat history when closing sidebar, just hide it
-              setHasGeneratedWorkflow(false);
-            }
-          }}
+          onClose={() => setShowAI(false)}
           onGenerateWorkflow={handleAIGenerateWorkflow}
-          mode={hasGeneratedWorkflow ? 'sidebar' : 'modal'}
+          mode="modal"
           initialMessages={chatMessages}
           initialSessionId={chatSessionId}
         />

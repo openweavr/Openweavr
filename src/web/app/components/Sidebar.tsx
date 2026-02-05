@@ -5,6 +5,8 @@ type Page = 'dashboard' | 'workflows' | 'runs' | 'builder' | 'plugins' | 'logs' 
 interface SidebarProps {
   currentPage: string;
   onNavigate: (page: Page, workflowName?: string) => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 const navItems = [
@@ -17,8 +19,79 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ] as const;
 
-export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const { connected } = useWebSocket();
+
+  if (collapsed) {
+    return (
+      <aside
+        className="sidebar"
+        style={{
+          width: '56px',
+          minWidth: '56px',
+          padding: '12px 8px',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          {/* Expand button */}
+          <button
+            onClick={onToggleCollapsed}
+            style={{
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              marginBottom: '8px',
+            }}
+            title="Expand sidebar"
+          >
+            <span style={{ fontSize: '16px' }}>→</span>
+          </button>
+
+          {/* Icon-only nav items */}
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id as typeof currentPage)}
+              style={{
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: currentPage === item.id ? 'var(--bg-hover)' : 'transparent',
+                border: currentPage === item.id ? '1px solid var(--accent-purple)' : '1px solid transparent',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '18px',
+              }}
+              title={item.label}
+            >
+              {item.icon}
+            </button>
+          ))}
+        </div>
+
+        {/* Status dot at bottom */}
+        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', paddingTop: '12px' }}>
+          <span
+            style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: connected ? 'var(--accent-green)' : 'var(--accent-red)',
+            }}
+            title={connected ? 'Gateway connected' : 'Disconnected'}
+          />
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="sidebar">
@@ -45,6 +118,22 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           </svg>
           <span>Openweavr</span>
         </div>
+        {onToggleCollapsed && (
+          <button
+            onClick={onToggleCollapsed}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              color: 'var(--text-muted)',
+              fontSize: '14px',
+            }}
+            title="Collapse sidebar"
+          >
+            ←
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav">

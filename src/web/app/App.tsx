@@ -17,6 +17,7 @@ export function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<string | null>(null);
   const [runsWorkflowFilter, setRunsWorkflowFilter] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     // Check if user has completed onboarding
@@ -41,6 +42,8 @@ export function App() {
     if (page === 'builder') {
       setEditingWorkflow(workflowName ?? null);
       setRunsWorkflowFilter(null);
+      // Auto-collapse sidebar when entering builder for more canvas space
+      setSidebarCollapsed(true);
     } else if (page === 'runs') {
       setEditingWorkflow(null);
       setRunsWorkflowFilter(workflowName ?? null);
@@ -98,7 +101,12 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       <main className="main-content">
         {renderPage()}
       </main>
