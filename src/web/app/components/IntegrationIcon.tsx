@@ -98,6 +98,25 @@ const brandColors: Record<string, string> = {
   google: '#4285F4',
   'amazon-bedrock': '#FF9900',
   'azure-openai': '#0078D4',
+
+  // Workflow actions (light colors for dark theme)
+  ai: '#a78bfa',
+  brain: '#c084fc',
+  http: '#60a5fa',
+  cron: '#fbbf24',
+  email: '#f472b6',
+  json: '#34d399',
+  imessage: '#60a5fa',
+  file: '#94a3b8',
+  'file-write': '#94a3b8',
+  folder: '#fbbf24',
+  trash: '#f87171',
+  terminal: '#4ade80',
+  script: '#a78bfa',
+  notification: '#fbbf24',
+  clipboard: '#94a3b8',
+  webhook: '#60a5fa',
+  transform: '#c084fc',
 };
 
 export function IntegrationIcon({ name, size = 24, color, style }: IntegrationIconProps) {
