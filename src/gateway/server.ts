@@ -2738,8 +2738,10 @@ When the user approves the plan and you generate the final YAML, include the com
               }
 
             } else if (aiConfig.provider === 'ollama') {
-              // Ollama with tool calling support
+              // Ollama - try with tools first, fall back to simple chat if model doesn't support it
               const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+
+              // First try with tools
               response = await fetch(`${ollamaUrl}/api/chat`, {
                 method: 'POST',
                 headers: {
@@ -2773,26 +2775,30 @@ When the user approves the plan and you generate the final YAML, include the com
               responseData = await response.json() as Record<string, unknown>;
               const ollamaMessage = responseData.message as { content?: string; tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }> } | undefined;
 
-              if (ollamaMessage?.content) {
-                fullResponse += ollamaMessage.content;
-                send({ type: 'delta', content: ollamaMessage.content });
-              }
-
+              // Check if model properly used tool_calls (not just outputting JSON in content)
               if (ollamaMessage?.tool_calls && ollamaMessage.tool_calls.length > 0) {
+                // Model supports tool calling properly
                 for (const toolCall of ollamaMessage.tool_calls) {
                   const toolName = toolCall.function.name;
-                  // Ollama returns arguments as object, not string
-                  const toolInput = typeof toolCall.function.arguments === 'string'
+                  let toolInput = typeof toolCall.function.arguments === 'string'
                     ? JSON.parse(toolCall.function.arguments) as Record<string, unknown>
                     : toolCall.function.arguments as Record<string, unknown>;
 
+                  // Ollama sometimes returns nested format: {param: {type, description, value}}
+                  const extractedInput: Record<string, unknown> = {};
+                  for (const [key, val] of Object.entries(toolInput)) {
+                    if (val && typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+                      extractedInput[key] = (val as Record<string, unknown>).value;
+                    } else {
+                      extractedInput[key] = val;
+                    }
+                  }
+                  toolInput = extractedInput;
+
                   send({ type: 'tool_start', toolName });
-
                   const toolResult = await executeTool(toolName, toolInput);
-
                   send({ type: 'tool_end', toolName, result: toolResult.slice(0, 200) + '...' });
 
-                  // Add tool result to persistent storage and local apiMessages
                   scheduler.store.addChatMessage({
                     sessionId: sessionId!,
                     role: 'tool',
@@ -2806,6 +2812,42 @@ When the user approves the plan and you generate the final YAML, include the com
                   });
                 }
                 continueLoop = true;
+              } else if (ollamaMessage?.content) {
+                // Model responded with content (either no tools needed, or model doesn't support tool calling)
+                // Check if it tried to output tool JSON in content (sign of poor tool support)
+                const content = ollamaMessage.content;
+                const looksLikeToolJson = /^\s*```?\s*\{?\s*"name"/.test(content) ||
+                                          /^\s*\{?\s*"name"\s*:/.test(content);
+
+                if (looksLikeToolJson && iteration === 1) {
+                  // Model doesn't properly support tools - retry without tools
+                  send({ type: 'delta', content: '[Using simple mode - your model may not fully support tool calling]\n\n' });
+
+                  const retryResponse = await fetch(`${ollamaUrl}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      model: aiConfig.model ?? 'llama3.2',
+                      messages: [
+                        { role: 'system', content: systemPrompt + '\n\nNote: Respond directly without using any tools or JSON formatting.' },
+                        ...apiMessages,
+                      ],
+                      stream: false,
+                    }),
+                  });
+
+                  if (retryResponse.ok) {
+                    const retryData = await retryResponse.json() as Record<string, unknown>;
+                    const retryMessage = (retryData.message as { content?: string })?.content ?? '';
+                    fullResponse += retryMessage;
+                    send({ type: 'delta', content: retryMessage });
+                  }
+                  continueLoop = false;
+                } else {
+                  fullResponse += content;
+                  send({ type: 'delta', content });
+                  continueLoop = false;
+                }
               } else {
                 continueLoop = false;
               }
@@ -3111,6 +3153,31 @@ steps:
           const { trackUsage } = await import('../plugins/builtin/ai/index.js');
           trackUsage(data.usage.prompt_tokens ?? 0, data.usage.completion_tokens ?? 0);
         }
+      } else if (aiConfig.provider === 'ollama') {
+        // Ollama for workflow generation
+        const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+        const response = await fetch(`${ollamaUrl}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: aiConfig.model ?? 'llama3.2',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: 'Generate the final workflow YAML based on our conversation.' },
+            ],
+            stream: false,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.text().catch(() => '');
+          return c.json({ error: `Ollama API error: ${err || response.statusText}` }, 500);
+        }
+
+        const data = await response.json() as { message?: { content?: string } };
+        yamlContent = data.message?.content ?? '';
       } else {
         return c.json({ error: 'Unsupported AI provider for workflow generation' }, 400);
       }
