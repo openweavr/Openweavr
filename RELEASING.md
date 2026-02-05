@@ -4,7 +4,6 @@ This document describes the release process for Weavr.
 
 ## Prerequisites
 
-- You must be logged in to npm: `npm login`
 - You must have push access to the GitHub repository
 - All tests must pass: `npm test`
 
@@ -31,6 +30,7 @@ Use `npm version` to bump the version. This will:
 - Create a git commit with the version
 - Create a git tag
 - Push to GitHub (via postversion hook)
+- **CI will automatically publish to npm**
 
 ```bash
 # For a patch release (0.1.3 -> 0.1.4)
@@ -46,15 +46,7 @@ npm version major
 npm version 1.2.3
 ```
 
-### 3. Publish to npm
-
-```bash
-npm publish
-```
-
-This will:
-- Run `prepublishOnly` hook (build + test)
-- Publish to npm registry
+That's it! The GitHub CI workflow will handle building and publishing to npm.
 
 ## Version Hooks
 
@@ -64,16 +56,8 @@ The following npm scripts run automatically during versioning:
 |------|--------|-------------|
 | `version` | `git add -A` | Stages all changes before commit |
 | `postversion` | `git push && git push --tags` | Pushes commit and tag to GitHub |
-| `prepublishOnly` | `npm run build && npm run test:run` | Builds and tests before publish |
 
 ## Troubleshooting
-
-### "need auth" error when publishing
-
-```bash
-npm login
-# Enter your npm credentials
-```
 
 ### Version already exists
 
@@ -88,15 +72,6 @@ git push origin :refs/tags/v0.1.4
 
 # Try again
 npm version patch
-```
-
-### Build fails during publish
-
-Fix the issue, then:
-
-```bash
-# The version was already bumped, so just publish
-npm publish
 ```
 
 ## Changelog
