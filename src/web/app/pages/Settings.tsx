@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { IntegrationIcon } from '../components/IntegrationIcon';
 
 // Models that support OAuth (ChatGPT backend API via Codex)
 const OAUTH_SUPPORTED_MODELS = ['gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5.2', 'gpt-5.1', 'gpt-5-codex'];
@@ -946,7 +947,7 @@ export function Settings() {
               {/* Telegram */}
               <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '24px' }}>📱</span>
+                  <IntegrationIcon name="telegram" size={24} />
                   <div>
                     <div style={{ fontWeight: 600 }}>Telegram</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -995,7 +996,7 @@ export function Settings() {
               {/* WhatsApp */}
               <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '24px' }}>💬</span>
+                  <IntegrationIcon name="whatsapp" size={24} />
                   <div>
                     <div style={{ fontWeight: 600 }}>WhatsApp</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -1085,7 +1086,7 @@ export function Settings() {
               {/* iMessage */}
               <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '24px' }}>💭</span>
+                  <IntegrationIcon name="imessage" size={24} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>iMessage</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -1117,16 +1118,16 @@ export function Settings() {
 
             <div style={{ display: 'grid', gap: '12px' }}>
               {[
-                { name: 'http', version: '1.0.0', icon: '🌐', description: 'HTTP requests and webhooks' },
-                { name: 'cron', version: '1.0.0', icon: '⏰', description: 'Scheduled triggers' },
-                { name: 'github', version: '1.0.0', icon: '🐙', description: 'GitHub integration' },
-                { name: 'slack', version: '1.0.0', icon: '💬', description: 'Slack messaging' },
-                { name: 'discord', version: '1.0.0', icon: '🎮', description: 'Discord webhooks' },
-                { name: 'linear', version: '1.0.0', icon: '📐', description: 'Linear project management' },
-                { name: 'notion', version: '1.0.0', icon: '📝', description: 'Notion pages & databases' },
-                { name: 'email', version: '1.0.0', icon: '📧', description: 'Email via SMTP' },
-                { name: 'ai', version: '1.0.0', icon: '🤖', description: 'AI/LLM actions' },
-                { name: 'json', version: '1.0.0', icon: '{ }', description: 'JSON manipulation' },
+                { name: 'http', version: '1.0.0', description: 'HTTP requests and webhooks' },
+                { name: 'cron', version: '1.0.0', description: 'Scheduled triggers' },
+                { name: 'github', version: '1.0.0', description: 'GitHub integration' },
+                { name: 'slack', version: '1.0.0', description: 'Slack messaging' },
+                { name: 'discord', version: '1.0.0', description: 'Discord webhooks' },
+                { name: 'linear', version: '1.0.0', description: 'Linear project management' },
+                { name: 'notion', version: '1.0.0', description: 'Notion pages & databases' },
+                { name: 'email', version: '1.0.0', description: 'Email via SMTP' },
+                { name: 'ai', version: '1.0.0', description: 'AI/LLM actions' },
+                { name: 'json', version: '1.0.0', description: 'JSON manipulation' },
               ].map((plugin) => (
                 <div
                   key={plugin.name}
@@ -1139,7 +1140,7 @@ export function Settings() {
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <span style={{ fontSize: '20px' }}>{plugin.icon}</span>
+                  <IntegrationIcon name={plugin.name} size={20} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500 }}>
                       {plugin.name}
