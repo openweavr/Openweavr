@@ -2737,6 +2737,79 @@ When the user approves the plan and you generate the final YAML, include the com
                 continueLoop = false;
               }
 
+            } else if (aiConfig.provider === 'ollama') {
+              // Ollama with tool calling support
+              const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+              response = await fetch(`${ollamaUrl}/api/chat`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: aiConfig.model ?? 'llama3.2',
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    ...apiMessages,
+                  ],
+                  tools: chatTools.map(t => ({
+                    type: 'function',
+                    function: {
+                      name: t.name,
+                      description: t.description,
+                      parameters: t.input_schema,
+                    },
+                  })),
+                  stream: false,
+                }),
+              });
+
+              if (!response.ok) {
+                const err = await response.text().catch(() => '');
+                send({ type: 'error', error: `Ollama API error: ${err || response.statusText}` });
+                controller.close();
+                return;
+              }
+
+              responseData = await response.json() as Record<string, unknown>;
+              const ollamaMessage = responseData.message as { content?: string; tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }> } | undefined;
+
+              if (ollamaMessage?.content) {
+                fullResponse += ollamaMessage.content;
+                send({ type: 'delta', content: ollamaMessage.content });
+              }
+
+              if (ollamaMessage?.tool_calls && ollamaMessage.tool_calls.length > 0) {
+                for (const toolCall of ollamaMessage.tool_calls) {
+                  const toolName = toolCall.function.name;
+                  // Ollama returns arguments as object, not string
+                  const toolInput = typeof toolCall.function.arguments === 'string'
+                    ? JSON.parse(toolCall.function.arguments) as Record<string, unknown>
+                    : toolCall.function.arguments as Record<string, unknown>;
+
+                  send({ type: 'tool_start', toolName });
+
+                  const toolResult = await executeTool(toolName, toolInput);
+
+                  send({ type: 'tool_end', toolName, result: toolResult.slice(0, 200) + '...' });
+
+                  // Add tool result to persistent storage and local apiMessages
+                  scheduler.store.addChatMessage({
+                    sessionId: sessionId!,
+                    role: 'tool',
+                    content: toolResult,
+                    toolName,
+                    timestamp: Date.now(),
+                  });
+                  apiMessages.push({
+                    role: 'user',
+                    content: `[Tool Result: ${toolName}]\n${toolResult}`,
+                  });
+                }
+                continueLoop = true;
+              } else {
+                continueLoop = false;
+              }
+
             } else {
               const providerName = aiConfig.provider || 'unknown';
               send({ type: 'error', error: `Provider "${providerName}" does not support tool use for agentic chat. Please use OpenAI or Anthropic.` });
