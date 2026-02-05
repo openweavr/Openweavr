@@ -243,6 +243,48 @@
         text-align: left;
       }
 
+      .install-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 0;
+      }
+
+      .install-tab {
+        padding: 10px 20px;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .install-tab:hover {
+        color: var(--text-primary);
+        background: var(--bg-card);
+      }
+
+      .install-tab.active {
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border-color: var(--border-color);
+      }
+
+      .install-content {
+        display: none;
+      }
+
+      .install-content.active {
+        display: block;
+      }
+
+      .install-content .code-block {
+        border-top-left-radius: 0;
+      }
+
       .code-block {
         background: var(--bg-card);
         border: 1px solid var(--border-color);
@@ -709,16 +751,51 @@
 
       <!-- Install Block -->
       <div class="install-block fade-in delay-3">
-        <div class="code-block">
-          <div class="code-header">
-            <div class="code-dot red"></div>
-            <div class="code-dot yellow"></div>
-            <div class="code-dot green"></div>
-            <span style="color: var(--text-muted); font-size: 12px; margin-left: 12px;">Install in 60 seconds</span>
-            <button class="copy-btn" onclick="copyInstallCommand(this)">Copy</button>
-          </div>
-          <pre><code id="install-command">curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
+        <div class="install-tabs">
+          <button class="install-tab active" onclick="switchInstallTab('curl')">curl</button>
+          <button class="install-tab" onclick="switchInstallTab('npm')">npm</button>
+          <button class="install-tab" onclick="switchInstallTab('brew')">Homebrew</button>
         </div>
+
+        <div class="install-content active" id="install-curl">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+              <span style="color: var(--text-muted); font-size: 12px; margin-left: 12px;">Recommended</span>
+              <button class="copy-btn" onclick="copyInstallCommand(this, 'curl-command')">Copy</button>
+            </div>
+            <pre><code id="curl-command">curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
+          </div>
+        </div>
+
+        <div class="install-content" id="install-npm">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+              <span style="color: var(--text-muted); font-size: 12px; margin-left: 12px;">Requires Node.js 22+</span>
+              <button class="copy-btn" onclick="copyInstallCommand(this, 'npm-command')">Copy</button>
+            </div>
+            <pre><code id="npm-command">npm install -g @openweavr/weavr</code></pre>
+          </div>
+        </div>
+
+        <div class="install-content" id="install-brew">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+              <span style="color: var(--text-muted); font-size: 12px; margin-left: 12px;">macOS only</span>
+              <button class="copy-btn" onclick="copyInstallCommand(this, 'brew-command')">Copy</button>
+            </div>
+            <pre><code id="brew-command">brew tap openweavr/tap && brew install weavr</code></pre>
+          </div>
+        </div>
+
         <p class="install-note">Works on macOS, Linux, and WSL. No Docker required.</p>
         <div class="requirements">
           <span>&#x1F4BB; macOS 12+ / Ubuntu 20+</span>
@@ -999,8 +1076,18 @@
     </footer>
 
     <script>
-      function copyInstallCommand(btn) {
-        const command = document.getElementById('install-command').textContent;
+      function switchInstallTab(tab) {
+        // Update tab buttons
+        document.querySelectorAll('.install-tab').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.install-tab[onclick*="${tab}"]`).classList.add('active');
+
+        // Update content
+        document.querySelectorAll('.install-content').forEach(content => content.classList.remove('active'));
+        document.getElementById(`install-${tab}`).classList.add('active');
+      }
+
+      function copyInstallCommand(btn, commandId) {
+        const command = document.getElementById(commandId).textContent;
         navigator.clipboard.writeText(command).then(() => {
           btn.textContent = 'Copied!';
           btn.style.background = 'rgba(34, 197, 94, 0.2)';

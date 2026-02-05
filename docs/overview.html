@@ -64,8 +64,10 @@
           <!-- Tabs -->
           <div class="install-tabs fade" style="--delay: 0.1s;">
             <div class="tab-buttons">
-              <button class="tab-btn active" data-tab="script">One-liner Install</button>
-              <button class="tab-btn" data-tab="manual">Manual (Git Clone)</button>
+              <button class="tab-btn active" data-tab="script">curl</button>
+              <button class="tab-btn" data-tab="npm">npm</button>
+              <button class="tab-btn" data-tab="brew">Homebrew</button>
+              <button class="tab-btn" data-tab="manual">Manual</button>
             </div>
 
             <div class="tab-content active" id="tab-script">
@@ -83,6 +85,32 @@ curl -fsSL https://openweavr.ai/install.sh | bash</code></pre>
               <p style="margin-top: 16px; color: var(--muted); font-size: 14px;">
                 This script installs Node.js if needed, clones the repo, builds everything, and adds <span class="inline-code">weavr</span> to your PATH.
               </p>
+            </div>
+
+            <div class="tab-content" id="tab-npm">
+              <div class="code-block" style="margin-top: 0; border-top-left-radius: 0;">
+                <div class="code-header">
+                  <div class="code-dot red"></div>
+                  <div class="code-dot yellow"></div>
+                  <div class="code-dot green"></div>
+                  <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">Requires Node.js 22+</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'npm-cmd')">Copy</button>
+                </div>
+                <pre><code id="npm-cmd">npm install -g @openweavr/weavr</code></pre>
+              </div>
+            </div>
+
+            <div class="tab-content" id="tab-brew">
+              <div class="code-block" style="margin-top: 0; border-top-left-radius: 0;">
+                <div class="code-header">
+                  <div class="code-dot red"></div>
+                  <div class="code-dot yellow"></div>
+                  <div class="code-dot green"></div>
+                  <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">macOS only</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'brew-cmd')">Copy</button>
+                </div>
+                <pre><code id="brew-cmd">brew tap openweavr/tap && brew install weavr</code></pre>
+              </div>
             </div>
 
             <div class="tab-content" id="tab-manual">
