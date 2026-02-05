@@ -21,6 +21,7 @@ INSTALL_DIR="${WEAVR_INSTALL_DIR:-$HOME/.weavr}"
 BIN_DIR="${WEAVR_BIN_DIR:-$HOME/.local/bin}"
 MIN_NODE_VERSION=22
 BRANCH="${WEAVR_BRANCH:-main}"
+TRACK_URL="https://openweavr.ai/api/track-install"
 
 # Colors
 RED='\033[0;31m'
@@ -94,6 +95,19 @@ detect_arch() {
     *)             arch="unknown" ;;
   esac
   echo "$arch"
+}
+
+# Track installation (non-blocking, silent failure)
+track_install() {
+  local os="$1"
+  local arch="$2"
+  local version="$3"
+
+  # Send tracking ping in background, ignore errors
+  (curl -fsSL -X POST "$TRACK_URL" \
+    -H "Content-Type: application/json" \
+    -d "{\"os\":\"$os\",\"arch\":\"$arch\",\"version\":\"$version\"}" \
+    --max-time 5 >/dev/null 2>&1 || true) &
 }
 
 # Check if command exists
@@ -283,12 +297,17 @@ EOF
 
 main() {
   local modify_path=true
+  local track=true
 
   # Parse arguments
   while [ $# -gt 0 ]; do
     case "$1" in
       --no-modify-path)
         modify_path=false
+        shift
+        ;;
+      --no-track)
+        track=false
         shift
         ;;
       --branch)
@@ -302,6 +321,7 @@ main() {
         echo ""
         echo "Options:"
         echo "  --no-modify-path    Don't add weavr to PATH"
+        echo "  --no-track          Don't send anonymous install analytics"
         echo "  --branch BRANCH     Install from a specific branch (default: main)"
         echo "  --help              Show this help message"
         echo ""
@@ -411,10 +431,15 @@ main() {
 
   # Verify installation by running weavr
   info "Verifying installation..."
+  local version="unknown"
   if "$BIN_DIR/weavr" --version >/dev/null 2>&1; then
-    local version
     version=$("$BIN_DIR/weavr" --version 2>/dev/null || echo "unknown")
     success "weavr $version is ready!"
+
+    # Track successful installation (anonymous, non-blocking)
+    if [ "$track" = true ]; then
+      track_install "$os" "$arch" "$version"
+    fi
   else
     warn "Installation completed but weavr command verification failed"
     warn "Try running: $BIN_DIR/weavr --version"
