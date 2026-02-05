@@ -1,6 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import type { Workflow, Step, WorkflowRun, StepResult, ActionContext } from '../types/index.js';
+import { readFileSync } from 'node:fs';
+import type {
+  ActionContext,
+  MemoryBlock,
+  MemoryContext,
+  MemorySource,
+  Step,
+  StepResult,
+  WeavrConfig,
+  Workflow,
+  WorkflowRun,
+} from '../types/index.js';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
+import { loadConfig } from '../config/index.js';
 
 // Import AI tracking context functions
 let setTrackingContext: ((ctx: { model?: string; workflowName?: string; runId?: string }) => void) | null = null;
@@ -26,6 +38,8 @@ export interface ExecutorOptions {
 
 export class WorkflowExecutor {
   private runs = new Map<string, WorkflowRun>();
+  private memoryCaches = new Map<string, Map<string, string>>();
+  private cachedConfig: { value: WeavrConfig; loadedAt: number } | null = null;
 
   constructor(private options: ExecutorOptions) {}
 
@@ -42,6 +56,7 @@ export class WorkflowExecutor {
     };
 
     this.runs.set(runId, run);
+    this.memoryCaches.set(runId, new Map());
 
     // Set AI tracking context for token usage
     if (setTrackingContext) {
@@ -74,6 +89,7 @@ export class WorkflowExecutor {
       if (clearTrackingContext) {
         clearTrackingContext();
       }
+      this.memoryCaches.delete(runId);
     }
 
     this.options.onRunComplete?.(run);
@@ -144,12 +160,13 @@ export class WorkflowExecutor {
 
       if (!action) {
         // Check if it's a built-in action
-        const output = await this.executeBuiltinAction(step, run, workflow);
+        const interpolationCtx = await this.buildInterpolationContext(run, workflow);
+        const output = await this.executeBuiltinAction(step, run, workflow, interpolationCtx);
         stepResult.output = output;
         stepResult.status = 'completed';
       } else {
-        // Build interpolation context with built-in variables
-        const interpolationCtx = this.buildInterpolationContext(run, workflow);
+        const interpolationCtx = await this.buildInterpolationContext(run, workflow);
+        const memory = (interpolationCtx as { memory?: MemoryContext }).memory ?? { blocks: {}, sources: {} };
 
         // Interpolate config values
         const interpolatedConfig = this.interpolateConfig(
@@ -166,6 +183,7 @@ export class WorkflowExecutor {
           trigger: run.triggerData,
           steps: this.getStepOutputs(run),
           env: workflow.env ?? {},
+          memory,
           log: (message: string) => {
             console.log(`[${workflow.name}:${step.id}] ${message}`);
             // Also send to run history via callback
@@ -196,8 +214,8 @@ export class WorkflowExecutor {
     }
   }
 
-  // Build interpolation context with built-in variables
-  private buildInterpolationContext(run: WorkflowRun, workflow: Workflow): Record<string, unknown> {
+  // Build base interpolation context (memory is injected separately)
+  private buildBaseInterpolationContext(run: WorkflowRun, workflow: Workflow): Record<string, unknown> {
     const now = new Date();
     return {
       trigger: run.triggerData,
@@ -211,13 +229,75 @@ export class WorkflowExecutor {
     };
   }
 
+  private async buildInterpolationContext(run: WorkflowRun, workflow: Workflow): Promise<Record<string, unknown>> {
+    const baseContext = this.buildBaseInterpolationContext(run, workflow);
+    const memory = await this.buildMemoryContext(run, workflow, baseContext);
+    return { ...baseContext, memory };
+  }
+
+  private async buildMemoryContext(
+    run: WorkflowRun,
+    workflow: Workflow,
+    baseContext: Record<string, unknown>
+  ): Promise<MemoryContext> {
+    const blocks = workflow.memory ?? [];
+    if (blocks.length === 0) {
+      return { blocks: {}, sources: {} };
+    }
+
+    const memoryCache = this.getMemoryCache(run.id);
+    const memoryContext: MemoryContext = {
+      blocks: {},
+      sources: {},
+    };
+
+    for (const block of blocks) {
+      const sourceValues: Record<string, string> = {};
+      const sourceOutputs: string[] = [];
+
+      for (let i = 0; i < block.sources.length; i++) {
+        const source = block.sources[i];
+        const sourceId = source.id ?? `source_${i + 1}`;
+        const cacheKey = `${block.id}:${sourceId}`;
+        const value = await this.resolveMemorySource(block, source, baseContext, memoryCache, cacheKey, run.id);
+        sourceValues[sourceId] = value;
+
+        if (source.label) {
+          sourceOutputs.push(`## ${source.label}\n${value}`);
+        } else {
+          sourceOutputs.push(value);
+        }
+      }
+
+      memoryContext.sources[block.id] = sourceValues;
+
+      let blockText = block.template
+        ? this.interpolate(block.template, { ...baseContext, sources: sourceValues })
+        : sourceOutputs.join(block.separator ?? '\n\n');
+
+      if (block.dedupe) {
+        blockText = this.dedupeLines(blockText);
+      }
+
+      if (block.maxChars && blockText.length > block.maxChars) {
+        blockText = `${blockText.slice(0, block.maxChars)}…`;
+      }
+
+      memoryContext.blocks[block.id] = blockText;
+    }
+
+    run.memory = memoryContext;
+    return memoryContext;
+  }
+
   private async executeBuiltinAction(
     step: Step,
-    run: WorkflowRun,
-    workflow: Workflow
+    _run: WorkflowRun,
+    workflow: Workflow,
+    context: Record<string, unknown>
   ): Promise<unknown> {
     const config = step.config ?? {};
-    const ctx = this.buildInterpolationContext(run, workflow);
+    const ctx = context;
 
     switch (step.action) {
       case 'transform': {
@@ -257,6 +337,279 @@ export class WorkflowExecutor {
       }
     }
     return outputs;
+  }
+
+  private getMemoryCache(runId: string): Map<string, string> {
+    let cache = this.memoryCaches.get(runId);
+    if (!cache) {
+      cache = new Map<string, string>();
+      this.memoryCaches.set(runId, cache);
+    }
+    return cache;
+  }
+
+  private async getConfig(): Promise<WeavrConfig> {
+    const now = Date.now();
+    if (this.cachedConfig && now - this.cachedConfig.loadedAt < 30000) {
+      return this.cachedConfig.value;
+    }
+    const config = await loadConfig();
+    this.cachedConfig = { value: config, loadedAt: now };
+    return config;
+  }
+
+  private async resolveMemorySource(
+    block: MemoryBlock,
+    source: MemorySource,
+    baseContext: Record<string, unknown>,
+    cache: Map<string, string>,
+    cacheKey: string,
+    runId: string
+  ): Promise<string> {
+    const cacheable = this.isCacheableMemorySource(source);
+    const dynamic = this.hasInterpolationInSource(source);
+
+    if (cacheable && !dynamic && cache.has(cacheKey)) {
+      return cache.get(cacheKey) ?? '';
+    }
+
+    try {
+      let value = '';
+      switch (source.type) {
+        case 'text': {
+          value = this.interpolate(String(source.text), baseContext);
+          break;
+        }
+        case 'file': {
+          const path = this.interpolate(String(source.path), baseContext);
+          value = readFileSync(path, 'utf-8');
+          break;
+        }
+        case 'url': {
+          const url = this.interpolate(String(source.url), baseContext);
+          value = await this.fetchUrlContent(url);
+          break;
+        }
+        case 'web_search': {
+          const query = this.interpolate(String(source.query), baseContext);
+          value = await this.runWebSearch(query, source.maxResults);
+          break;
+        }
+        case 'step': {
+          const steps = baseContext.steps as Record<string, unknown> | undefined;
+          const stepOutput = steps?.[source.step];
+          value = this.resolveMemoryValue(stepOutput, source.path);
+          break;
+        }
+        case 'trigger': {
+          const triggerData = baseContext.trigger;
+          value = this.resolveMemoryValue(triggerData, source.path);
+          break;
+        }
+        default:
+          value = '';
+      }
+
+      value = this.normalizeMemoryValue(value);
+
+      if (source.maxChars && value.length > source.maxChars) {
+        value = `${value.slice(0, source.maxChars)}…`;
+      }
+
+      if (cacheable && !dynamic) {
+        cache.set(cacheKey, value);
+      }
+
+      return value;
+    } catch (err) {
+      const message = `[memory:${block.id}] Failed to load ${source.type} source: ${String(err)}`;
+      this.options.onLog?.(runId, 'memory', message);
+      return message;
+    }
+  }
+
+  private resolveMemoryValue(data: unknown, path?: string): string {
+    if (path && data && typeof data === 'object') {
+      const resolved = this.resolvePath(path, data as Record<string, unknown>);
+      return this.formatMemoryValue(resolved);
+    }
+    return this.formatMemoryValue(data);
+  }
+
+  private formatMemoryValue(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+
+  private normalizeMemoryValue(value: string): string {
+    return value.replace(/\r\n/g, '\n').trim();
+  }
+
+  private isCacheableMemorySource(source: MemorySource): boolean {
+    return source.type !== 'step' && source.type !== 'trigger';
+  }
+
+  private hasInterpolationInSource(source: MemorySource): boolean {
+    switch (source.type) {
+      case 'text':
+        return this.hasInterpolation(source.text);
+      case 'file':
+        return this.hasInterpolation(source.path);
+      case 'url':
+        return this.hasInterpolation(source.url);
+      case 'web_search':
+        return this.hasInterpolation(source.query);
+      default:
+        return false;
+    }
+  }
+
+  private hasInterpolation(value?: string): boolean {
+    return Boolean(value && value.includes('{{'));
+  }
+
+  private dedupeLines(value: string): string {
+    const lines = value.split('\n');
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        deduped.push(line);
+        continue;
+      }
+      if (!seen.has(trimmed)) {
+        seen.add(trimmed);
+        deduped.push(line);
+      }
+    }
+    return deduped.join('\n');
+  }
+
+  private async fetchUrlContent(url: string): Promise<string> {
+    const response = await this.fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Weavr/1.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const text = await response.text();
+    const limited = text.slice(0, 12000);
+
+    if (contentType.includes('text/html')) {
+      return this.stripHtml(limited);
+    }
+    return limited;
+  }
+
+  private stripHtml(html: string): string {
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+      .replace(/<header[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private async runWebSearch(query: string, maxResults = 5): Promise<string> {
+    const config = await this.getConfig();
+    const provider = config.webSearch?.provider;
+    const configKey = config.webSearch?.apiKey;
+    let braveKey = provider === 'brave' ? configKey : process.env.BRAVE_API_KEY;
+    let tavilyKey = provider === 'tavily' ? configKey : process.env.TAVILY_API_KEY;
+
+    if (!provider && configKey && !braveKey && !tavilyKey) {
+      braveKey = configKey;
+    }
+
+    if (braveKey) {
+      const response = await this.fetchWithTimeout(
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${maxResults}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'X-Subscription-Token': braveKey,
+          },
+        },
+        15000
+      );
+      if (!response.ok) {
+        throw new Error(`Brave search failed: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json() as {
+        web?: { results?: Array<{ title: string; url: string; description: string }> };
+      };
+      const results = data.web?.results ?? [];
+      if (results.length === 0) return 'No search results found.';
+      return results.slice(0, maxResults).map((r, i) =>
+        `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.description}`
+      ).join('\n');
+    }
+
+    if (tavilyKey) {
+      const response = await this.fetchWithTimeout('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query,
+          search_depth: 'basic',
+          max_results: maxResults,
+        }),
+      }, 15000);
+      if (!response.ok) {
+        throw new Error(`Tavily search failed: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json() as {
+        results?: Array<{ title: string; url: string; content: string }>;
+      };
+      const results = data.results ?? [];
+      if (results.length === 0) return 'No search results found.';
+      return results.slice(0, maxResults).map((r, i) =>
+        `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.content.slice(0, 300)}`
+      ).join('\n');
+    }
+
+    const fallback = await this.fetchWithTimeout(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
+    );
+    if (!fallback.ok) {
+      throw new Error(`Search failed: ${fallback.status} ${fallback.statusText}`);
+    }
+    const data = await fallback.json() as { Abstract?: string; RelatedTopics?: Array<{ Text?: string }> };
+    const results: string[] = [];
+    if (data.Abstract) results.push(`Summary: ${data.Abstract}`);
+    if (data.RelatedTopics?.length) {
+      for (const topic of data.RelatedTopics.slice(0, maxResults)) {
+        if (topic.Text) results.push(`- ${topic.Text}`);
+      }
+    }
+    return results.length > 0 ? results.join('\n') : 'No search results found.';
+  }
+
+  private async fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 30000): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private interpolate(template: string, context: Record<string, unknown>): string {
