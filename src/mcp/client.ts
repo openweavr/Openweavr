@@ -65,10 +65,19 @@ export class MCPClient implements IMCPClient {
       }, timeout);
 
       try {
-        this.log(`Starting MCP server: ${config.command} ${config.args.join(' ')}`);
+        // Substitute environment variables in args (e.g., ${HOME}, $HOME)
+        const substitutedArgs = config.args.map(arg => {
+          return arg.replace(/\$\{(\w+)\}/g, (_, varName) => {
+            return process.env[varName] ?? '';
+          }).replace(/\$(\w+)/g, (_, varName) => {
+            return process.env[varName] ?? '';
+          });
+        });
+
+        this.log(`Starting MCP server: ${config.command} ${substitutedArgs.join(' ')}`);
 
         // Spawn the MCP server process
-        this.process = spawn(config.command, config.args, {
+        this.process = spawn(config.command, substitutedArgs, {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: { ...process.env, ...config.env },
           cwd: config.cwd,

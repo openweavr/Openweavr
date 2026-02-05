@@ -1005,7 +1005,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
         ...customEnv,
       };
 
-      // Generate config for this server
+      // Generate config for this server (env var substitution happens in MCP client)
       const serverConfig: MCPServerConfig = {
         command: server.configTemplate.command,
         args: server.configTemplate.args,
@@ -1517,6 +1517,7 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
 Reference previous step outputs: \`{{ steps.<step-id>.<field> }}\`
 Reference trigger data: \`{{ trigger.<field> }}\`
 Reference environment variables: \`{{ env.<var> }}\`
+Reference memory blocks: \`{{ memory.blocks.<block-id> }}\` and sources: \`{{ memory.sources.<block-id>.<source-id> }}\`
 
 Built-in variables (always available):
 - \`{{ currentDate }}\` - Today's date (YYYY-MM-DD)
@@ -1536,6 +1537,13 @@ IMPORTANT: Use the correct output field for each action:
 \`\`\`yaml
 name: descriptive-workflow-name
 description: Brief description of what this workflow does
+
+memory:
+  - id: project-context
+    sources:
+      - id: docs
+        type: file
+        path: docs/overview.md
 
 trigger:
   type: <trigger-type>
@@ -1971,7 +1979,7 @@ Output ONLY the YAML code block, no additional text.`;
 
 ## CRITICAL RULES
 1. **ONLY use actions and triggers from the "Available" lists below** - never invent or guess action names
-2. **Variable syntax**: Use \`{{ steps.step_id.result }}\` for step outputs, \`{{ trigger.field }}\` for trigger data, \`{{ currentDate }}\` for today's date
+2. **Variable syntax**: Use \`{{ steps.step_id.result }}\` for step outputs, \`{{ trigger.field }}\` for trigger data, \`{{ memory.blocks.block_id }}\` for memory blocks, \`{{ memory.sources.block_id.source_id }}\` for individual sources, and \`{{ currentDate }}\` for today's date
 3. **AI Agent is powerful**: Use \`ai.agent\` for ANY open-ended task - research, analysis, summarization, decision-making, report generation
 4. **ALWAYS include \`{{ currentDate }}\` in agent tasks** that involve research or time-sensitive information
 
@@ -2008,6 +2016,10 @@ The user can enable MCP (Model Context Protocol) servers in Settings to give age
 - Productivity apps (Slack, Notion, Google Drive)
 
 When using ai.agent, specify which tools to enable in the \`tools\` field as an array.
+
+### Memory Blocks (Optional, but powerful)
+Workflows can include a top-level \`memory\` section to assemble context from files, URLs, search results, or previous steps.
+Use \`{{ memory.blocks.<id> }}\` inside prompts or step configs, or set \`memory: ["block-id"]\` on \`ai.agent\` to append memory automatically.
 
 ### Writing Effective Agent Tasks (CRITICAL)
 Agent tasks must be **detailed and specific**. A good task should:
