@@ -42,6 +42,7 @@
         <a href="#http">HTTP / Webhooks</a>
         <a href="#email">Email</a>
         <a href="#cron">Cron Schedules</a>
+        <a href="#mcp">MCP Servers</a>
       </aside>
 
       <section class="content">
@@ -406,6 +407,147 @@
 <span class="comment"># "0 * * * *"      - Every hour</span>
 <span class="comment"># "0 9 * * 1-5"    - 9 AM on weekdays</span>
 <span class="comment"># "0 0 1 * *"      - First day of each month</span></code></pre>
+          </div>
+        </div>
+
+        <div class="section" id="mcp">
+          <h2>MCP Servers</h2>
+          <p>
+            Model Context Protocol (MCP) servers extend AI agent capabilities with custom tools.
+            Weavr includes a catalog of 20+ pre-configured MCP servers that can be enabled from the UI.
+          </p>
+
+          <h3>Available MCP Servers</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th>Description</th>
+                <th>Tools Provided</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="inline-code">filesystem</span></td>
+                <td>File system operations</td>
+                <td>read_file, write_file, list_directory, search_files</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">git</span></td>
+                <td>Git repository operations</td>
+                <td>git_status, git_diff, git_commit, git_log</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">github</span></td>
+                <td>GitHub API access</td>
+                <td>create_issue, create_pr, search_repos, get_file_contents</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">postgres</span></td>
+                <td>PostgreSQL database</td>
+                <td>query, describe_table, list_tables</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">sqlite</span></td>
+                <td>SQLite database</td>
+                <td>query, describe_table, list_tables</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">puppeteer</span></td>
+                <td>Browser automation</td>
+                <td>navigate, screenshot, click, fill, evaluate</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">brave-search</span></td>
+                <td>Web search via Brave</td>
+                <td>brave_web_search, brave_local_search</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">slack</span></td>
+                <td>Slack workspace access</td>
+                <td>list_channels, post_message, search_messages</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">google-drive</span></td>
+                <td>Google Drive access</td>
+                <td>search_files, read_file, create_file</td>
+              </tr>
+              <tr>
+                <td><span class="inline-code">sequential-thinking</span></td>
+                <td>Step-by-step reasoning</td>
+                <td>sequentialthinking</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Enabling via UI</h3>
+          <p>
+            The easiest way to enable MCP servers is through the Settings page in the web UI:
+          </p>
+          <ol>
+            <li>Go to Settings in the web app</li>
+            <li>Scroll to the MCP Servers section</li>
+            <li>Click the toggle to enable/disable servers</li>
+            <li>Servers start/stop immediately - no restart required</li>
+          </ol>
+
+          <h3>Configuration via YAML</h3>
+          <p>
+            You can also configure MCP servers in <span class="inline-code">~/.weavr/config.yaml</span>:
+          </p>
+
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">mcp:</span>
+  <span class="keyword">servers:</span>
+    <span class="keyword">filesystem:</span>
+      <span class="keyword">command:</span> <span class="string">npx</span>
+      <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-filesystem", "/path/to/dir"]</span>
+
+    <span class="keyword">github:</span>
+      <span class="keyword">command:</span> <span class="string">npx</span>
+      <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-github"]</span>
+      <span class="keyword">env:</span>
+        <span class="keyword">GITHUB_PERSONAL_ACCESS_TOKEN:</span> <span class="string">"your-token"</span>
+
+    <span class="keyword">postgres:</span>
+      <span class="keyword">command:</span> <span class="string">npx</span>
+      <span class="keyword">args:</span> <span class="string">[-y, "@modelcontextprotocol/server-postgres"]</span>
+      <span class="keyword">env:</span>
+        <span class="keyword">DATABASE_URL:</span> <span class="string">"postgresql://user:pass@localhost/db"</span></code></pre>
+          </div>
+
+          <h3>Using MCP Tools in Workflows</h3>
+          <p>
+            Once enabled, MCP tools are automatically available to AI agents.
+            You can specify which tools to use in the <span class="inline-code">tools</span> field:
+          </p>
+
+          <div class="code-block">
+            <div class="code-header">
+              <div class="code-dot red"></div>
+              <div class="code-dot yellow"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <pre><code><span class="keyword">steps:</span>
+  - <span class="keyword">id:</span> <span class="string">analyze-repo</span>
+    <span class="keyword">action:</span> <span class="string">ai.agent</span>
+    <span class="keyword">with:</span>
+      <span class="keyword">task:</span> <span class="string">"List all TODO comments in the repository"</span>
+      <span class="keyword">tools:</span>
+        - <span class="string">git_status</span>          <span class="comment"># From git MCP</span>
+        - <span class="string">search_files</span>        <span class="comment"># From filesystem MCP</span>
+        - <span class="string">read_file</span>           <span class="comment"># Built-in or MCP</span></code></pre>
+          </div>
+
+          <div class="callout">
+            <strong>Tool discovery:</strong> The Workflow Builder shows all available tools
+            (built-in + MCP) when editing an AI agent step. Tools from MCP servers are
+            labeled with their server name.
           </div>
         </div>
       </section>

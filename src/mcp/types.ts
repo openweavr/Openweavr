@@ -121,6 +121,14 @@ export interface IMCPClient {
 export interface IMCPManager {
   /** Load and connect to servers from config */
   loadFromConfig(configPath?: string): Promise<void>;
+  /** Connect to a specific server */
+  connectServer(name: string, config: MCPServerConfig): Promise<void>;
+  /** Disconnect a specific server */
+  disconnectServer(name: string): Promise<void>;
+  /** Check if a server is connected */
+  isServerConnected(name: string): boolean;
+  /** Get list of connected server names */
+  getConnectedServers(): string[];
   /** Get all connected servers */
   getServers(): Map<string, IMCPClient>;
   /** Get all available tools across all servers */

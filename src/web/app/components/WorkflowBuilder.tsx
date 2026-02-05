@@ -938,6 +938,7 @@ function PropertyEditor({
   onDelete,
   nodes,
   edges,
+  availableTools,
 }: {
   node: Node<StepData>;
   schema: ActionSchema | undefined;
@@ -946,6 +947,7 @@ function PropertyEditor({
   onDelete: () => void;
   nodes: Node<StepData>[];
   edges: Edge[];
+  availableTools?: ToolInfo[];
 }) {
   const [config, setConfig] = useState<Record<string, unknown>>(
     normalizeConfig(node.data.action, node.data.config)
@@ -1058,23 +1060,89 @@ function PropertyEditor({
         );
       case 'multiselect': {
         const selectedValues = Array.isArray(value) ? value : (field.default as string[] ?? []);
+
+        // For tools field in ai.agent, use dynamic tools from API
+        const isToolsField = field.name === 'tools' && node.data.action === 'ai.agent';
+        const options = isToolsField && availableTools && availableTools.length > 0
+          ? availableTools.map(t => ({
+              value: t.id,
+              label: t.source === 'mcp' ? `${t.name} (MCP: ${t.server ?? 'server'})` : t.name,
+              description: t.description,
+              source: t.source,
+            }))
+          : field.options?.map(o => ({ ...o, source: 'builtin', description: '' })) ?? [];
+
+        // Group tools by source
+        const builtinTools = options.filter(o => o.source === 'builtin');
+        const mcpTools = options.filter(o => o.source === 'mcp');
+
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {field.options?.map((opt) => (
-              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={selectedValues.includes(opt.value)}
-                  onChange={(e) => {
-                    const newValues = e.target.checked
-                      ? [...selectedValues, opt.value]
-                      : selectedValues.filter((v: string) => v !== opt.value);
-                    handleFieldChange(field.name, newValues);
-                  }}
-                />
-                <span style={{ fontSize: '13px' }}>{opt.label}</span>
-              </label>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {builtinTools.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  Built-in Tools
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {builtinTools.map((opt) => (
+                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedValues.includes(opt.value)}
+                        onChange={(e) => {
+                          const newValues = e.target.checked
+                            ? [...selectedValues, opt.value]
+                            : selectedValues.filter((v: string) => v !== opt.value);
+                          handleFieldChange(field.name, newValues);
+                        }}
+                        style={{ marginTop: '2px' }}
+                      />
+                      <div>
+                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
+                        {opt.description && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{opt.description}</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {mcpTools.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', marginTop: '8px', textTransform: 'uppercase' }}>
+                  MCP Tools {mcpTools.length > 0 && `(${mcpTools.length} available)`}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflow: 'auto' }}>
+                  {mcpTools.map((opt) => (
+                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedValues.includes(opt.value)}
+                        onChange={(e) => {
+                          const newValues = e.target.checked
+                            ? [...selectedValues, opt.value]
+                            : selectedValues.filter((v: string) => v !== opt.value);
+                          handleFieldChange(field.name, newValues);
+                        }}
+                        style={{ marginTop: '2px' }}
+                      />
+                      <div>
+                        <span style={{ fontSize: '13px' }}>{opt.label}</span>
+                        {opt.description && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{opt.description}</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {isToolsField && mcpTools.length === 0 && (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px' }}>
+                Enable MCP servers in Settings to add more tools
+              </div>
+            )}
           </div>
         );
       }
@@ -1560,6 +1628,16 @@ function parseYamlToGraph(yamlStr: string): { nodes: Node<StepData>[]; edges: Ed
   return { nodes, edges, name };
 }
 
+// Tool info from API
+interface ToolInfo {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  source: string;
+  server?: string;
+}
+
 export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBack }: WorkflowBuilderProps) {
   const [name, setName] = useState(initialName ?? 'my-workflow');
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -1571,6 +1649,31 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [hasGeneratedWorkflow, setHasGeneratedWorkflow] = useState(false);
+
+  // Dynamic tool list for AI agent
+  const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
+
+  // Fetch available tools on mount
+  useEffect(() => {
+    fetch('/api/tools')
+      .then(res => res.json())
+      .then(data => {
+        const tools: ToolInfo[] = [
+          ...(data.builtin ?? []),
+          ...(data.mcp ?? []),
+        ];
+        setAvailableTools(tools);
+      })
+      .catch(err => {
+        console.error('Failed to fetch tools:', err);
+        // Fallback to builtin tools
+        setAvailableTools([
+          { id: 'web_search', name: 'Web Search', description: 'Search the web', category: 'builtin', source: 'builtin' },
+          { id: 'web_fetch', name: 'Web Fetch', description: 'Fetch URL content', category: 'builtin', source: 'builtin' },
+          { id: 'shell', name: 'Shell Commands', description: 'Execute shell commands', category: 'builtin', source: 'builtin' },
+        ]);
+      });
+  }, []);
 
   useEffect(() => {
     if (initialYaml) {
@@ -1878,6 +1981,7 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
             onDelete={() => deleteNode(selectedNode.id)}
             nodes={nodes}
             edges={edges}
+            availableTools={availableTools}
           />
         ) : (
           <div className="card" style={{ flex: 1 }}>

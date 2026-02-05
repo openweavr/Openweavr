@@ -9,6 +9,45 @@ const isOAuthSupportedModel = (model: string | undefined): boolean => {
   return OAUTH_SUPPORTED_MODELS.includes(model);
 };
 
+// Types for dynamic model registry
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow: number;
+  maxTokens: number;
+  supportsImages: boolean;
+  supportsReasoning: boolean;
+  cost?: {
+    input: number;
+    output: number;
+  };
+}
+
+interface ProviderInfo {
+  id: string;
+  name: string;
+  description: string;
+  envVar?: string;
+  authType: 'api_key' | 'oauth' | 'local' | 'cli' | 'aws' | 'gcloud';
+  setupUrl?: string;
+  models: ModelInfo[];
+  hasCredentials?: boolean;
+}
+
+// Types for MCP catalog
+interface MCPServerEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  package: string;
+  official?: boolean;
+  tools?: string[];
+  requiredEnv?: string[];
+  setupUrl?: string;
+}
+
 interface Config {
   server: {
     port: number;
@@ -59,6 +98,20 @@ export function Settings() {
   // OpenAI OAuth state
   const [oauthConnected, setOauthConnected] = useState(false);
   const [oauthConnecting, setOauthConnecting] = useState(false);
+
+  // Dynamic model registry
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  // MCP server catalog
+  const [mcpCatalog, setMcpCatalog] = useState<MCPServerEntry[]>([]);
+  const [enabledMcpServers, setEnabledMcpServers] = useState<string[]>([]);
+  const [connectedMcpServers, setConnectedMcpServers] = useState<string[]>([]);
+  const [loadingMcp, setLoadingMcp] = useState(true);
+  const [mcpCategoryFilter, setMcpCategoryFilter] = useState<string>('all');
+  const [expandedMcpServer, setExpandedMcpServer] = useState<string | null>(null);
+  const [mcpServerConfigs, setMcpServerConfigs] = useState<Record<string, Record<string, string>>>({});
+  const [togglingMcp, setTogglingMcp] = useState<string | null>(null);
 
   // Messaging state
   const [telegramToken, setTelegramToken] = useState('');
@@ -123,6 +176,35 @@ export function Settings() {
       })
       .catch(() => {
         // OAuth API may not be available
+      });
+
+    // Load dynamic model registry
+    fetch('/api/models')
+      .then((res) => res.json())
+      .then((data) => {
+        setProviders(data.providers ?? []);
+        setLoadingProviders(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load model registry:', err);
+        setLoadingProviders(false);
+      });
+
+    // Load MCP catalog and enabled servers
+    Promise.all([
+      fetch('/api/mcp/catalog').then(res => res.json()),
+      fetch('/api/mcp/enabled').then(res => res.json()),
+    ])
+      .then(([catalogData, enabledData]) => {
+        // API returns 'servers' field
+        setMcpCatalog(catalogData.servers ?? catalogData.catalog ?? []);
+        setEnabledMcpServers(enabledData.servers ?? enabledData.enabled ?? []);
+        setConnectedMcpServers(enabledData.connected ?? []);
+        setLoadingMcp(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load MCP catalog:', err);
+        setLoadingMcp(false);
       });
   }, []);
 
@@ -246,14 +328,79 @@ export function Settings() {
     setApiKey(''); // Reset API key when changing provider
   };
 
-  const getDefaultModel = (provider: string): string => {
-    switch (provider) {
+  const getDefaultModel = (providerId: string): string => {
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.models.length > 0) {
+      return provider.models[0].id;
+    }
+    // Fallbacks for when providers haven't loaded yet
+    switch (providerId) {
       case 'anthropic': return 'claude-sonnet-4-20250514';
-      case 'openai': return 'gpt-5.2-codex'; // Default to OAuth-compatible model
-      case 'ollama': return 'llama3.2';
+      case 'openai': return 'gpt-4o';
+      case 'ollama': return 'llama3.3';
       default: return '';
     }
   };
+
+  // Get models for the currently selected provider
+  const getCurrentProviderModels = (): ModelInfo[] => {
+    if (!config?.ai?.provider) return [];
+    const provider = providers.find(p => p.id === config.ai?.provider);
+    return provider?.models ?? [];
+  };
+
+  // Get current provider info
+  const getCurrentProvider = (): ProviderInfo | undefined => {
+    if (!config?.ai?.provider) return undefined;
+    return providers.find(p => p.id === config.ai?.provider);
+  };
+
+  // Toggle MCP server
+  const handleMcpToggle = async (serverId: string, enable: boolean) => {
+    setTogglingMcp(serverId);
+    try {
+      const endpoint = enable ? `/api/mcp/enable/${serverId}` : `/api/mcp/disable/${serverId}`;
+      const body = enable ? {
+        env: mcpServerConfigs[serverId] ?? {},
+      } : undefined;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setEnabledMcpServers(prev =>
+          enable ? [...prev, serverId] : prev.filter(id => id !== serverId)
+        );
+        // Update connection status based on response
+        if (enable && data.connected) {
+          setConnectedMcpServers(prev => [...prev, serverId]);
+        } else if (!enable) {
+          setConnectedMcpServers(prev => prev.filter(id => id !== serverId));
+        }
+        if (enable) {
+          setExpandedMcpServer(null); // Collapse config panel after enabling
+        }
+        setMessage({
+          type: data.connected !== false ? 'success' : 'error',
+          text: data.message ?? `MCP server ${enable ? 'enabled' : 'disabled'}.`
+        });
+      } else {
+        setMessage({ type: 'error', text: data.error ?? 'Failed to toggle MCP server' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error: Could not toggle MCP server' });
+    }
+    setTogglingMcp(null);
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  // Get unique MCP categories
+  const mcpCategories = ['all', ...new Set(mcpCatalog.map(s => s.category))];
 
   const getApiKeyPlaceholder = (): string => {
     if (config?.ai?.hasApiKey) {
@@ -268,7 +415,12 @@ export function Settings() {
 
   const canUseOAuth = config?.ai?.provider === 'openai' && isOAuthSupportedModel(config?.ai?.model);
   const isOpenAIWithOAuth = config?.ai?.provider === 'openai' && config?.ai?.authMethod === 'oauth';
-  const needsApiKey = config?.ai?.provider && config.ai.provider !== 'ollama' && !(isOpenAIWithOAuth && canUseOAuth);
+
+  // Determine if API key is needed based on provider auth type
+  const currentProvider = getCurrentProvider();
+  const providerNeedsApiKey = currentProvider?.authType === 'api_key';
+  const providerIsLocal = currentProvider?.authType === 'local' || currentProvider?.authType === 'cli';
+  const needsApiKey = config?.ai?.provider && providerNeedsApiKey && !(isOpenAIWithOAuth && canUseOAuth);
 
   const handleOAuthConnect = async () => {
     setOauthConnecting(true);
@@ -441,10 +593,60 @@ export function Settings() {
                   onChange={(e) => handleProviderChange(e.target.value)}
                 >
                   <option value="">None</option>
-                  <option value="anthropic">Anthropic (Claude)</option>
-                  <option value="openai">OpenAI (GPT)</option>
-                  <option value="ollama">Ollama (Local)</option>
+                  {providers.length > 0 ? (
+                    <>
+                      {/* API-based providers (with API key or cloud auth) */}
+                      <optgroup label="API Providers">
+                        {providers
+                          .filter(p => ['api_key', 'aws', 'gcloud'].includes(p.authType))
+                          .map(provider => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.name}
+                              {provider.hasCredentials && ' ✓'}
+                            </option>
+                          ))}
+                      </optgroup>
+                      {/* Local/CLI providers */}
+                      <optgroup label="Local / CLI">
+                        {providers
+                          .filter(p => ['local', 'cli'].includes(p.authType))
+                          .map(provider => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    /* Fallback while loading or if API failed */
+                    <>
+                      <optgroup label="API Providers">
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="openai">OpenAI (GPT)</option>
+                        <option value="google">Google (Gemini)</option>
+                        <option value="groq">Groq</option>
+                        <option value="mistral">Mistral AI</option>
+                        <option value="xai">xAI (Grok)</option>
+                        <option value="openrouter">OpenRouter</option>
+                      </optgroup>
+                      <optgroup label="Local / CLI">
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="claude-cli">Claude CLI</option>
+                        <option value="llm-cli">LLM CLI</option>
+                      </optgroup>
+                    </>
+                  )}
                 </select>
+                {loadingProviders && (
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Loading provider details...
+                  </p>
+                )}
+                {!loadingProviders && getCurrentProvider()?.description && (
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {getCurrentProvider()?.description}
+                  </p>
+                )}
               </div>
 
               {config?.ai?.provider && (
@@ -459,38 +661,69 @@ export function Settings() {
                       )
                     }
                   >
-                    {config.ai.provider === 'anthropic' && (
+                    {getCurrentProviderModels().length > 0 ? (
                       <>
-                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                        <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                        <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                        {getCurrentProviderModels().map(model => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                            {model.supportsReasoning && ' (Reasoning)'}
+                            {model.supportsImages && ' (Vision)'}
+                          </option>
+                        ))}
+                        {/* Keep current model visible if not in the list */}
+                        {config.ai?.model && !getCurrentProviderModels().find(m => m.id === config.ai?.model) && (
+                          <option value={config.ai.model}>{config.ai.model} (current)</option>
+                        )}
                       </>
-                    )}
-                    {config.ai.provider === 'openai' && (
+                    ) : (
+                      /* Fallback for when dynamic models haven't loaded */
                       <>
-                        <optgroup label="ChatGPT OAuth (Plus/Pro subscription)">
-                          <option value="gpt-5.2-codex">GPT-5.2 Codex (Latest)</option>
-                          <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
-                          <option value="gpt-5.2">GPT-5.2</option>
-                          <option value="gpt-5.1">GPT-5.1</option>
-                        </optgroup>
-                        <optgroup label="API Key Required">
-                          <option value="gpt-4o">GPT-4o</option>
-                          <option value="gpt-4o-mini">GPT-4o Mini</option>
-                          <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                          <option value="o1-preview">o1 Preview</option>
-                          <option value="o1-mini">o1 Mini</option>
-                        </optgroup>
-                      </>
-                    )}
-                    {config.ai.provider === 'ollama' && (
-                      <>
-                        <option value="llama3.2">Llama 3.2</option>
-                        <option value="mistral">Mistral</option>
-                        <option value="codellama">Code Llama</option>
+                        {/* Always show current model first */}
+                        {config.ai?.model && (
+                          <option value={config.ai.model}>{config.ai.model}</option>
+                        )}
+                        {config.ai.provider === 'anthropic' && (
+                          <>
+                            {config.ai?.model !== 'claude-sonnet-4-20250514' && <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>}
+                            {config.ai?.model !== 'claude-opus-4-20250514' && <option value="claude-opus-4-20250514">Claude Opus 4</option>}
+                            {config.ai?.model !== 'claude-3-5-haiku-20241022' && <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>}
+                          </>
+                        )}
+                        {config.ai.provider === 'openai' && (
+                          <>
+                            {config.ai?.model !== 'gpt-4o' && <option value="gpt-4o">GPT-4o</option>}
+                            {config.ai?.model !== 'gpt-4o-mini' && <option value="gpt-4o-mini">GPT-4o Mini</option>}
+                            {config.ai?.model !== 'o1' && <option value="o1">o1</option>}
+                          </>
+                        )}
+                        {config.ai.provider === 'google' && (
+                          <>
+                            {config.ai?.model !== 'gemini-2.0-flash' && <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>}
+                            {config.ai?.model !== 'gemini-1.5-pro' && <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>}
+                          </>
+                        )}
+                        {config.ai.provider === 'ollama' && (
+                          <>
+                            {config.ai?.model !== 'llama3.3' && <option value="llama3.3">Llama 3.3 70B</option>}
+                            {config.ai?.model !== 'llama3.2' && <option value="llama3.2">Llama 3.2</option>}
+                            {config.ai?.model !== 'mistral' && <option value="mistral">Mistral</option>}
+                            {config.ai?.model !== 'qwen2.5-coder' && <option value="qwen2.5-coder">Qwen 2.5 Coder</option>}
+                          </>
+                        )}
                       </>
                     )}
                   </select>
+                  {/* Show model details */}
+                  {(() => {
+                    const model = getCurrentProviderModels().find(m => m.id === config.ai?.model);
+                    if (!model) return null;
+                    return (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Context: {(model.contextWindow / 1000).toFixed(0)}K tokens
+                        {model.cost && ` • $${model.cost.input}/M input, $${model.cost.output}/M output`}
+                      </p>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -522,20 +755,34 @@ export function Settings() {
                     </button>
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                    {config?.ai?.provider === 'anthropic' && (
-                      <>Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>Anthropic Console</a></>
-                    )}
-                    {config?.ai?.provider === 'openai' && (
-                      <>Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>OpenAI Platform</a></>
-                    )}
+                    {(() => {
+                      const provider = getCurrentProvider();
+                      if (provider?.setupUrl) {
+                        return (
+                          <>Get your API key from <a href={provider.setupUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>{provider.name}</a></>
+                        );
+                      }
+                      if (provider?.envVar) {
+                        return <>Or set the {provider.envVar} environment variable</>;
+                      }
+                      return null;
+                    })()}
                   </p>
                 </div>
               )}
 
-              {config?.ai?.provider === 'ollama' && (
+              {providerIsLocal && (
                 <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                    Ollama runs locally and doesn't require an API key. Make sure Ollama is running on your machine.
+                    {currentProvider?.authType === 'local' && (
+                      <>{currentProvider?.name} runs locally and doesn't require an API key. Make sure it's running on your machine.</>
+                    )}
+                    {currentProvider?.authType === 'cli' && (
+                      <>{currentProvider?.name} uses a command-line tool. Make sure it's installed and configured.</>
+                    )}
+                    {currentProvider?.setupUrl && (
+                      <> <a href={currentProvider.setupUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>Setup guide</a></>
+                    )}
                   </p>
                 </div>
               )}
@@ -908,6 +1155,235 @@ export function Settings() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* MCP Server Catalog */}
+          <div className="card">
+            <h2 className="card-title" style={{ marginBottom: '8px' }}>MCP Tool Servers</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Enable Model Context Protocol (MCP) servers to give AI agents access to additional tools.
+              Changes require a server restart to take effect.
+            </p>
+
+            {loadingMcp ? (
+              <div className="empty-state" style={{ padding: '40px 0' }}>
+                <div className="empty-icon">...</div>
+                <div className="empty-title">Loading MCP catalog...</div>
+              </div>
+            ) : (
+              <>
+                {/* Category filter */}
+                <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {mcpCategories.map(cat => (
+                    <button
+                      key={cat}
+                      className={`btn btn-ghost ${mcpCategoryFilter === cat ? 'btn-primary' : ''}`}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        textTransform: 'capitalize',
+                        ...(mcpCategoryFilter === cat ? {} : { opacity: 0.7 })
+                      }}
+                      onClick={() => setMcpCategoryFilter(cat)}
+                    >
+                      {cat === 'all' ? 'All' : cat.replace('-', ' ')}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Server list */}
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {mcpCatalog
+                    .filter(server => mcpCategoryFilter === 'all' || server.category === mcpCategoryFilter)
+                    .map(server => {
+                      const isEnabled = enabledMcpServers.includes(server.id);
+                      const isConnected = connectedMcpServers.includes(server.id);
+                      const isToggling = togglingMcp === server.id;
+                      const isExpanded = expandedMcpServer === server.id;
+                      const hasConfig = server.requiredEnv && server.requiredEnv.length > 0;
+                      const categoryIcons: Record<string, string> = {
+                        'filesystem': '📁',
+                        'git': '🔀',
+                        'database': '🗄️',
+                        'browser': '🌐',
+                        'search': '🔍',
+                        'cloud': '☁️',
+                        'productivity': '📋',
+                        'dev-tools': '🛠️',
+                        'other': '📦',
+                      };
+
+                      return (
+                        <div
+                          key={server.id}
+                          style={{
+                            background: isConnected ? 'rgba(34, 197, 94, 0.08)' : isEnabled ? 'rgba(251, 191, 36, 0.05)' : 'var(--bg-tertiary)',
+                            border: isConnected ? '1px solid rgba(34, 197, 94, 0.3)' : isEnabled ? '1px solid rgba(251, 191, 36, 0.2)' : '1px solid transparent',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden',
+                            opacity: isToggling ? 0.7 : 1,
+                            transition: 'opacity 0.2s',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '12px',
+                              padding: '12px 16px',
+                            }}
+                          >
+                            <span style={{ fontSize: '20px' }}>
+                              {categoryIcons[server.category] ?? '📦'}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 500 }}>{server.name}</span>
+                                {server.official && (
+                                  <span className="badge badge-default" style={{ fontSize: '10px' }}>official</span>
+                                )}
+                                {isConnected && (
+                                  <span className="badge badge-success" style={{ fontSize: '10px' }}>running</span>
+                                )}
+                                {isEnabled && !isConnected && (
+                                  <span className="badge badge-warning" style={{ fontSize: '10px' }}>not connected</span>
+                                )}
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                                  {server.category.replace('-', ' ')}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {server.description}
+                              </div>
+                              {server.tools && server.tools.length > 0 && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                  Tools: {server.tools.slice(0, 4).join(', ')}
+                                  {server.tools.length > 4 && ` +${server.tools.length - 4} more`}
+                                </div>
+                              )}
+                              {hasConfig && !isExpanded && !isEnabled && (
+                                <div style={{ fontSize: '11px', color: 'rgb(251, 191, 36)', marginTop: '4px' }}>
+                                  Requires: {server.requiredEnv?.join(', ')}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {server.setupUrl && (
+                                <a
+                                  href={server.setupUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: 'var(--text-muted)',
+                                    fontSize: '12px',
+                                    textDecoration: 'none',
+                                  }}
+                                  title="Setup instructions"
+                                >
+                                  Docs
+                                </a>
+                              )}
+                              {hasConfig && (
+                                <button
+                                  className="btn btn-ghost"
+                                  style={{
+                                    padding: '6px 12px',
+                                    fontSize: '12px',
+                                  }}
+                                  onClick={() => setExpandedMcpServer(isExpanded ? null : server.id)}
+                                >
+                                  {isExpanded ? 'Hide' : 'Configure'}
+                                </button>
+                              )}
+                              <button
+                                className={`btn ${isEnabled ? 'btn-ghost' : 'btn-secondary'}`}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  ...(isEnabled ? { color: 'var(--accent-red)' } : {})
+                                }}
+                                onClick={() => handleMcpToggle(server.id, !isEnabled)}
+                                disabled={isToggling}
+                              >
+                                {isToggling ? 'Working...' : isEnabled ? 'Disable' : 'Enable'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Configuration panel */}
+                          {isExpanded && hasConfig && (
+                            <div style={{
+                              padding: '12px 16px',
+                              borderTop: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                            }}>
+                              <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: '12px', color: 'var(--text-secondary)' }}>
+                                Environment Variables
+                              </div>
+                              <div style={{ display: 'grid', gap: '12px' }}>
+                                {server.requiredEnv?.map(envVar => (
+                                  <div key={envVar}>
+                                    <label className="label" style={{ fontSize: '12px' }}>{envVar}</label>
+                                    <input
+                                      type="password"
+                                      className="input"
+                                      value={mcpServerConfigs[server.id]?.[envVar] ?? ''}
+                                      onChange={(e) => setMcpServerConfigs(prev => ({
+                                        ...prev,
+                                        [server.id]: {
+                                          ...prev[server.id],
+                                          [envVar]: e.target.value,
+                                        },
+                                      }))}
+                                      placeholder={`Enter ${envVar}`}
+                                      style={{ fontSize: '13px' }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                These values will be saved to your config and passed to the MCP server.
+                                {server.setupUrl && (
+                                  <> See <a href={server.setupUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)' }}>documentation</a> for setup instructions.</>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {mcpCatalog.filter(s => mcpCategoryFilter === 'all' || s.category === mcpCategoryFilter).length === 0 && (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No servers in this category
+                  </div>
+                )}
+
+                {/* Summary */}
+                {enabledMcpServers.length > 0 && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '12px 16px',
+                    background: connectedMcpServers.length > 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                    border: `1px solid ${connectedMcpServers.length > 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)'}`,
+                    borderRadius: 'var(--radius-md)',
+                  }}>
+                    <span style={{ color: connectedMcpServers.length > 0 ? 'var(--accent-green)' : 'rgb(251, 191, 36)' }}>
+                      {connectedMcpServers.length > 0
+                        ? `${connectedMcpServers.length} server${connectedMcpServers.length !== 1 ? 's' : ''} running`
+                        : `${enabledMcpServers.length} server${enabledMcpServers.length !== 1 ? 's' : ''} enabled but not connected`
+                      }
+                    </span>
+                    {connectedMcpServers.length > 0 && connectedMcpServers.length < enabledMcpServers.length && (
+                      <span style={{ color: 'var(--text-muted)', marginLeft: '8px', fontSize: '12px' }}>
+                        ({enabledMcpServers.length - connectedMcpServers.length} failed to connect)
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>

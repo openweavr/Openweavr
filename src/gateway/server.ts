@@ -15,7 +15,7 @@ import { WorkflowExecutor } from '../engine/executor.js';
 import { parser } from '../engine/parser.js';
 import { globalRegistry } from '../plugins/sdk/registry.js';
 import { TriggerScheduler } from '../engine/scheduler.js';
-import { initializePlugins, isPluginsInitialized } from '../plugins/loader.js';
+import { initializePlugins, isPluginsInitialized, getGlobalMCPManager } from '../plugins/loader.js';
 import {
   generatePKCE,
   buildAuthorizationURL,
@@ -27,6 +27,8 @@ import {
 } from '../auth/openai-oauth.js';
 import { verifyWebhookSignature, parseWebhookEvent } from '../plugins/builtin/github/index.js';
 import { createServer as createHttpServer } from 'node:http';
+import { getAllProviders, hasProviderCredentials } from '../models/registry.js';
+import { MCP_SERVER_CATALOG, type MCPServerConfig } from '../mcp/catalog.js';
 
 export interface GatewayServer {
   start(): Promise<void>;
@@ -884,6 +886,250 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
     } catch {
       return c.json({ configured: false });
     }
+  });
+
+  // ============================================================================
+  // Models API - Dynamic model catalog from pi-ai
+  // ============================================================================
+
+  app.get('/api/models', (c) => {
+    try {
+      const providers = getAllProviders();
+      // Add credential status for each provider
+      const providersWithStatus = providers.map((provider) => ({
+        ...provider,
+        hasCredentials: hasProviderCredentials(provider.id),
+      }));
+      return c.json({ providers: providersWithStatus });
+    } catch (err) {
+      return c.json({ error: 'Failed to load models', details: String(err) }, 500);
+    }
+  });
+
+  app.get('/api/models/:provider', (c) => {
+    const providerId = c.req.param('provider');
+    try {
+      const providers = getAllProviders();
+      const provider = providers.find((p) => p.id === providerId);
+      if (!provider) {
+        return c.json({ error: 'Provider not found' }, 404);
+      }
+      return c.json({
+        ...provider,
+        hasCredentials: hasProviderCredentials(provider.id),
+      });
+    } catch (err) {
+      return c.json({ error: 'Failed to load models', details: String(err) }, 500);
+    }
+  });
+
+  // ============================================================================
+  // MCP Server Catalog API
+  // ============================================================================
+
+  app.get('/api/mcp/catalog', (c) => {
+    return c.json({
+      servers: MCP_SERVER_CATALOG.map((server) => ({
+        ...server,
+        hasRequiredEnv: !server.requiredEnv || server.requiredEnv.every((v) => !!process.env[v]),
+      })),
+    });
+  });
+
+  app.get('/api/mcp/catalog/:id', (c) => {
+    const serverId = c.req.param('id');
+    const server = MCP_SERVER_CATALOG.find((s) => s.id === serverId);
+    if (!server) {
+      return c.json({ error: 'Server not found' }, 404);
+    }
+    return c.json({
+      ...server,
+      hasRequiredEnv: !server.requiredEnv || server.requiredEnv.every((v) => !!process.env[v]),
+    });
+  });
+
+  // Get currently enabled MCP servers from config and their status
+  app.get('/api/mcp/enabled', async (c) => {
+    try {
+      const content = await readFile(configFile, 'utf-8');
+      const config = parseYaml(content) as WeavrConfig & { mcp?: { servers?: Record<string, unknown> } };
+      const enabledServers = config.mcp?.servers ? Object.keys(config.mcp.servers) : [];
+
+      // Get actual connection status
+      const connectedServers = getGlobalMCPManager()?.getConnectedServers() ?? [];
+
+      return c.json({
+        servers: enabledServers,
+        connected: connectedServers,
+        status: enabledServers.map(id => ({
+          id,
+          enabled: true,
+          connected: connectedServers.includes(id),
+        })),
+      });
+    } catch {
+      return c.json({ servers: [], connected: [], status: [] });
+    }
+  });
+
+  // Enable an MCP server from the catalog
+  app.post('/api/mcp/enable/:id', async (c) => {
+    const serverId = c.req.param('id');
+    const server = MCP_SERVER_CATALOG.find((s) => s.id === serverId);
+    if (!server) {
+      return c.json({ error: 'Server not found in catalog' }, 404);
+    }
+
+    try {
+      // Parse request body for custom env vars
+      let customEnv: Record<string, string> = {};
+      try {
+        const body = await c.req.json() as { env?: Record<string, string> };
+        customEnv = body.env ?? {};
+      } catch {
+        // No body or invalid JSON - that's fine
+      }
+
+      // Load existing config
+      let existingConfig: WeavrConfig & { mcp?: { servers?: Record<string, unknown> } } = DEFAULT_CONFIG as any;
+      try {
+        const content = await readFile(configFile, 'utf-8');
+        existingConfig = parseYaml(content) as WeavrConfig & { mcp?: { servers?: Record<string, unknown> } };
+      } catch {
+        // No existing config
+      }
+
+      // Merge template env with custom env (custom values override template)
+      const mergedEnv = {
+        ...(server.configTemplate.env ?? {}),
+        ...customEnv,
+      };
+
+      // Generate config for this server
+      const serverConfig: MCPServerConfig = {
+        command: server.configTemplate.command,
+        args: server.configTemplate.args,
+        ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
+        ...(server.configTemplate.timeout ? { timeout: server.configTemplate.timeout } : {}),
+      };
+
+      // Add to config file for persistence
+      existingConfig.mcp = existingConfig.mcp ?? { servers: {} };
+      existingConfig.mcp.servers = existingConfig.mcp.servers ?? {};
+      existingConfig.mcp.servers[serverId] = serverConfig;
+      await writeFile(configFile, stringifyYaml(existingConfig), 'utf-8');
+
+      // Actually start the MCP server now (no restart required!)
+      let connected = false;
+      let connectionError: string | undefined;
+      const mcpManager = getGlobalMCPManager();
+      if (mcpManager) {
+        try {
+          await mcpManager.connectServer(serverId, serverConfig);
+          connected = true;
+          console.log(`[MCP] Started server '${serverId}' dynamically`);
+        } catch (err) {
+          connectionError = String(err);
+          console.error(`[MCP] Failed to start server '${serverId}':`, err);
+        }
+      }
+
+      return c.json({
+        success: true,
+        connected,
+        message: connected
+          ? `MCP server '${server.name}' enabled and started!`
+          : `MCP server '${server.name}' enabled but failed to start: ${connectionError}. Check config and try again.`,
+      });
+    } catch (err) {
+      return c.json({ error: 'Failed to enable server', details: String(err) }, 500);
+    }
+  });
+
+  // Disable an MCP server
+  app.post('/api/mcp/disable/:id', async (c) => {
+    const serverId = c.req.param('id');
+
+    try {
+      // Actually stop the MCP server now
+      const mcpManager = getGlobalMCPManager();
+      if (mcpManager) {
+        try {
+          await mcpManager.disconnectServer(serverId);
+          console.log(`[MCP] Stopped server '${serverId}'`);
+        } catch (err) {
+          console.error(`[MCP] Error stopping server '${serverId}':`, err);
+        }
+      }
+
+      // Remove from config file
+      const content = await readFile(configFile, 'utf-8');
+      const existingConfig = parseYaml(content) as WeavrConfig & { mcp?: { servers?: Record<string, unknown> } };
+
+      if (existingConfig.mcp?.servers?.[serverId]) {
+        delete existingConfig.mcp.servers[serverId];
+        await writeFile(configFile, stringifyYaml(existingConfig), 'utf-8');
+      }
+
+      return c.json({ success: true, message: `MCP server '${serverId}' disabled and stopped.` });
+    } catch (err) {
+      return c.json({ error: 'Failed to disable server', details: String(err) }, 500);
+    }
+  });
+
+  // Get all available tools for agent (built-in + MCP)
+  app.get('/api/tools', async (c) => {
+    const builtinTools = [
+      { id: 'web_search', name: 'Web Search', description: 'Search the web for information', category: 'builtin', source: 'builtin' },
+      { id: 'web_fetch', name: 'Web Fetch', description: 'Fetch and extract content from URLs', category: 'builtin', source: 'builtin' },
+      { id: 'shell', name: 'Shell Commands', description: 'Execute shell commands', category: 'builtin', source: 'builtin' },
+      { id: 'read_file', name: 'Read File', description: 'Read content from a file', category: 'builtin', source: 'builtin' },
+      { id: 'write_file', name: 'Write File', description: 'Write content to a file', category: 'builtin', source: 'builtin' },
+    ];
+
+    // Get MCP tools from running servers
+    const mcpTools: Array<{ id: string; name: string; description: string; category: string; source: string; server: string }> = [];
+    try {
+      const mcpManager = getGlobalMCPManager();
+      if (mcpManager) {
+        const tools = await mcpManager.getAllTools();
+        for (const tool of tools) {
+          mcpTools.push({
+            id: tool.name,
+            name: tool.name,
+            description: tool.description ?? `Tool from ${tool.server}`,
+            category: 'mcp',
+            source: 'mcp',
+            server: tool.server,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to get MCP tools:', err);
+    }
+
+    // Get enabled MCP servers from config for reference
+    let enabledServers: string[] = [];
+    try {
+      const content = await readFile(configFile, 'utf-8');
+      const config = parseYaml(content) as WeavrConfig & { mcp?: { servers?: Record<string, unknown> } };
+      enabledServers = config.mcp?.servers ? Object.keys(config.mcp.servers) : [];
+    } catch {
+      // No config
+    }
+
+    return c.json({
+      builtin: builtinTools,
+      mcp: mcpTools,
+      enabledMcpServers: enabledServers,
+      // Catalog info for servers that could provide tools
+      catalog: MCP_SERVER_CATALOG.map(s => ({
+        id: s.id,
+        name: s.name,
+        tools: s.tools ?? [],
+        enabled: enabledServers.includes(s.id),
+      })),
+    });
   });
 
   // OpenAI OAuth endpoints
@@ -1745,7 +1991,23 @@ The \`ai.agent\` action is extremely powerful and should be used for:
 - **Data processing**: Analyzing data, extracting insights, making decisions
 - **Multi-step reasoning**: Complex tasks that require thinking through steps
 
-The ai.agent has access to web_search and web_fetch tools when needed.
+### Available Agent Tools
+**Built-in tools** (always available):
+- \`web_search\` - Search the web for information
+- \`web_fetch\` - Fetch and extract content from URLs
+- \`shell\` - Execute shell commands
+- \`read_file\` / \`write_file\` - File system operations
+
+**MCP Tools** (from enabled MCP servers):
+The user can enable MCP (Model Context Protocol) servers in Settings to give agents access to additional tools:
+- Git operations (git_status, git_log, git_diff, git_commit)
+- GitHub API (list_repos, create_issue, list_prs)
+- Database queries (SQLite, PostgreSQL)
+- Browser automation (Playwright, Puppeteer)
+- Cloud services (AWS, Cloudflare)
+- Productivity apps (Slack, Notion, Google Drive)
+
+When using ai.agent, specify which tools to enable in the \`tools\` field as an array.
 
 ### Writing Effective Agent Tasks (CRITICAL)
 Agent tasks must be **detailed and specific**. A good task should:

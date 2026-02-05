@@ -378,6 +378,40 @@ export class MCPManager implements IMCPManager {
     return client.callTool(toolName, args);
   }
 
+  async disconnectServer(name: string): Promise<void> {
+    const client = this.servers.get(name);
+    if (!client) {
+      this.log(`Server '${name}' not found`);
+      return;
+    }
+
+    try {
+      await client.disconnect();
+    } catch (err) {
+      this.log(`Error disconnecting '${name}': ${err}`);
+    }
+
+    this.servers.delete(name);
+
+    // Remove tools for this server
+    for (const [toolName, serverName] of this.toolToServer) {
+      if (serverName === name) {
+        this.toolToServer.delete(toolName);
+      }
+    }
+
+    this.log(`Disconnected server '${name}'`);
+  }
+
+  isServerConnected(name: string): boolean {
+    const client = this.servers.get(name);
+    return client?.isConnected() ?? false;
+  }
+
+  getConnectedServers(): string[] {
+    return Array.from(this.servers.keys()).filter(name => this.servers.get(name)?.isConnected());
+  }
+
   async disconnectAll(): Promise<void> {
     for (const [name, client] of this.servers) {
       try {
