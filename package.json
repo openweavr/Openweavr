@@ -1,5 +1,5 @@
 {
-  "name": "weavr",
+  "name": "@openweavr/weavr",
   "version": "0.1.0",
   "description": "Self-hosted workflow automation with AI agents. Weave your workflows together.",
   "type": "module",
@@ -16,6 +16,12 @@
       "import": "./dist/plugins/sdk/index.js"
     }
   },
+  "files": [
+    "dist",
+    "weavr.mjs",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx watch src/cli/program.ts",
     "dev:web": "vite --config src/web/vite.config.ts",
@@ -28,7 +34,13 @@
     "test:run": "vitest run",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepublishOnly": "npm run build && npm run test:run",
+    "version": "git add -A",
+    "postversion": "git push && git push --tags"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
