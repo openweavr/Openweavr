@@ -1,6 +1,6 @@
 {
   "name": "@openweavr/weavr",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Self-hosted workflow automation with AI agents. Weave your workflows together.",
   "type": "module",
   "bin": {
