@@ -7,10 +7,13 @@
   <em>Weave your workflows together.</em>
 </p>
 
-[![CI](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml/badge.svg)](https://github.com/Openweavr/Openweavr/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Openweavr/Openweavr?include_prereleases&sort=semver)](https://github.com/Openweavr/Openweavr/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
+<p align="center">
+  <a href="https://github.com/openweavr/Openweavr/actions/workflows/ci.yml"><img src="https://github.com/openweavr/Openweavr/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/openweavr/Openweavr/releases"><img src="https://img.shields.io/github/v/release/openweavr/Openweavr?include_prereleases&sort=semver" alt="Release" /></a>
+  <a href="https://www.npmjs.com/package/@openweavr/weavr"><img src="https://img.shields.io/npm/v/@openweavr/weavr" alt="npm" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-22%2B-green.svg" alt="Node.js 22+" /></a>
+</p>
 
 <p align="center">
   <img src="./assets/dashboard-screenshot.png" alt="Openweavr Dashboard" width="800" />
@@ -34,7 +37,7 @@ Weavr connects AI agents with your developer tools—GitHub, Linear, Notion, Sla
 
 ```bash
 # Install
-npm install -g weavr
+npm install -g @openweavr/weavr
 
 # Setup
 weavr onboard
