@@ -20,6 +20,7 @@ import { type ContextPanelTab } from './ContextPanel';
 import { YAMLEditor } from './YAMLEditor';
 import { MemoryBlockEditor } from './MemoryBlockEditor';
 import { AIChatPanel, type ChatMessage } from './AIChatPanel';
+import { IntegrationIcon } from './IntegrationIcon';
 import YAML from 'yaml';
 
 interface WorkflowBuilderProps {
@@ -131,7 +132,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'http.get',
     label: 'HTTP GET',
     description: 'Fetch data from a URL',
-    icon: '🌐',
+    icon: 'http',
     category: 'HTTP',
     fields: [
       { name: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com/data', required: true },
@@ -147,7 +148,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'http.post',
     label: 'HTTP POST',
     description: 'Send data to a URL',
-    icon: '🌐',
+    icon: 'http',
     category: 'HTTP',
     fields: [
       { name: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com/data', required: true },
@@ -164,7 +165,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'http.request',
     label: 'HTTP Request',
     description: 'Make a custom HTTP request',
-    icon: '🌐',
+    icon: 'http',
     category: 'HTTP',
     fields: [
       { name: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com', required: true },
@@ -189,7 +190,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'slack.post',
     label: 'Post to Slack',
     description: 'Send a message to a Slack channel',
-    icon: '💬',
+    icon: 'slack',
     category: 'Slack',
     fields: [
       { name: 'channel', label: 'Channel', type: 'text', placeholder: '#general', required: true },
@@ -201,7 +202,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'discord.send',
     label: 'Send to Discord',
     description: 'Send a message via Discord webhook',
-    icon: '🎮',
+    icon: 'discord',
     category: 'Discord',
     fields: [
       { name: 'webhook_url', label: 'Webhook URL', type: 'text', placeholder: 'https://discord.com/api/webhooks/...', required: true },
@@ -213,7 +214,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'github.create_issue',
     label: 'Create GitHub Issue',
     description: 'Create a new issue in a repository',
-    icon: '🐙',
+    icon: 'github',
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
@@ -226,7 +227,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'github.create_comment',
     label: 'Add GitHub Comment',
     description: 'Add a comment to an issue or PR',
-    icon: '🐙',
+    icon: 'github',
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
@@ -239,7 +240,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'ai.complete',
     label: 'AI Generate',
     description: 'Generate text using AI',
-    icon: '🤖',
+    icon: 'ai',
     category: 'AI',
     fields: [
       { name: 'prompt', label: 'Prompt', type: 'textarea', placeholder: 'Write a summary of...', required: true },
@@ -256,7 +257,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'ai.summarize',
     label: 'AI Summarize',
     description: 'Summarize text using AI',
-    icon: '🤖',
+    icon: 'ai',
     category: 'AI',
     fields: [
       { name: 'text', label: 'Text to Summarize', type: 'textarea', placeholder: 'The text to summarize...', required: true },
@@ -275,7 +276,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'ai.agent',
     label: 'AI Agent',
     description: 'Run a free-flowing AI agent that can use tools to accomplish a task',
-    icon: '🧠',
+    icon: 'brain',
     category: 'AI',
     fields: [
       { name: 'task', label: 'Task', type: 'textarea', placeholder: 'Research the latest news about AI and write a summary...', required: true },
@@ -300,7 +301,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'email.send',
     label: 'Send Email',
     description: 'Send an email via SMTP',
-    icon: '📧',
+    icon: 'email',
     category: 'Email',
     fields: [
       { name: 'to', label: 'To', type: 'text', placeholder: 'recipient@example.com', required: true },
@@ -313,7 +314,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'json.parse',
     label: 'Parse JSON',
     description: 'Parse a JSON string',
-    icon: '📊',
+    icon: 'json',
     category: 'Data',
     fields: [
       { name: 'input', label: 'JSON String', type: 'textarea', placeholder: '{"key": "value"}', required: true },
@@ -326,7 +327,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'json.get',
     label: 'Get JSON Value',
     description: 'Extract a value from JSON using a path',
-    icon: '📊',
+    icon: 'json',
     category: 'Data',
     fields: [
       { name: 'input', label: 'JSON Object', type: 'textarea', placeholder: '{{ steps.prev.data }}', required: true },
@@ -341,7 +342,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'transform',
     label: 'Transform Data',
     description: 'Transform data using a template',
-    icon: '🔄',
+    icon: 'transform',
     category: 'Data',
     fields: [
       { name: 'template', label: 'Template', type: 'textarea', placeholder: '{{ steps.prev.data | json }}', required: true },
@@ -355,7 +356,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'filesystem.read',
     label: 'Read File',
     description: 'Read contents of a file',
-    icon: '📄',
+    icon: 'file',
     category: 'Local',
     fields: [
       { name: 'path', label: 'File Path', type: 'text', placeholder: '/path/to/file.txt', required: true },
@@ -377,7 +378,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'filesystem.write',
     label: 'Write File',
     description: 'Write content to a file',
-    icon: '📝',
+    icon: 'file-write',
     category: 'Local',
     fields: [
       { name: 'path', label: 'File Path', type: 'text', placeholder: '/path/to/file.txt', required: true },
@@ -397,7 +398,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'filesystem.list',
     label: 'List Directory',
     description: 'List files in a directory',
-    icon: '📁',
+    icon: 'folder',
     category: 'Local',
     fields: [
       { name: 'path', label: 'Directory Path', type: 'text', placeholder: '/path/to/dir', required: true },
@@ -413,7 +414,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'filesystem.delete',
     label: 'Delete File',
     description: 'Delete a file',
-    icon: '🗑️',
+    icon: 'trash',
     category: 'Local',
     fields: [
       { name: 'path', label: 'File Path', type: 'text', placeholder: '/path/to/file.txt', required: true },
@@ -428,7 +429,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'shell.exec',
     label: 'Run Command',
     description: 'Execute a shell command',
-    icon: '💻',
+    icon: 'terminal',
     category: 'Local',
     fields: [
       { name: 'command', label: 'Command', type: 'text', placeholder: 'ls -la', required: true },
@@ -445,7 +446,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'shell.script',
     label: 'Run Script',
     description: 'Run a multi-line script',
-    icon: '📜',
+    icon: 'script',
     category: 'Local',
     fields: [
       { name: 'script', label: 'Script', type: 'textarea', placeholder: '#!/bin/bash\necho "Hello"', required: true },
@@ -467,7 +468,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'notification.show',
     label: 'Show Notification',
     description: 'Display a system notification',
-    icon: '🔔',
+    icon: 'notification',
     category: 'Local',
     fields: [
       { name: 'title', label: 'Title', type: 'text', placeholder: 'Workflow Complete', required: true },
@@ -483,7 +484,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'clipboard.read',
     label: 'Read Clipboard',
     description: 'Read text from clipboard',
-    icon: '📋',
+    icon: 'clipboard',
     category: 'Local',
     fields: [],
     outputFields: [
@@ -494,7 +495,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'clipboard.write',
     label: 'Write Clipboard',
     description: 'Write text to clipboard',
-    icon: '📋',
+    icon: 'clipboard',
     category: 'Local',
     fields: [
       { name: 'text', label: 'Text', type: 'textarea', placeholder: 'Text to copy...', required: true },
@@ -508,7 +509,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'telegram.send',
     label: 'Send Telegram',
     description: 'Send a Telegram message',
-    icon: '✈️',
+    icon: 'telegram',
     category: 'Messaging',
     fields: [
       { name: 'chatId', label: 'Chat ID', type: 'text', placeholder: '123456789', required: true },
@@ -529,7 +530,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'whatsapp.send',
     label: 'Send WhatsApp',
     description: 'Send a WhatsApp message',
-    icon: '💬',
+    icon: 'whatsapp',
     category: 'Messaging',
     fields: [
       { name: 'to', label: 'Phone Number', type: 'text', placeholder: '1234567890', required: true },
@@ -545,7 +546,7 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     id: 'imessage.send',
     label: 'Send iMessage',
     description: 'Send an iMessage (macOS only)',
-    icon: '💬',
+    icon: 'imessage',
     category: 'Messaging',
     fields: [
       { name: 'to', label: 'Phone/Email', type: 'text', placeholder: '+1234567890', required: true },
@@ -563,7 +564,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'http.webhook',
     label: 'Webhook',
     description: 'Trigger when an HTTP request is received',
-    icon: '🔗',
+    icon: 'webhook',
     category: 'HTTP',
     fields: [
       { name: 'path', label: 'Path', type: 'text', placeholder: '/my-webhook', required: true },
@@ -577,7 +578,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'cron.schedule',
     label: 'Schedule',
     description: 'Trigger on a schedule',
-    icon: '⏰',
+    icon: 'cron',
     category: 'Time',
     fields: [
       { name: 'schedule', label: 'Schedule', type: 'schedule', required: true },
@@ -588,7 +589,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'github.push',
     label: 'GitHub Push',
     description: 'Trigger when code is pushed',
-    icon: '🐙',
+    icon: 'github',
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
@@ -599,7 +600,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'github.pull_request',
     label: 'GitHub PR',
     description: 'Trigger on pull request events',
-    icon: '🐙',
+    icon: 'github',
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
@@ -615,7 +616,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'github.issue.opened',
     label: 'GitHub Issue',
     description: 'Trigger when an issue is opened',
-    icon: '🐙',
+    icon: 'github',
     category: 'GitHub',
     fields: [
       { name: 'repo', label: 'Repository', type: 'text', placeholder: 'owner/repo', required: true },
@@ -626,7 +627,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'filesystem.watch',
     label: 'File Changed',
     description: 'Trigger when files change in a directory',
-    icon: '📁',
+    icon: 'folder',
     category: 'Local',
     fields: [
       { name: 'path', label: 'Watch Path', type: 'text', placeholder: '/path/to/watch', required: true },
@@ -638,7 +639,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'telegram.message',
     label: 'Telegram Message',
     description: 'Trigger on incoming Telegram messages',
-    icon: '✈️',
+    icon: 'telegram',
     category: 'Messaging',
     fields: [
       { name: 'path', label: 'Webhook Path', type: 'text', placeholder: '/telegram', required: true },
@@ -648,7 +649,7 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     id: 'whatsapp.message',
     label: 'WhatsApp Message',
     description: 'Trigger on incoming WhatsApp messages',
-    icon: '💬',
+    icon: 'whatsapp',
     category: 'Messaging',
     fields: [],
   },
@@ -682,7 +683,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepData>>) {
         {data.stepId}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '20px' }}>{data.icon}</span>
+        <IntegrationIcon name={data.icon} size={20} />
         <div>
           <div style={{ fontWeight: 600, fontSize: '13px', color: '#fff' }}>{data.label}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{data.action}</div>
@@ -719,7 +720,7 @@ function TriggerNode({ data, selected }: NodeProps<Node<StepData>>) {
         trigger
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '20px' }}>{data.icon}</span>
+        <IntegrationIcon name={data.icon} size={20} />
         <div>
           <div style={{ fontWeight: 600, fontSize: '13px', color: '#fff' }}>{data.label}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{data.action}</div>
@@ -1877,7 +1878,7 @@ function NodeSelector({
                       e.currentTarget.style.background = 'var(--bg-secondary)';
                     }}
                   >
-                    <span style={{ fontSize: '24px', lineHeight: 1 }}>{schema.icon}</span>
+                    <IntegrationIcon name={schema.icon} size={24} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '2px', color: '#fff' }}>
                         {schema.label}
@@ -2639,7 +2640,7 @@ export function WorkflowBuilder({ onSave, saving, initialYaml, initialName, onBa
                     zIndex: 1,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>{selectedNode.data.icon}</span>
+                      <IntegrationIcon name={selectedNode.data.icon} size={16} />
                       <span style={{ fontSize: '13px', fontWeight: 600 }}>{selectedNode.data.label}</span>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedNode.data.action}</span>
                     </div>

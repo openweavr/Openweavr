@@ -18,6 +18,17 @@ import {
   FaAws,
   FaMicrosoft,
   FaGoogle,
+  FaBrain,
+  FaFile,
+  FaFilePen,
+  FaFolder,
+  FaTrash,
+  FaTerminal,
+  FaFileCode,
+  FaBell,
+  FaClipboard,
+  FaLink,
+  FaArrowsRotate,
 } from 'react-icons/fa6';
 
 interface IntegrationIconProps {
@@ -57,6 +68,19 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; color?: strin
   email: FaEnvelope,
   json: FaCode,
   imessage: FaApple,
+
+  // Workflow actions
+  brain: FaBrain,
+  file: FaFile,
+  'file-write': FaFilePen,
+  folder: FaFolder,
+  trash: FaTrash,
+  terminal: FaTerminal,
+  script: FaFileCode,
+  notification: FaBell,
+  clipboard: FaClipboard,
+  webhook: FaLink,
+  transform: FaArrowsRotate,
 };
 
 // Brand colors for each service
