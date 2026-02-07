@@ -152,6 +152,24 @@ export interface WeavrConfig {
   scheduler?: {
     dbPath?: string;
   };
+  email?: {
+    smtp?: {
+      host: string;
+      port?: number;
+      secure?: boolean;
+      user?: string;
+      pass?: string;
+      authMethod?: 'login' | 'plain';
+    };
+  };
+  calendar?: {
+    caldav?: {
+      calendarUrl: string;
+      username?: string;
+      password?: string;
+      bearerToken?: string;
+    };
+  };
   mcp?: {
     servers?: Record<string, MCPServerConfig>;
   };

@@ -1,6 +1,6 @@
 import { definePlugin, defineAction } from '../../sdk/types.js';
 import { z } from 'zod';
-import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -119,6 +119,20 @@ function formatMemoryContext(memory: MemoryContext | undefined, selection: unkno
   }
 
   return sections.join('\n\n');
+}
+
+function normalizeToolList(tools: unknown): string[] {
+  if (tools === undefined || tools === null) return [];
+  if (Array.isArray(tools)) {
+    return tools.map((t) => String(t).trim()).filter(Boolean);
+  }
+  if (typeof tools === 'string') {
+    return tools
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 // Helper to sleep for a given duration
@@ -861,9 +875,16 @@ Return ONLY the category name, nothing else.`;
         const task = memoryContext
           ? `${rawTask}\n\n## Memory Context\n${memoryContext}`
           : rawTask;
-        const tools = (ctx.config.tools as string[] | undefined) ?? ['web_search', 'web_fetch', 'shell'];
+        const toolsConfig = ctx.config.tools;
+        const normalizedTools = normalizeToolList(toolsConfig);
+        const tools = toolsConfig === undefined || toolsConfig === null
+          ? ['web_search', 'web_fetch', 'http_request', 'filesystem', 'shell']
+          : normalizedTools;
         const maxIterations = (ctx.config.maxIterations as number) ?? 10;
         const systemPrompt = ctx.config.system as string | undefined;
+        const modelOverride = ctx.config.model as string | undefined;
+        const maxTokensOverride = ctx.config.maxTokens as number | undefined;
+        const temperatureOverride = ctx.config.temperature as number | undefined;
 
         const anthropicKey = getAnthropicKey(ctx);
         const openaiKey = getOpenAIKey(ctx);
@@ -889,13 +910,27 @@ Return ONLY the category name, nothing else.`;
         const failedTools: Map<string, { count: number; lastError: string }> = new Map();
 
         // Build available tools based on configuration
+        const toolSet = new Set(
+          tools
+            .map((tool) => tool.toLowerCase())
+            .flatMap((tool) => (tool === 'all' ? ['web_search', 'web_fetch', 'http_request', 'filesystem', 'shell'] : [tool]))
+        );
+
+        const wantsReadFile = toolSet.has('filesystem') || toolSet.has('read_file');
+        const wantsWriteFile = toolSet.has('filesystem') || toolSet.has('write_file');
+        const wantsListDirectory = toolSet.has('filesystem') || toolSet.has('list_directory');
+        const wantsHttp = toolSet.has('http') || toolSet.has('http_request');
+        const wantsShell = toolSet.has('shell') || toolSet.has('shell_exec');
+        const wantsWebSearch = toolSet.has('web_search');
+        const wantsWebFetch = toolSet.has('web_fetch');
+
         const availableTools: Array<{
           name: string;
           description: string;
           input_schema: Record<string, unknown>;
         }> = [];
 
-        if (tools.includes('web_search')) {
+        if (wantsWebSearch) {
           availableTools.push({
             name: 'web_search',
             description: 'Search the web for information',
@@ -909,7 +944,7 @@ Return ONLY the category name, nothing else.`;
           });
         }
 
-        if (tools.includes('web_fetch')) {
+        if (wantsWebFetch) {
           availableTools.push({
             name: 'web_fetch',
             description: 'Fetch content from a URL',
@@ -923,7 +958,7 @@ Return ONLY the category name, nothing else.`;
           });
         }
 
-        if (tools.includes('shell')) {
+        if (wantsShell) {
           availableTools.push({
             name: 'shell_exec',
             description: 'Execute a shell command (use with caution)',
@@ -937,7 +972,7 @@ Return ONLY the category name, nothing else.`;
           });
         }
 
-        if (tools.includes('filesystem')) {
+        if (wantsReadFile) {
           availableTools.push({
             name: 'read_file',
             description: 'Read contents of a file',
@@ -949,6 +984,9 @@ Return ONLY the category name, nothing else.`;
               required: ['path'],
             },
           });
+        }
+
+        if (wantsWriteFile) {
           availableTools.push({
             name: 'write_file',
             description: 'Write content to a file',
@@ -959,6 +997,40 @@ Return ONLY the category name, nothing else.`;
                 content: { type: 'string', description: 'Content to write' },
               },
               required: ['path', 'content'],
+            },
+          });
+        }
+
+        if (wantsListDirectory) {
+          availableTools.push({
+            name: 'list_directory',
+            description: 'List files in a directory',
+            input_schema: {
+              type: 'object',
+              properties: {
+                path: { type: 'string', description: 'Directory path to list' },
+                pattern: { type: 'string', description: 'Optional regex pattern to filter entries' },
+                recursive: { type: 'boolean', description: 'Recursively list subdirectories' },
+              },
+              required: ['path'],
+            },
+          });
+        }
+
+        if (wantsHttp) {
+          availableTools.push({
+            name: 'http_request',
+            description: 'Make an HTTP request',
+            input_schema: {
+              type: 'object',
+              properties: {
+                url: { type: 'string', description: 'Request URL' },
+                method: { type: 'string', description: 'HTTP method (GET, POST, PUT, PATCH, DELETE)' },
+                headers: { type: 'object', description: 'Request headers' },
+                body: { type: 'object', description: 'JSON body payload' },
+                timeout: { type: 'number', description: 'Timeout in ms' },
+              },
+              required: ['url'],
             },
           });
         }
@@ -993,7 +1065,8 @@ Return ONLY the category name, nothing else.`;
           }
 
           // Check for too-short results that indicate failure
-          if (result.length < 50 && !result.includes('successfully')) {
+          const shortResultSafeTools = new Set(['shell_exec', 'read_file', 'write_file', 'list_directory', 'http_request']);
+          if (result.length < 50 && !result.includes('successfully') && !shortResultSafeTools.has(_toolName)) {
             return {
               valid: false,
               feedback: `${result}\n\n[VALIDATION: Result too short. Try an alternative approach.]`,
@@ -1291,6 +1364,86 @@ Try web_fetch with specific URLs:
               }
             }
 
+            case 'list_directory': {
+              try {
+                const targetPath = String(input.path);
+                const recursive = Boolean(input.recursive);
+                const pattern = typeof input.pattern === 'string' && input.pattern.length > 0
+                  ? new RegExp(input.pattern)
+                  : null;
+
+                const entries: Array<{ path: string; name: string; type: 'file' | 'directory'; size?: number }> = [];
+                const stack = [targetPath];
+
+                while (stack.length > 0) {
+                  const current = stack.pop() as string;
+                  const dirEntries = readdirSync(current, { withFileTypes: true });
+                  for (const entry of dirEntries) {
+                    if (pattern && !pattern.test(entry.name)) continue;
+                    const fullPath = join(current, entry.name);
+                    if (entry.isDirectory()) {
+                      entries.push({ path: fullPath, name: entry.name, type: 'directory' });
+                      if (recursive) stack.push(fullPath);
+                    } else if (entry.isFile()) {
+                      const stats = statSync(fullPath);
+                      entries.push({ path: fullPath, name: entry.name, type: 'file', size: stats.size });
+                    }
+                  }
+                }
+
+                return JSON.stringify({ path: targetPath, count: entries.length, entries }, null, 2);
+              } catch (err) {
+                return `List failed: ${String(err)}`;
+              }
+            }
+
+            case 'http_request': {
+              try {
+                const url = String(input.url);
+                const method = String(input.method ?? 'GET').toUpperCase();
+                const timeout = typeof input.timeout === 'number' ? input.timeout : 30000;
+                let headers: Record<string, string> = {};
+                if (typeof input.headers === 'string') {
+                  try {
+                    headers = JSON.parse(input.headers) as Record<string, string>;
+                  } catch {
+                    headers = {};
+                  }
+                } else if (input.headers && typeof input.headers === 'object') {
+                  headers = input.headers as Record<string, string>;
+                }
+                const body = input.body;
+
+                const response = await fetchWithTimeout(url, {
+                  method,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...headers,
+                  },
+                  body: body === undefined ? undefined : JSON.stringify(body),
+                }, timeout, 2, ctx.log);
+
+                const contentType = response.headers.get('content-type') ?? '';
+                let data: string;
+                if (contentType.includes('application/json')) {
+                  const json = await response.json();
+                  data = JSON.stringify(json, null, 2);
+                } else {
+                  data = await response.text();
+                }
+
+                const truncated = data.length > 12000 ? `${data.slice(0, 12000)}\n...(truncated)` : data;
+                return JSON.stringify({
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: Object.fromEntries(response.headers.entries()),
+                  body: truncated,
+                }, null, 2);
+              } catch (err) {
+                return `HTTP request failed: ${String(err)}`;
+              }
+            }
+
             default: {
               // Try MCP tools as fallback
               if (mcpManager && mcpManager.getServers().size > 0) {
@@ -1348,8 +1501,9 @@ Once you have sufficient information (even if not perfect), synthesize your answ
 ## Tool Selection Guide
 - **web_search**: Use first for discovery. Batch multiple queries if related.
 - **web_fetch**: Use for specific known URLs. Combine with search results.
+- **http_request**: Use for API calls or structured HTTP responses.
 - **shell_exec**: Use for local commands. Check permissions first.
-- **read_file/write_file**: Use for local file operations.
+- **read_file/write_file/list_directory**: Use for local file operations.
 
 ## Efficiency Rules
 - Aim to complete in 2-3 iterations, not 5+
@@ -1386,6 +1540,7 @@ If a tool returns [FAILED] or [ERROR]:
           let responseData: Record<string, unknown>;
 
           if (anthropicKey) {
+            const model = modelOverride ?? globalConfig.model ?? 'claude-sonnet-4-20250514';
             response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: {
@@ -1394,8 +1549,9 @@ If a tool returns [FAILED] or [ERROR]:
                 'anthropic-version': '2023-06-01',
               },
               body: JSON.stringify({
-                model: globalConfig.model ?? 'claude-sonnet-4-20250514',
-                max_tokens: 4096,
+                model,
+                max_tokens: maxTokensOverride ?? 4096,
+                ...(temperatureOverride !== undefined ? { temperature: temperatureOverride } : {}),
                 system: finalSystemPrompt,
                 tools: availableTools,
                 messages,
@@ -1412,7 +1568,7 @@ If a tool returns [FAILED] or [ERROR]:
             // Track usage for Anthropic agent calls
             const usage = responseData.usage as { input_tokens?: number; output_tokens?: number } | undefined;
             if (usage) {
-              trackUsage(usage.input_tokens ?? 0, usage.output_tokens ?? 0);
+              trackUsage(usage.input_tokens ?? 0, usage.output_tokens ?? 0, model);
             }
 
             const content = responseData.content as Array<{ type: string; text?: string; name?: string; input?: unknown; id?: string }>;
@@ -1623,6 +1779,7 @@ If a tool returns [FAILED] or [ERROR]:
             }
 
             // Codex API with streaming
+            const codexModel = modelOverride ?? globalConfig.model ?? 'gpt-4o';
             const codexResponse = await fetch('https://chatgpt.com/backend-api/codex/responses', {
               method: 'POST',
               headers: {
@@ -1630,7 +1787,7 @@ If a tool returns [FAILED] or [ERROR]:
                 'Authorization': `Bearer ${oauthToken}`,
               },
               body: JSON.stringify({
-                model: globalConfig.model ?? 'gpt-4o',
+                model: codexModel,
                 instructions: finalSystemPrompt,
                 input: codexInput,
                 stream: true,
@@ -1741,6 +1898,7 @@ If a tool returns [FAILED] or [ERROR]:
               }
             }
 
+            const model = modelOverride ?? globalConfig.model ?? 'gpt-4o';
             response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -1748,8 +1906,9 @@ If a tool returns [FAILED] or [ERROR]:
                 'Authorization': `Bearer ${authToken}`,
               },
               body: JSON.stringify({
-                model: globalConfig.model ?? 'gpt-4o',
-                max_tokens: 4096,
+                model,
+                max_tokens: maxTokensOverride ?? 4096,
+                ...(temperatureOverride !== undefined ? { temperature: temperatureOverride } : {}),
                 messages: openaiMessages,
                 tools: availableTools.map(t => ({
                   type: 'function',
@@ -1772,7 +1931,7 @@ If a tool returns [FAILED] or [ERROR]:
             // Track usage for OpenAI agent calls
             const openaiUsage = responseData.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
             if (openaiUsage) {
-              trackUsage(openaiUsage.prompt_tokens ?? 0, openaiUsage.completion_tokens ?? 0);
+              trackUsage(openaiUsage.prompt_tokens ?? 0, openaiUsage.completion_tokens ?? 0, model);
             }
 
             const choice = (responseData.choices as Array<{
