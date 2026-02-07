@@ -26,12 +26,14 @@ Weavr connects AI agents with your developer tools—GitHub, Linear, Notion, Sla
 ## ✨ Features
 
 - **🏠 Self-hosted** — Your workflows, your data, your infrastructure
-- **🤖 AI Agents** — Autonomous agents with web search, tool use, and multi-step reasoning
-- **🔌 Plugin ecosystem** — Extensible integrations for any tool
+- **🤖 AI Agents** — Autonomous agents with web search, file access, shell commands, and multi-step reasoning
+- **🔌 Plugin ecosystem** — Built-in integrations for GitHub, Slack, Discord, Telegram, Linear, Notion, and more
+- **🧩 MCP Support** — Extend AI agents with any [Model Context Protocol](https://modelcontextprotocol.io/) server
 - **📡 Real-time** — WebSocket-powered event streaming
-- **🎯 DAG execution** — Parallel steps, retries, error handling
+- **🎯 DAG execution** — Parallel steps, conditional logic, retries, error handling
 - **🖥️ CLI + Web UI** — Terminal power users and visual builders welcome
-- **💬 Messaging** — Built-in WhatsApp, Telegram, and iMessage support
+- **💬 Messaging** — Built-in WhatsApp, Telegram, Discord, and iMessage support
+- **📧 Email & Calendar** — Send emails and manage calendar events
 
 ## 🚀 Quick Start
 
@@ -103,6 +105,51 @@ steps:
 
 See more examples in the [examples/](./examples) directory.
 
+## 🤖 AI Agent Tools
+
+AI agents (`ai.agent` action) can use these built-in tools:
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search the web (requires Brave or Tavily API key) |
+| `web_fetch` | Fetch and extract content from URLs |
+| `http_request` | Make HTTP/API requests |
+| `read_file` | Read file contents |
+| `write_file` | Create or modify files |
+| `list_directory` | List files in a directory |
+| `shell_exec` | Execute shell commands |
+
+Specify tools in your workflow:
+```yaml
+- id: research
+  action: ai.agent
+  with:
+    tools: "web_search,web_fetch"  # or "all" for all tools
+    task: "Research the latest news on AI"
+```
+
+You can also extend agents with [MCP servers](https://modelcontextprotocol.io/) for custom tool access.
+
+## 🔌 Built-in Integrations
+
+| Plugin | Actions | Triggers |
+|--------|---------|----------|
+| **ai** | agent, complete, summarize, classify, sentiment | — |
+| **github** | create_issue, comment, get_issue, add_label | push, pull_request, issue, release, etc. |
+| **slack** | post, reply | message, reaction |
+| **discord** | send, reply | message |
+| **telegram** | send, reply | message |
+| **whatsapp** | send | — |
+| **imessage** | send | — |
+| **linear** | create_issue, update_issue | — |
+| **notion** | create_page, update_page, query | — |
+| **email** | send | — |
+| **calendar** | create_event, list_events | — |
+| **http** | request, fetch | webhook |
+| **cron** | — | schedule |
+| **shell** | exec | — |
+| **filesystem** | read, write, list | — |
+
 ## 🛠️ CLI Commands
 
 ```bash
@@ -146,9 +193,15 @@ weavr ask "When PR is merged, deploy to staging"
 
 ### AI Provider
 Configure your AI provider during onboarding or in Settings:
-- **Anthropic** (Claude) - Recommended
-- **OpenAI** (GPT-4)
-- **Ollama** (Local models)
+- **Anthropic** — Claude models (default: `claude-sonnet-4-20250514`)
+- **OpenAI** — GPT models (default: `gpt-4o`). Supports OAuth sign-in or API key.
+- **Ollama** — Local models (default: `llama3.2`). Any Ollama-supported model works.
+
+You can specify any model your provider supports in `~/.weavr/config.yaml`:
+```yaml
+provider: anthropic  # or openai, ollama
+model: claude-sonnet-4-20250514  # any model ID supported by your provider
+```
 
 ### Web Search (for AI Agents)
 AI agents need a search API to browse the web. Get a free Brave Search API key:
@@ -156,6 +209,22 @@ AI agents need a search API to browse the web. Get a free Brave Search API key:
 1. Sign up at [brave.com/search/api](https://brave.com/search/api/)
 2. Choose "Data for Search" plan (2,000 free queries/month)
 3. Add your API key in Settings or set `BRAVE_API_KEY` environment variable
+
+Alternatively, you can use [Tavily Search API](https://tavily.com/) by setting `TAVILY_API_KEY`.
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models |
+| `OPENAI_API_KEY` | OpenAI API key for GPT models |
+| `BRAVE_API_KEY` | Brave Search API key (for AI agent web search) |
+| `TAVILY_API_KEY` | Tavily Search API key (alternative to Brave) |
+| `GITHUB_TOKEN` | GitHub personal access token (for GitHub triggers/actions) |
+| `SLACK_BOT_TOKEN` | Slack bot token (for Slack integration) |
+| `DISCORD_BOT_TOKEN` | Discord bot token (for Discord integration) |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token (for Telegram integration) |
+| `LINEAR_API_KEY` | Linear API key (for Linear integration) |
 
 ## 📁 Project Structure
 
@@ -196,6 +265,16 @@ export default definePlugin({
   ],
 });
 ```
+
+## 📚 Documentation
+
+Full documentation is available at [openweavr.github.io/Openweavr](https://openweavr.github.io/Openweavr/).
+
+- [Getting Started](https://openweavr.github.io/Openweavr/getting-started.html)
+- [Writing Workflows](https://openweavr.github.io/Openweavr/workflows.html)
+- [AI Agents](https://openweavr.github.io/Openweavr/agents.html)
+- [Integrations](https://openweavr.github.io/Openweavr/integrations.html)
+- [CLI Reference](https://openweavr.github.io/Openweavr/cli.html)
 
 ## 🤝 Contributing
 
