@@ -244,6 +244,24 @@ export interface WeavrConfig {
   };
   // GitHub webhook secret for signature verification
   githubWebhookSecret?: string;
+  email?: {
+    smtp?: {
+      host: string;
+      port?: number;
+      secure?: boolean;
+      user?: string;
+      pass?: string;
+      authMethod?: 'login' | 'plain';
+    };
+  };
+  calendar?: {
+    caldav?: {
+      calendarUrl: string;
+      username?: string;
+      password?: string;
+      bearerToken?: string;
+    };
+  };
 }
 
 export const DEFAULT_CONFIG: WeavrConfig = {

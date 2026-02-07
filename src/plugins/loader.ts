@@ -10,6 +10,7 @@ import discordPlugin from './builtin/discord/index.js';
 import linearPlugin from './builtin/linear/index.js';
 import notionPlugin from './builtin/notion/index.js';
 import emailPlugin from './builtin/email/index.js';
+import calendarPlugin from './builtin/calendar/index.js';
 import aiPlugin from './builtin/ai/index.js';
 import jsonPlugin from './builtin/json/index.js';
 
@@ -33,6 +34,7 @@ const builtinPlugins = [
   linearPlugin,
   notionPlugin,
   emailPlugin,
+  calendarPlugin,
   aiPlugin,
   jsonPlugin,
   // Local/system plugins

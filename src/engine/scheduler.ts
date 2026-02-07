@@ -7,6 +7,8 @@ import { parse as parseYaml } from 'yaml';
 import { randomUUID } from 'node:crypto';
 import type { Workflow, WorkflowRun, WeavrConfig } from '../types/index.js';
 import { parser } from './parser.js';
+
+const WEBHOOK_TRIGGER_TYPES = new Set(['http.webhook', 'email.inbound']);
 import { WorkflowExecutor } from './executor.js';
 import type { PluginRegistry } from '../plugins/sdk/registry.js';
 import { TriggerManager } from './trigger-manager.js';
@@ -280,9 +282,11 @@ export class TriggerScheduler {
 
     for (const scheduled of this.scheduledWorkflows.values()) {
       if (scheduled.status !== 'active') continue;
-      if (scheduled.triggerType !== 'http.webhook') continue;
+      if (!WEBHOOK_TRIGGER_TYPES.has(scheduled.triggerType)) continue;
 
-      const webhookPath = scheduled.triggerConfig.path as string;
+      const defaultPath = scheduled.triggerType === 'email.inbound' ? 'email' : undefined;
+      const webhookPath = (scheduled.triggerConfig.path as string | undefined) ?? defaultPath;
+      if (!webhookPath) continue;
       if (webhookPath === path || webhookPath === `/${path}` || `/${webhookPath}` === path) {
         try {
           const runId = randomUUID();
@@ -290,10 +294,18 @@ export class TriggerScheduler {
           runIds.push(runId);
 
           this.events.onWorkflowTriggered?.(scheduled.name, runId);
+          const triggerPayload = scheduled.triggerType === 'email.inbound'
+            ? {
+              type: 'email',
+              path,
+              provider: scheduled.triggerConfig.provider as string | undefined,
+              data,
+            }
+            : { type: 'webhook', path, data };
           this.enqueueRun(
             scheduled.name,
-            'http.webhook',
-            { type: 'webhook', path, data },
+            scheduled.triggerType,
+            triggerPayload,
             scheduled.workflowContent,
             runId
           );
@@ -459,7 +471,7 @@ export class TriggerScheduler {
           console.error(`[scheduler] Invalid cron schedule for ${name}:`, err);
         }
       }
-    } else if (triggerType !== 'http.webhook') {
+    } else if (!WEBHOOK_TRIGGER_TYPES.has(triggerType)) {
       const success = await this.triggerManager.setupTrigger(name, triggerType, triggerConfig, yamlContent, id);
       if (success) {
         console.log(`[scheduler] Custom trigger set up: ${name} (${triggerType})`);
