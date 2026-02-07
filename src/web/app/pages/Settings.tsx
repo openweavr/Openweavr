@@ -55,6 +55,27 @@ interface Config {
     host: string;
   };
   timezone?: string;
+  email?: {
+    smtp?: {
+      host?: string;
+      port?: number;
+      secure?: boolean;
+      user?: string;
+      pass?: string;
+      authMethod?: 'login' | 'plain';
+      hasPass?: boolean;
+    };
+  };
+  calendar?: {
+    caldav?: {
+      calendarUrl?: string;
+      username?: string;
+      password?: string;
+      bearerToken?: string;
+      hasPassword?: boolean;
+      hasBearerToken?: boolean;
+    };
+  };
   ai?: {
     provider?: string;
     model?: string;
@@ -122,6 +143,24 @@ export function Settings() {
   const [whatsappConnecting, setWhatsappConnecting] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
 
+  // Email SMTP state
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('');
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [smtpAuthMethod, setSmtpAuthMethod] = useState<'login' | 'plain'>('login');
+
+  // Calendar (CalDAV) state
+  const [caldavUrl, setCaldavUrl] = useState('');
+  const [caldavUsername, setCaldavUsername] = useState('');
+  const [caldavPassword, setCaldavPassword] = useState('');
+  const [showCaldavPassword, setShowCaldavPassword] = useState(false);
+  const [caldavBearer, setCaldavBearer] = useState('');
+  const [showCaldavBearer, setShowCaldavBearer] = useState(false);
+  const [caldavAuthMode, setCaldavAuthMode] = useState<'basic' | 'bearer'>('basic');
+
   // Timezone - detect system default
   const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -143,11 +182,31 @@ export function Settings() {
     ]},
   ];
 
+  const applyEmailCalendarConfig = (nextConfig: Config | null) => {
+    if (!nextConfig) return;
+
+    const smtp = nextConfig.email?.smtp;
+    setSmtpHost(smtp?.host ?? '');
+    setSmtpPort(smtp?.port ? String(smtp.port) : '');
+    setSmtpSecure(Boolean(smtp?.secure));
+    setSmtpUser(smtp?.user ?? '');
+    setSmtpAuthMethod(smtp?.authMethod ?? 'login');
+    setSmtpPass('');
+
+    const caldav = nextConfig.calendar?.caldav;
+    setCaldavUrl(caldav?.calendarUrl ?? '');
+    setCaldavUsername(caldav?.username ?? '');
+    setCaldavAuthMode(caldav?.bearerToken ? 'bearer' : 'basic');
+    setCaldavPassword('');
+    setCaldavBearer('');
+  };
+
   useEffect(() => {
     fetch('/api/config')
       .then((res) => res.json())
       .then((data) => {
         setConfig(data.config);
+        applyEmailCalendarConfig(data.config);
         setLoading(false);
       })
       .catch((err) => {
@@ -271,6 +330,31 @@ export function Settings() {
     setMessage(null);
 
     try {
+      const smtpPortValue = smtpPort ? parseInt(smtpPort, 10) : undefined;
+      const smtpConfig = (smtpHost || smtpUser || smtpPass || smtpPort || config?.email?.smtp) ? {
+        host: smtpHost,
+        port: smtpPortValue,
+        secure: smtpSecure,
+        user: smtpUser || undefined,
+        pass: smtpPass || undefined,
+        authMethod: smtpAuthMethod,
+      } : undefined;
+
+      const caldavConfig = (caldavUrl || caldavUsername || caldavPassword || caldavBearer || config?.calendar?.caldav) ? {
+        calendarUrl: caldavUrl,
+        ...(caldavAuthMode === 'basic'
+          ? {
+            username: caldavUsername || undefined,
+            password: caldavPassword || undefined,
+            bearerToken: undefined,
+          }
+          : {
+            username: undefined,
+            password: undefined,
+            bearerToken: caldavBearer || undefined,
+          }),
+      } : undefined;
+
       const saveConfig = {
         ...config,
         ai: config.ai?.provider ? {
@@ -281,6 +365,8 @@ export function Settings() {
           provider: 'brave',
           apiKey: braveApiKey,
         } : config.webSearch,
+        email: smtpConfig ? { smtp: smtpConfig } : config.email,
+        calendar: caldavConfig ? { caldav: caldavConfig } : config.calendar,
         messaging: {
           ...config.messaging,
           telegram: (telegramToken || telegramChatId) ? {
@@ -303,10 +389,14 @@ export function Settings() {
         setBraveApiKey(''); // Clear the Brave API key field after saving
         setTelegramToken(''); // Clear the telegram token field after saving
         setTelegramChatId(''); // Clear the telegram chat ID field after saving
+        setSmtpPass('');
+        setCaldavPassword('');
+        setCaldavBearer('');
         // Reload config to get updated hasApiKey status
         const reloadRes = await fetch('/api/config');
         const reloadData = await reloadRes.json();
         setConfig(reloadData.config);
+        applyEmailCalendarConfig(reloadData.config);
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error ?? 'Failed to save settings' });
@@ -494,6 +584,7 @@ export function Settings() {
   };
 
   const isMacOS = navigator.platform.toLowerCase().includes('mac');
+  const webhookBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
     <div>
@@ -1114,6 +1205,233 @@ export function Settings() {
           </div>
 
           <div className="card">
+            <h2 className="card-title" style={{ marginBottom: '20px' }}>Email Configuration</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Configure SMTP credentials for <code>email.send</code> actions. You can also use API keys in workflows.
+            </p>
+
+            <div style={{ display: 'grid', gap: '16px', maxWidth: '520px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <IntegrationIcon name="email" size={24} />
+                <div>
+                  <div style={{ fontWeight: 600 }}>SMTP</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Used when provider is <code>smtp</code> or <code>auto</code>
+                  </div>
+                </div>
+                {config?.email?.smtp?.host && (
+                  <span className="badge badge-success" style={{ marginLeft: 'auto' }}>configured</span>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="label">SMTP Host</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    placeholder="smtp.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="label">Port</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(e.target.value)}
+                    placeholder="587"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="label">Auth Method</label>
+                  <select
+                    className="input"
+                    value={smtpAuthMethod}
+                    onChange={(e) => setSmtpAuthMethod(e.target.value as 'login' | 'plain')}
+                  >
+                    <option value="login">LOGIN</option>
+                    <option value="plain">PLAIN</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '24px' }}>
+                  <input
+                    type="checkbox"
+                    checked={smtpSecure}
+                    onChange={(e) => setSmtpSecure(e.target.checked)}
+                    style={{ width: '14px', height: '14px' }}
+                  />
+                  <span style={{ fontSize: '12px' }}>Use TLS (secure)</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Username</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  placeholder="your-email@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="label">
+                  Password
+                  {config?.email?.smtp?.hasPass && (
+                    <span style={{ color: 'var(--accent-green)', marginLeft: '8px', fontSize: '12px' }}>
+                      (configured)
+                    </span>
+                  )}
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type={showSmtpPass ? 'text' : 'password'}
+                    className="input"
+                    value={smtpPass}
+                    onChange={(e) => setSmtpPass(e.target.value)}
+                    placeholder={config?.email?.smtp?.hasPass ? 'Password is set (enter new to change)' : 'SMTP password'}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    style={{ padding: '8px 12px' }}
+                  >
+                    {showSmtpPass ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Inbound email webhook: <code>{webhookBaseUrl}/webhook/email</code>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="card-title" style={{ marginBottom: '20px' }}>Calendar Configuration</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Configure CalDAV access for <code>calendar.*</code> actions and triggers.
+            </p>
+
+            <div style={{ display: 'grid', gap: '16px', maxWidth: '520px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <IntegrationIcon name="calendar" size={24} />
+                <div>
+                  <div style={{ fontWeight: 600 }}>CalDAV</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Nextcloud, iCloud, Fastmail, and more
+                  </div>
+                </div>
+                {config?.calendar?.caldav?.calendarUrl && (
+                  <span className="badge badge-success" style={{ marginLeft: 'auto' }}>configured</span>
+                )}
+              </div>
+
+              <div>
+                <label className="label">Calendar URL</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={caldavUrl}
+                  onChange={(e) => setCaldavUrl(e.target.value)}
+                  placeholder="https://cal.example.com/dav/calendars/user/default/"
+                />
+              </div>
+
+              <div>
+                <label className="label">Auth Type</label>
+                <select
+                  className="input"
+                  value={caldavAuthMode}
+                  onChange={(e) => setCaldavAuthMode(e.target.value as 'basic' | 'bearer')}
+                >
+                  <option value="basic">Username + Password</option>
+                  <option value="bearer">Bearer Token</option>
+                </select>
+              </div>
+
+              {caldavAuthMode === 'basic' ? (
+                <>
+                  <div>
+                    <label className="label">Username</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={caldavUsername}
+                      onChange={(e) => setCaldavUsername(e.target.value)}
+                      placeholder="user@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      Password
+                      {config?.calendar?.caldav?.hasPassword && (
+                        <span style={{ color: 'var(--accent-green)', marginLeft: '8px', fontSize: '12px' }}>
+                          (configured)
+                        </span>
+                      )}
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type={showCaldavPassword ? 'text' : 'password'}
+                        className="input"
+                        value={caldavPassword}
+                        onChange={(e) => setCaldavPassword(e.target.value)}
+                        placeholder={config?.calendar?.caldav?.hasPassword ? 'Password is set (enter new to change)' : 'CalDAV password'}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => setShowCaldavPassword(!showCaldavPassword)}
+                        style={{ padding: '8px 12px' }}
+                      >
+                        {showCaldavPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="label">
+                    Bearer Token
+                    {config?.calendar?.caldav?.hasBearerToken && (
+                      <span style={{ color: 'var(--accent-green)', marginLeft: '8px', fontSize: '12px' }}>
+                        (configured)
+                      </span>
+                    )}
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type={showCaldavBearer ? 'text' : 'password'}
+                      className="input"
+                      value={caldavBearer}
+                      onChange={(e) => setCaldavBearer(e.target.value)}
+                      placeholder={config?.calendar?.caldav?.hasBearerToken ? 'Token is set (enter new to change)' : 'Bearer token'}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setShowCaldavBearer(!showCaldavBearer)}
+                      style={{ padding: '8px 12px' }}
+                    >
+                      {showCaldavBearer ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
             <h2 className="card-title" style={{ marginBottom: '20px' }}>Built-in Plugins</h2>
 
             <div style={{ display: 'grid', gap: '12px' }}>
@@ -1125,7 +1443,8 @@ export function Settings() {
                 { name: 'discord', version: '1.0.0', description: 'Discord webhooks' },
                 { name: 'linear', version: '1.0.0', description: 'Linear project management' },
                 { name: 'notion', version: '1.0.0', description: 'Notion pages & databases' },
-                { name: 'email', version: '1.0.0', description: 'Email via SMTP' },
+                { name: 'email', version: '1.1.0', description: 'Email via SMTP or API' },
+                { name: 'calendar', version: '1.0.0', description: 'CalDAV calendar integration' },
                 { name: 'ai', version: '1.0.0', description: 'AI/LLM actions' },
                 { name: 'json', version: '1.0.0', description: 'JSON manipulation' },
               ].map((plugin) => (

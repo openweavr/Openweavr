@@ -284,9 +284,10 @@ const ACTION_SCHEMAS: ActionSchema[] = [
       { name: 'tools', label: 'Available Tools', type: 'multiselect', options: [
         { value: 'web_search', label: 'Web Search' },
         { value: 'web_fetch', label: 'Web Fetch' },
+        { value: 'http_request', label: 'HTTP Request' },
         { value: 'shell', label: 'Shell Commands' },
         { value: 'filesystem', label: 'File System' },
-      ], default: ['web_search', 'web_fetch'] },
+      ], default: ['web_search', 'web_fetch', 'http_request', 'filesystem'] },
       { name: 'memory', label: 'Memory Blocks', type: 'multiselect', options: [] },
       { name: 'maxIterations', label: 'Max Iterations', type: 'number', placeholder: '10', default: 10 },
     ],
@@ -300,13 +301,87 @@ const ACTION_SCHEMAS: ActionSchema[] = [
   {
     id: 'email.send',
     label: 'Send Email',
-    description: 'Send an email via SMTP',
+    description: 'Send an email via SMTP or API',
     icon: 'email',
     category: 'Email',
     fields: [
       { name: 'to', label: 'To', type: 'text', placeholder: 'recipient@example.com', required: true },
+      { name: 'cc', label: 'CC', type: 'text', placeholder: 'cc@example.com' },
+      { name: 'bcc', label: 'BCC', type: 'text', placeholder: 'bcc@example.com' },
+      { name: 'from', label: 'From', type: 'text', placeholder: 'noreply@example.com' },
+      { name: 'replyTo', label: 'Reply-To', type: 'text', placeholder: 'reply@example.com' },
       { name: 'subject', label: 'Subject', type: 'text', placeholder: 'Email subject', required: true },
-      { name: 'body', label: 'Body', type: 'textarea', placeholder: 'Email content...', required: true },
+      { name: 'text', label: 'Text Body', type: 'textarea', placeholder: 'Plain text content...' },
+      { name: 'html', label: 'HTML Body', type: 'textarea', placeholder: '<p>Hello...</p>' },
+      { name: 'provider', label: 'Provider', type: 'select', options: [
+        { value: 'auto', label: 'Auto' },
+        { value: 'smtp', label: 'SMTP' },
+        { value: 'api', label: 'API' },
+      ], default: 'auto' },
+    ],
+  },
+  // Calendar (CalDAV)
+  {
+    id: 'calendar.list_events',
+    label: 'List Events',
+    description: 'List events from a CalDAV calendar',
+    icon: 'calendar',
+    category: 'Calendar',
+    fields: [
+      { name: 'calendarUrl', label: 'Calendar URL', type: 'text', placeholder: 'https://cal.example.com/dav/calendars/user/default/', required: true },
+      { name: 'username', label: 'Username', type: 'text', placeholder: 'user@example.com' },
+      { name: 'password', label: 'Password', type: 'text', placeholder: 'App password' },
+      { name: 'bearerToken', label: 'Bearer Token', type: 'text', placeholder: 'Bearer token (optional)' },
+      { name: 'from', label: 'From', type: 'text', placeholder: '2026-02-07T00:00:00Z' },
+      { name: 'to', label: 'To', type: 'text', placeholder: '2026-02-14T00:00:00Z' },
+      { name: 'limit', label: 'Limit', type: 'number', placeholder: '10', default: 10 },
+    ],
+    outputFields: [
+      { name: 'count', type: 'number', description: 'Number of events returned' },
+      { name: 'events', type: 'array', description: 'List of events' },
+    ],
+  },
+  {
+    id: 'calendar.create_event',
+    label: 'Create Event',
+    description: 'Create or update a CalDAV event',
+    icon: 'calendar',
+    category: 'Calendar',
+    fields: [
+      { name: 'calendarUrl', label: 'Calendar URL', type: 'text', placeholder: 'https://cal.example.com/dav/calendars/user/default/', required: true },
+      { name: 'username', label: 'Username', type: 'text', placeholder: 'user@example.com' },
+      { name: 'password', label: 'Password', type: 'text', placeholder: 'App password' },
+      { name: 'bearerToken', label: 'Bearer Token', type: 'text', placeholder: 'Bearer token (optional)' },
+      { name: 'summary', label: 'Summary', type: 'text', placeholder: 'Weekly sync', required: true },
+      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Agenda...' },
+      { name: 'location', label: 'Location', type: 'text', placeholder: 'Conference room' },
+      { name: 'start', label: 'Start', type: 'text', placeholder: '2026-02-10T15:00:00Z', required: true },
+      { name: 'end', label: 'End', type: 'text', placeholder: '2026-02-10T15:30:00Z' },
+      { name: 'allDay', label: 'All Day', type: 'boolean' },
+      { name: 'timezone', label: 'Timezone', type: 'text', placeholder: 'America/New_York' },
+    ],
+    outputFields: [
+      { name: 'uid', type: 'string', description: 'Event UID' },
+      { name: 'url', type: 'string', description: 'Event URL' },
+      { name: 'status', type: 'number', description: 'HTTP status' },
+    ],
+  },
+  {
+    id: 'calendar.delete_event',
+    label: 'Delete Event',
+    description: 'Delete a CalDAV event',
+    icon: 'calendar',
+    category: 'Calendar',
+    fields: [
+      { name: 'calendarUrl', label: 'Calendar URL', type: 'text', placeholder: 'https://cal.example.com/dav/calendars/user/default/', required: true },
+      { name: 'username', label: 'Username', type: 'text', placeholder: 'user@example.com' },
+      { name: 'password', label: 'Password', type: 'text', placeholder: 'App password' },
+      { name: 'bearerToken', label: 'Bearer Token', type: 'text', placeholder: 'Bearer token (optional)' },
+      { name: 'uid', label: 'Event UID', type: 'text', placeholder: 'event-uid', required: true },
+    ],
+    outputFields: [
+      { name: 'uid', type: 'string', description: 'Event UID' },
+      { name: 'status', type: 'number', description: 'HTTP status' },
     ],
   },
   // JSON
@@ -577,6 +652,17 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     ],
   },
   {
+    id: 'email.inbound',
+    label: 'Inbound Email',
+    description: 'Trigger on inbound email webhooks',
+    icon: 'email',
+    category: 'Email',
+    fields: [
+      { name: 'path', label: 'Webhook Path', type: 'text', placeholder: 'email', required: true, default: 'email' },
+      { name: 'provider', label: 'Provider', type: 'text', placeholder: 'resend (optional)' },
+    ],
+  },
+  {
     id: 'cron.schedule',
     label: 'Schedule',
     description: 'Trigger on a schedule',
@@ -585,6 +671,22 @@ const TRIGGER_SCHEMAS: ActionSchema[] = [
     fields: [
       { name: 'schedule', label: 'Schedule', type: 'schedule', required: true },
       { name: 'timezone', label: 'Timezone', type: 'select', options: TIMEZONE_OPTIONS, default: '' },
+    ],
+  },
+  {
+    id: 'calendar.event_upcoming',
+    label: 'Calendar Event',
+    description: 'Trigger when a CalDAV event is upcoming',
+    icon: 'calendar',
+    category: 'Calendar',
+    fields: [
+      { name: 'calendarUrl', label: 'Calendar URL', type: 'text', placeholder: 'https://cal.example.com/dav/calendars/user/default/', required: true },
+      { name: 'username', label: 'Username', type: 'text', placeholder: 'user@example.com' },
+      { name: 'password', label: 'Password', type: 'text', placeholder: 'App password' },
+      { name: 'bearerToken', label: 'Bearer Token', type: 'text', placeholder: 'Bearer token (optional)' },
+      { name: 'windowMinutes', label: 'Window Minutes', type: 'number', placeholder: '60', default: 60 },
+      { name: 'pollIntervalSeconds', label: 'Poll Interval (seconds)', type: 'number', placeholder: '60', default: 60 },
+      { name: 'lookbackMinutes', label: 'Lookback Minutes', type: 'number', placeholder: '5', default: 5 },
     ],
   },
   {
@@ -840,6 +942,29 @@ function getTriggerVariables(triggerType?: string): Array<{ path: string; descri
     return [
       ...common,
       { path: 'trigger.expression', description: 'Cron expression' },
+    ];
+  }
+
+  if (triggerType?.startsWith('email.inbound')) {
+    return [
+      ...common,
+      { path: 'trigger.path', description: 'Webhook path' },
+      { path: 'trigger.provider', description: 'Provider identifier' },
+      { path: 'trigger.data.body', description: 'Inbound payload body' },
+      { path: 'trigger.data.headers', description: 'Inbound payload headers' },
+    ];
+  }
+
+  if (triggerType?.startsWith('calendar.event_upcoming')) {
+    return [
+      ...common,
+      { path: 'trigger.calendarUrl', description: 'Calendar URL' },
+      { path: 'trigger.event.summary', description: 'Event summary' },
+      { path: 'trigger.event.start', description: 'Event start time' },
+      { path: 'trigger.event.end', description: 'Event end time' },
+      { path: 'trigger.event.location', description: 'Event location' },
+      { path: 'trigger.windowMinutes', description: 'Window minutes' },
+      { path: 'trigger.fetchedAt', description: 'Fetch timestamp' },
     ];
   }
 

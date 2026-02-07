@@ -12,6 +12,7 @@ import {
   FaRobot,
   FaEnvelope,
   FaClock,
+  FaCalendarDays,
   FaGlobe,
   FaCode,
   FaApple,
@@ -66,6 +67,7 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; color?: strin
   http: FaGlobe,
   cron: FaClock,
   email: FaEnvelope,
+  calendar: FaCalendarDays,
   json: FaCode,
   imessage: FaApple,
 
@@ -105,6 +107,7 @@ const brandColors: Record<string, string> = {
   http: '#60a5fa',
   cron: '#fbbf24',
   email: '#f472b6',
+  calendar: '#38bdf8',
   json: '#34d399',
   imessage: '#60a5fa',
   file: '#94a3b8',

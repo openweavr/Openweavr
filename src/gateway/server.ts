@@ -771,6 +771,22 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
           apiKey: config.webSearch.apiKey ? '••••••••' : undefined,
           hasApiKey: Boolean(config.webSearch.apiKey),
         } : undefined,
+        email: config.email ? {
+          smtp: config.email.smtp ? {
+            ...config.email.smtp,
+            pass: config.email.smtp.pass ? '••••••••' : undefined,
+            hasPass: Boolean(config.email.smtp.pass),
+          } : undefined,
+        } : undefined,
+        calendar: config.calendar ? {
+          caldav: config.calendar.caldav ? {
+            ...config.calendar.caldav,
+            password: config.calendar.caldav.password ? '••••••••' : undefined,
+            bearerToken: config.calendar.caldav.bearerToken ? '••••••••' : undefined,
+            hasPassword: Boolean(config.calendar.caldav.password),
+            hasBearerToken: Boolean(config.calendar.caldav.bearerToken),
+          } : undefined,
+        } : undefined,
         // Messaging: hide tokens but indicate if configured
         messaging: config.messaging ? {
           telegram: config.messaging.telegram ? {
@@ -889,6 +905,50 @@ export function createGatewayServer(config: WeavrConfig): GatewayServer {
             mergedConfig.messaging.slack.botToken = newConfig.messaging.slack.botToken;
           } else if (existingConfig.messaging?.slack?.botToken) {
             mergedConfig.messaging.slack.botToken = existingConfig.messaging.slack.botToken;
+          }
+        }
+      }
+
+      // Handle email config - preserve SMTP password if masked value is sent
+      if (newConfig.email) {
+        mergedConfig.email = {
+          ...existingConfig.email,
+          ...newConfig.email,
+        };
+        if (newConfig.email.smtp) {
+          mergedConfig.email.smtp = {
+            ...existingConfig.email?.smtp,
+            ...newConfig.email.smtp,
+          };
+          if (newConfig.email.smtp.pass && newConfig.email.smtp.pass !== '••••••••') {
+            mergedConfig.email.smtp.pass = newConfig.email.smtp.pass;
+          } else if (existingConfig.email?.smtp?.pass) {
+            mergedConfig.email.smtp.pass = existingConfig.email.smtp.pass;
+          }
+        }
+      }
+
+      // Handle calendar config - preserve secrets if masked values are sent
+      if (newConfig.calendar) {
+        mergedConfig.calendar = {
+          ...existingConfig.calendar,
+          ...newConfig.calendar,
+        };
+        if (newConfig.calendar.caldav) {
+          mergedConfig.calendar.caldav = {
+            ...existingConfig.calendar?.caldav,
+            ...newConfig.calendar.caldav,
+          };
+          if (newConfig.calendar.caldav.password && newConfig.calendar.caldav.password !== '••••••••') {
+            mergedConfig.calendar.caldav.password = newConfig.calendar.caldav.password;
+          } else if (existingConfig.calendar?.caldav?.password) {
+            mergedConfig.calendar.caldav.password = existingConfig.calendar.caldav.password;
+          }
+
+          if (newConfig.calendar.caldav.bearerToken && newConfig.calendar.caldav.bearerToken !== '••••••••') {
+            mergedConfig.calendar.caldav.bearerToken = newConfig.calendar.caldav.bearerToken;
+          } else if (existingConfig.calendar?.caldav?.bearerToken) {
+            mergedConfig.calendar.caldav.bearerToken = existingConfig.calendar.caldav.bearerToken;
           }
         }
       }
