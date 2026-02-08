@@ -879,15 +879,15 @@ export function Settings() {
                 </div>
               )}
 
-              {/* OpenAI OAuth Section - Only for OAuth-compatible models */}
-              {config?.ai?.provider === 'openai' && canUseOAuth && (
+              {/* OpenAI OAuth Section - Show for all OpenAI users */}
+              {config?.ai?.provider === 'openai' && (
                 <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginTop: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                     <span style={{ fontSize: '24px' }}>🔐</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600 }}>Sign in with ChatGPT</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        Use your ChatGPT Plus/Pro subscription
+                        Use your ChatGPT Plus/Pro subscription for GPT-5 models
                       </div>
                     </div>
                     {(oauthConnected || isOpenAIWithOAuth) ? (
@@ -899,9 +899,14 @@ export function Settings() {
 
                   {(oauthConnected || isOpenAIWithOAuth) ? (
                     <div>
-                      <p style={{ fontSize: '13px', color: 'var(--accent-green)', marginBottom: '12px' }}>
-                        ✓ Connected via ChatGPT OAuth. No API credits needed!
+                      <p style={{ fontSize: '13px', color: 'var(--accent-green)', marginBottom: '8px' }}>
+                        ✓ Connected via ChatGPT OAuth. GPT-5 models are now available!
                       </p>
+                      {!canUseOAuth && (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                          Select a GPT-5 model above to use your ChatGPT subscription.
+                        </p>
+                      )}
                       <button
                         className="btn btn-ghost"
                         onClick={handleOAuthDisconnect}
@@ -913,7 +918,7 @@ export function Settings() {
                   ) : (
                     <div>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                        Sign in with your ChatGPT Plus or Pro account. No API key or credits required!
+                        Sign in with your ChatGPT Plus or Pro account to unlock GPT-5 models. No API credits required!
                       </p>
                       <button
                         className="btn btn-secondary"
@@ -925,30 +930,6 @@ export function Settings() {
                       </button>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Warning if OAuth connected but model not supported */}
-              {config?.ai?.provider === 'openai' && !canUseOAuth && (oauthConnected || isOpenAIWithOAuth) && (
-                <div style={{ padding: '12px 16px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: 'var(--radius-md)', marginTop: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span style={{ fontSize: '16px' }}>⚠️</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'rgb(251, 191, 36)', marginBottom: '4px' }}>
-                        Model not compatible with OAuth
-                      </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                        The selected model requires an API key. OAuth works with: GPT-4o, GPT-5, GPT-5 Codex, Codex Mini.
-                      </p>
-                      <button
-                        className="btn btn-ghost"
-                        onClick={handleOAuthDisconnect}
-                        style={{ color: 'var(--accent-red)', marginTop: '8px', padding: '4px 8px', fontSize: '12px' }}
-                      >
-                        Disconnect OAuth
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
