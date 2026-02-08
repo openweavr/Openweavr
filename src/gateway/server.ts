@@ -1955,6 +1955,12 @@ Output ONLY the YAML code block, no additional text.`;
 
       // Call AI provider
       if (aiConfig.provider === 'openai') {
+        // GPT-5 models require OAuth - check before making API call
+        const requestedModel = aiConfig.model ?? 'gpt-4o-mini';
+        if (requestedModel.includes('gpt-5')) {
+          return c.json({ error: 'GPT-5 models require OAuth authentication with ChatGPT Plus/Pro. Please connect your ChatGPT account in Settings, or select a different model like GPT-4o.' }, 400);
+        }
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -1962,7 +1968,7 @@ Output ONLY the YAML code block, no additional text.`;
             'Authorization': `Bearer ${openaiAuthToken}`,
           },
           body: JSON.stringify({
-            model: aiConfig.model ?? 'gpt-4o-mini',
+            model: requestedModel,
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: prompt },
@@ -2729,6 +2735,15 @@ When the user approves the plan and you generate the final YAML, include the com
 
             } else if (aiConfig.provider === 'openai') {
               // OpenAI with function calling
+              // GPT-5 models require OAuth (ChatGPT Backend API) - fallback to gpt-4o for API key users
+              const requestedModel = aiConfig.model ?? 'gpt-4o-mini';
+              const isGpt5Model = requestedModel.includes('gpt-5');
+              if (isGpt5Model) {
+                send({ type: 'error', error: 'GPT-5 models require OAuth authentication with ChatGPT Plus/Pro. Please connect your ChatGPT account in Settings, or select a different model like GPT-4o.' });
+                controller.close();
+                return;
+              }
+
               response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -2736,7 +2751,7 @@ When the user approves the plan and you generate the final YAML, include the com
                   'Authorization': `Bearer ${openaiAuthToken}`,
                 },
                 body: JSON.stringify({
-                  model: aiConfig.model ?? 'gpt-4o-mini',
+                  model: requestedModel,
                   max_tokens: 4096,
                   messages: [
                     { role: 'system', content: systemPrompt },
@@ -3185,6 +3200,12 @@ steps:
           trackUsage(data.usage.input_tokens ?? 0, data.usage.output_tokens ?? 0);
         }
       } else if (aiConfig.provider === 'openai') {
+        // GPT-5 models require OAuth - check before making API call
+        const requestedModel = aiConfig.model ?? 'gpt-4o-mini';
+        if (requestedModel.includes('gpt-5')) {
+          return c.json({ error: 'GPT-5 models require OAuth authentication with ChatGPT Plus/Pro. Please connect your ChatGPT account in Settings, or select a different model like GPT-4o.' }, 400);
+        }
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -3192,7 +3213,7 @@ steps:
             'Authorization': `Bearer ${openaiAuthToken}`,
           },
           body: JSON.stringify({
-            model: aiConfig.model ?? 'gpt-4o-mini',
+            model: requestedModel,
             max_tokens: 2000,
             messages: [
               { role: 'system', content: systemPrompt },

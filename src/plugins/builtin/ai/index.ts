@@ -553,6 +553,11 @@ export default definePlugin({
           ctx.log(oauthToken ? 'Using OpenAI with OAuth for completion' : 'Using OpenAI for completion');
           const model = config.model ?? getConfiguredModel() ?? 'gpt-4o';
 
+          // GPT-5 models require OAuth - reject if using API key only
+          if (model.includes('gpt-5') && !oauthToken) {
+            throw new Error('GPT-5 models require OAuth authentication with ChatGPT Plus/Pro. Please connect your ChatGPT account in Settings, or select a different model like GPT-4o.');
+          }
+
           const messages = [];
           if (config.system) {
             messages.push({ role: 'system', content: config.system });
@@ -1845,6 +1850,12 @@ If a tool returns [FAILED] or [ERROR]:
             // OpenAI with function calling - use separate message tracking for proper format
             // OpenAI requires: assistant message with tool_calls, then tool messages with tool_call_id
             const authToken = openaiKey!; // Only use API key here, OAuth is handled above
+
+            // GPT-5 models require OAuth - reject if using API key only
+            const agentModel = modelOverride ?? globalConfig.model ?? 'gpt-4o';
+            if (agentModel.includes('gpt-5')) {
+              throw new Error('GPT-5 models require OAuth authentication with ChatGPT Plus/Pro. Please connect your ChatGPT account in Settings, or select a different model like GPT-4o.');
+            }
             type OpenAIMessage =
               | { role: 'system'; content: string }
               | { role: 'user'; content: string }
